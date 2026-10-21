@@ -80,6 +80,14 @@ The server reads settings (port, database password, secret key) from a file call
 Everyone has their own, because everyone's MySQL password is different. We share a template called
 `.env.example`, and each person copies it.
 
+```bash
+# Mac / Linux / Git Bash
+cp .env.example .env
+
+# Windows PowerShell
+Copy-Item .env.example .env
+```
+
 Then open `server/.env` and fill in your own values:
 
 | Setting | What it is | What to put |
@@ -93,7 +101,22 @@ Then open `server/.env` and fill in your own values:
 > ⚠️ **Never commit `.env`.** It contains passwords. Git already ignores it. Don't force-add it.
 > If you add a **new** setting, add it to `.env.example` too (with a fake value) so teammates know about it.
 
-### 2.6 Check everything works
+
+### 2.4 Set up the database
+
+You need MySQL 8 installed and running. Your MySQL username and password must be in `server/.env`.
+
+```bash
+npm run db:setup
+```
+
+You should see `Database "bbms" is ready.`
+
+This creates the `bbms` database, all tables (`server/db/schema.sql`) and fake test data
+(`server/db/seed.sql`). **Run it again any time you want a fresh database. It deletes all data.**
+Run it again after pulling changes to `schema.sql` or `seed.sql`.
+
+### 2.5 Check everything works
 
 **Run the tests:**
 
@@ -104,8 +127,8 @@ npm test
 You should see:
 
 ```
-Test Suites: 2 passed, 2 total
-Tests:       3 passed, 3 total
+Test Suites: 3 passed, 3 total
+Tests:       6 passed, 6 total
 ```
 
 **Start the server:**
@@ -283,10 +306,11 @@ module.exports = { registerDonor };
 
 ### Where the database code lives
 
-The MySQL connection and tables (`server/db/schema.sql`, `server/db/seed.sql`) arrive with the
-**"DB schema v1"** issue. Until then, build your service logic and tests without the database. The
-schema is the contract between modules, so **don't invent your own tables**. Use the ones in
-`schema.sql`, and ask in the group chat if something is missing.
+- `server/db/schema.sql`: all tables. This is the contract between modules. **Don't invent your own
+  tables.** If you need a new column, change `schema.sql` in your PR and mention it in the PR description.
+- `server/db/seed.sql`: fake data for testing (users for every role, donors, units in every status).
+- `server/src/db.js`: the shared connection. In a repository: `const db = require('../../db');`
+
 
 ---
 
