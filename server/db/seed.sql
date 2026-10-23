@@ -14,12 +14,12 @@ INSERT INTO users (id, email, password_hash, full_name, role, organisation) VALU
 
 -- Donors in different states
 INSERT INTO donors (id, donor_code, user_id, full_name, date_of_birth, gender, blood_group, phone,
-                    eligibility_status, deferral_reason, consent_given, consent_at) VALUES
-  (1, 'D-000001', 6,    'Ravi Kumar',   '1995-04-12', 'MALE',   'O-', '9000000001', 'ELIGIBLE', NULL,                  TRUE,  NOW()),
-  (2, 'D-000002', NULL, 'Priya Sharma', '1990-08-30', 'FEMALE', 'A+', '9000000002', 'ELIGIBLE', NULL,                  TRUE,  NOW()),
-  (3, 'D-000003', NULL, 'Arjun Rao',    '1988-01-05', 'MALE',   'B+', '9000000003', 'DEFERRED', 'Reactive TTI (HIV)', TRUE,  NOW()),
-  (4, 'D-000004', NULL, 'Neha Iyer',    '2001-11-20', 'FEMALE', NULL, '9000000004', 'ELIGIBLE', NULL,                  TRUE,  NOW()),
-  (5, 'D-000005', NULL, 'Sameer Khan',  '2004-02-14', 'MALE',   NULL, '9000000005', 'PENDING',  NULL,                  FALSE, NULL);
+                    id_proof, medical_history, eligibility_status, deferral_reason, consent_given, consent_at) VALUES
+  (1, 'D-000001', 6,    'Ravi Kumar',   '1995-04-12', 'MALE',   'O-', '9000000001', 'ID-000001', 'None',         'ELIGIBLE', NULL,                  TRUE,  NOW()),
+  (2, 'D-000002', NULL, 'Priya Sharma', '1990-08-30', 'FEMALE', 'A+', '9000000002', 'ID-000002', 'None',         'ELIGIBLE', NULL,                  TRUE,  NOW()),
+  (3, 'D-000003', NULL, 'Arjun Rao',    '1988-01-05', 'MALE',   'B+', '9000000003', 'ID-000003', 'None',         'DEFERRED', 'Reactive TTI (HIV)', TRUE,  NOW()),
+  (4, 'D-000004', NULL, 'Neha Iyer',    '2001-11-20', 'FEMALE', NULL, '9000000004', 'ID-000004', 'None',         'ELIGIBLE', NULL,                  TRUE,  NOW()),
+  (5, 'D-000005', NULL, 'Sameer Khan',  '2004-02-14', 'MALE',   NULL, '9000000005', 'ID-000005', 'None',         'PENDING',  NULL,                  FALSE, NULL);
 
 -- Donations (collected by lab tech 3)
 INSERT INTO donations (id, donor_id, collected_by, collected_at, status, volume_ml,

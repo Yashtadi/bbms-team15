@@ -34,6 +34,8 @@ CREATE TABLE donors (
   phone               VARCHAR(15) NOT NULL,
   email               VARCHAR(255) NULL,
   address             VARCHAR(255) NULL,
+  id_proof            VARCHAR(50) NOT NULL UNIQUE,   -- F-001 ID proof
+  medical_history     TEXT NULL,                     -- F-001 medical history
   eligibility_status  ENUM('PENDING','ELIGIBLE','DEFERRED') NOT NULL DEFAULT 'PENDING',
   deferral_reason     VARCHAR(255) NULL,
   deferred_until      DATE NULL,

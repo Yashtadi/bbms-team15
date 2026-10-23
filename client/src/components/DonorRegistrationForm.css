@@ -1,0 +1,304 @@
+/* Minimal Colors Theme (Dumma Branding palette)
+   #FF1D58 - Crimson / Blood Red
+   #F75990 - Coral Pink
+   #FFF685 - Warm Butter Yellow
+   #00DDFF - Electric Cyan
+   #0049B7 - Royal Deep Blue
+*/
+
+:root {
+  --color-crimson: #FF1D58;
+  --color-pink: #F75990;
+  --color-yellow: #FFF685;
+  --color-cyan: #00DDFF;
+  --color-blue: #0049B7;
+}
+
+.registration-form-container {
+  max-width: 660px;
+  margin: 2rem auto;
+  padding: 2.75rem;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 15px 35px -5px rgba(0, 73, 183, 0.15), 0 0 0 1px rgba(0, 221, 255, 0.2);
+  border: 1px solid rgba(0, 221, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.registration-form-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, #FF1D58 0%, #F75990 25%, #FFF685 50%, #00DDFF 75%, #0049B7 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .registration-form-container {
+    background: #091124;
+    border-color: rgba(0, 221, 255, 0.25);
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 221, 255, 0.08);
+    color: #f1f5f9;
+  }
+}
+
+.registration-form-container h2 {
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: #FF1D58;
+  letter-spacing: -0.02em;
+}
+
+.registration-form-container .subtitle {
+  color: #64748b;
+  font-size: 0.95rem;
+  margin-bottom: 2rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .registration-form-container .subtitle {
+    color: #94a3b8;
+  }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1.35rem;
+  text-align: left;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-group label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  color: #0049B7;
+}
+
+@media (prefers-color-scheme: dark) {
+  .form-group label {
+    color: #00DDFF;
+  }
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1.5px solid #cbd5e1;
+  font-size: 0.98rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  background-color: #f8fafc;
+  color: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    background-color: #0f1a36;
+    border-color: #1e2e54;
+    color: #f8fafc;
+  }
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: #00DDFF;
+  box-shadow: 0 0 0 3px rgba(0, 221, 255, 0.25);
+  background-color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    background-color: #142247;
+    border-color: #00DDFF;
+  }
+}
+
+.input-error {
+  border-color: #FF1D58 !important;
+  box-shadow: 0 0 0 3px rgba(255, 29, 88, 0.15) !important;
+}
+
+.field-error {
+  color: #FF1D58;
+  font-size: 0.825rem;
+  margin-top: 0.4rem;
+  font-weight: 600;
+}
+
+.alert-box {
+  padding: 0.9rem 1.1rem;
+  border-radius: 10px;
+  margin-bottom: 1.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.alert-error {
+  background-color: rgba(255, 29, 88, 0.1);
+  color: #FF1D58;
+  border: 1.5px solid rgba(255, 29, 88, 0.4);
+}
+
+/* Primary Button */
+.btn-primary {
+  width: 100%;
+  padding: 0.95rem;
+  background: linear-gradient(135deg, #FF1D58 0%, #F75990 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  box-shadow: 0 8px 20px -4px rgba(255, 29, 88, 0.4);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -4px rgba(255, 29, 88, 0.5);
+  background: linear-gradient(135deg, #e01549 0%, #FF1D58 100%);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Success Card */
+.registration-success-card {
+  max-width: 540px;
+  margin: 3rem auto;
+  padding: 3.5rem 2.5rem;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px -10px rgba(0, 73, 183, 0.2);
+  border: 1px solid rgba(0, 221, 255, 0.3);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.registration-success-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, #00DDFF 0%, #0049B7 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .registration-success-card {
+    background: #091124;
+    border-color: rgba(0, 221, 255, 0.3);
+    color: #f1f5f9;
+  }
+}
+
+.success-badge {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00DDFF 0%, #0049B7 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.25rem;
+  font-weight: bold;
+  margin: 0 auto 1.5rem;
+  box-shadow: 0 8px 25px rgba(0, 221, 255, 0.4);
+}
+
+.donor-id-display {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  margin: 1.75rem 0;
+  background: linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%);
+  border-radius: 12px;
+  border: 2px dashed #00DDFF;
+}
+
+@media (prefers-color-scheme: dark) {
+  .donor-id-display {
+    background: #0d1a38;
+    border-color: #00DDFF;
+  }
+}
+
+.donor-id-display span {
+  font-size: 0.85rem;
+  color: #0049B7;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.35rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .donor-id-display span {
+    color: #00DDFF;
+  }
+}
+
+.donor-id-display strong {
+  font-size: 2.35rem;
+  color: #FF1D58;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.05em;
+}
+
+.status-indicator {
+  margin-bottom: 2.25rem;
+  font-size: 0.95rem;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.3rem 0.85rem;
+  background-color: #FFF685;
+  color: #713f12;
+  border-radius: 9999px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  box-shadow: 0 2px 8px rgba(255, 246, 133, 0.5);
+}
