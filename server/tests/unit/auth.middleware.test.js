@@ -1,4 +1,4 @@
-const { requireRole } = require('../src/middleware/auth');
+const { requireRole } = require('../../src/middleware/auth');
 
 describe('requireRole', () => {
   it('accepts a valid role', () => {

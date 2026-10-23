@@ -1,4 +1,4 @@
-const db = require('../src/db');
+const db = require('../../src/db');
 
 const EXPECTED_TABLES = [
   'users', 'donors', 'donations', 'blood_requests', 'blood_units',
