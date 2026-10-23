@@ -37,7 +37,7 @@ The code must follow these three documents. If you have to do something differen
 | Backend (the API) | Node.js + Express | `server/` |
 | Database | MySQL | `server/db/` *(added in the "DB schema v1" issue)* |
 | Login and roles | JWT + role checks (RBAC) | `server/src/middleware/auth.js` |
-| Tests | Jest + Supertest | `server/tests/` |
+| Tests | Jest + Supertest (server), Vitest + React Testing Library (client) | `server/tests/`, `client/src/**/*.test.jsx` |
 
 **Words you will see**
 
@@ -158,7 +158,13 @@ bbms-team15/
 ├── README.md                  Project front page on GitHub
 ├── CONTRIBUTING.md            This guide
 ├── DEVIATIONS.md              (coming) Where we differ from SRS/SAD/STP, and why
-├── client/                    (coming) React frontend
+├── client/                    React frontend (Vite)
+│   ├── vite.config.js         Vite config, plus the Vitest test settings
+│   └── src/
+│       ├── App.jsx            The root React component
+│       ├── App.test.jsx       Client tests sit next to the component they test
+│       └── test/
+│           └── setup.js       Runs before client tests (adds matchers like toBeInTheDocument)
 └── server/                    Node.js + Express backend
     ├── package.json           Project info, scripts (npm test, npm run dev), list of packages
     ├── package-lock.json      Exact package versions. Commit it, never edit it by hand.
@@ -178,8 +184,11 @@ bbms-team15/
     │       ├── inventory/     Stock, expiry, FEFO      → F-030 to F-034
     │       └── request/       Hospital requests        → F-040 to F-044
     └── tests/                 Automated tests (Jest)
-        ├── health.test.js
-        └── auth.middleware.test.js
+        ├── unit/              No server, no DB
+        │   └── auth.middleware.test.js
+        └── integration/       Real HTTP requests (Supertest) and/or the real DB
+            ├── health.test.js
+            └── db.schema.test.js
 ```
 
 ### What each important file does
@@ -416,12 +425,27 @@ git merge main
 The course checks for **unit tests** and **integration tests** that cover **normal, boundary and error
 cases**.
 
-| Type | Tests what | Example |
-|---|---|---|
-| **Unit test** | One function on its own, with no server or DB | `isEligible({ age: 17 })` returns false |
-| **Integration test** | A real request going through routes → service (→ DB) | `POST /api/donors` returns `201` |
+| Type | Tests what | Where it goes | Example |
+|---|---|---|---|
+| **Unit test** | One function on its own, with no server or DB | `server/tests/unit/` | `isEligible({ age: 17 })` returns false |
+| **Integration test** | A real request going through routes → service (→ DB) | `server/tests/integration/` | `POST /api/donors` returns `201` |
+| **Client test** | A React component rendered in a simulated browser | `client/src/`, next to the component | The donor form shows an error for age 17 |
 
-- Put tests in `server/tests/`, named `<something>.test.js`. Jest finds them automatically.
+- Name server tests `<something>.test.js` and client tests `<Component>.test.jsx`. Jest and Vitest find
+  them automatically.
+- Running them:
+
+```bash
+# inside server/
+npm test                   # all server tests
+npm run test:unit          # only tests/unit
+npm run test:integration   # only tests/integration (needs MySQL + npm run db:setup)
+
+# inside client/
+npm test                   # all client tests, once
+npm run test:watch         # re-run on every save
+```
+
 - **Put the STP test case ID in the test name**, so we can show which test covers which requirement:
 
 ```js
@@ -435,15 +459,35 @@ describe('TC-Reg-02: donor eligibility', () => {
 
 - **Boundary cases** are the values right at the edges of a rule: age 17/18/65/66, weight 44.9/45,
   days since last donation 89/90.
-- For integration tests, use Supertest the same way `tests/health.test.js` does:
+- For integration tests, use Supertest the same way `tests/integration/health.test.js` does:
 
 ```js
 const request = require('supertest');
-const app = require('../src/app');
+const app = require('../../src/app');
 
 const res = await request(app).get('/api/health');
 expect(res.status).toBe(200);
 ```
+
+- For client tests, render the component and look for what the user sees, the same way
+  `client/src/App.test.jsx` does:
+
+```jsx
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import App from './App';
+
+describe('App', () => {
+  it('shows the page title', () => {
+    render(<App />);
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Blood Bank Management System' }),
+    ).toBeInTheDocument();
+  });
+});
+```
+
+  Use `@testing-library/user-event` to simulate typing and clicking.
 
 ---
 

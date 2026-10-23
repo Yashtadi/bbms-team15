@@ -7,6 +7,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
     "db:setup": "node db/setup.js"
   },
   "jest": {
