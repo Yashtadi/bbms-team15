@@ -3,14 +3,14 @@
 -- Dates are relative to NOW() so expiry alerts and FEFO always have something to show.
 -- password_hash values are placeholders. SR-002 (login) replaces them with real bcrypt hashes.
 
--- One user per role (+ a second lab tech for F-020 two-step verification)
+-- All demo users have the password: Password@123   (bcrypt hash below; never use this in production)
 INSERT INTO users (id, email, password_hash, full_name, role, organisation) VALUES
-  (1, 'admin@bbms.test',    'SET_IN_SR-002', 'Asha Admin',         'ADMIN',    NULL),
-  (2, 'manager@bbms.test',  'SET_IN_SR-002', 'Manoj Manager',      'MANAGER',  NULL),
-  (3, 'labtech@bbms.test',  'SET_IN_SR-002', 'Lata LabTech',       'LAB_TECH', NULL),
-  (4, 'labtech2@bbms.test', 'SET_IN_SR-002', 'Kiran LabTech',      'LAB_TECH', NULL),
-  (5, 'hospital@bbms.test', 'SET_IN_SR-002', 'City Hospital Desk', 'HOSPITAL', 'City General Hospital'),
-  (6, 'donor@bbms.test',    'SET_IN_SR-002', 'Ravi Kumar',         'DONOR',    NULL);
+  (1, 'admin@bbms.test',    '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Asha Admin',         'ADMIN',    NULL),
+  (2, 'manager@bbms.test',  '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Manoj Manager',      'MANAGER',  NULL),
+  (3, 'labtech@bbms.test',  '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Lata LabTech',       'LAB_TECH', NULL),
+  (4, 'labtech2@bbms.test', '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Kiran LabTech',      'LAB_TECH', NULL),
+  (5, 'hospital@bbms.test', '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'City Hospital Desk', 'HOSPITAL', 'City General Hospital'),
+  (6, 'donor@bbms.test',    '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Ravi Kumar',         'DONOR',    NULL);
 
 -- Donors in different states
 INSERT INTO donors (id, donor_code, user_id, full_name, date_of_birth, gender, blood_group, phone,
