@@ -220,10 +220,27 @@ server.
 - `requireAuth`: "the user must be logged in".
 - `requireRole('LAB_TECH', 'ADMIN')`: "the user must have one of these roles".
 
-> **Right now this is a temporary stub (placeholder).** It lets every request through, so you can build and
-> test your feature without a login system. **Still put `requireRole(...)` on your routes today.** When
-> the SR-002 issue is merged, it will start blocking wrong roles automatically (401 / 403), and you won't
-> need to change your code. It already throws an error if you misspell a role (e.g. `'LABTECH'`).
+> **Since SR-002 this is real.** No token → **401**, wrong role → **403**. `requireRole(...)` checks the
+> token *and* the role, so you don't need `requireAuth` as well. After it runs, your route can use
+> `req.user.id` and `req.user.role`, e.g. to save who recorded something (`collected_by`, `tested_by`).
+> It also throws an error at startup if you misspell a role (e.g. `'LABTECH'`).
+
+**Demo accounts** (from `server/db/seed.sql`). The password for all of them is `Password@123`:
+
+| Email | Role |
+|---|---|
+| `admin@bbms.test` | ADMIN |
+| `manager@bbms.test` | MANAGER |
+| `labtech@bbms.test`, `labtech2@bbms.test` | LAB_TECH |
+| `hospital@bbms.test` | HOSPITAL |
+| `donor@bbms.test` | DONOR |
+
+**Frontend:** call the API with `apiFetch` from `client/src/api.js`, not `fetch`. It adds the token for you:
+
+```js
+import { apiFetch } from '../api';
+const response = await apiFetch('/api/donations', { method: 'POST', body: JSON.stringify(data) });
+```
 
 **`server/src/modules/<name>/<name>.routes.js`.** These are empty routers right now. Each one has a comment
 listing which requirements belong to it. This is where you start working.
@@ -489,6 +506,22 @@ describe('App', () => {
 
   Use `@testing-library/user-event` to simulate typing and clicking.
 
+### Testing protected routes
+
+Every route with `requireRole(...)` returns **401** in tests unless you send a token. Use the helper:
+
+```js
+const { authHeader } = require('../helpers/auth');
+
+const res = await request(app)
+  .post('/api/donations')
+  .set(authHeader('LAB_TECH'))     // pretend to be the seed LAB_TECH user
+  .send(payload);
+```
+
+Also test that the **wrong role gets 403**, e.g. `.set(authHeader('HOSPITAL'))`. See
+`tests/integration/auth.test.js` for the full pattern.
+
 ---
 
 ## 7. The golden rules
@@ -497,7 +530,7 @@ describe('App', () => {
 2. **Never commit `.env` or `node_modules/`.** Look at `git status` before every commit.
 3. **Always branch from the latest `main`**, and never from a teammate's unmerged branch.
 4. **One issue = one branch = one PR.** Keep PRs small, so they get reviewed in hours, not days.
-5. **Always put `requireRole(...)` on routes**, even though it's a stub today.
+5. **Always put `requireRole(...)` on routes** (except login). Without it, a route is open to anyone.
 6. **SQL only in `*.repository.js`, and always with `?` placeholders.**
 7. **Use the status codes from the SAD** (section 4).
 8. **Different from SRS/SAD/STP? Add a row to `DEVIATIONS.md`** with the date, the document and section,

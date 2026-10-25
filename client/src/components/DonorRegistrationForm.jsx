@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiFetch } from '../api';
 
 export default function DonorRegistrationForm({ onSuccess }) {
   const [formData, setFormData] = useState({
@@ -58,9 +59,8 @@ export default function DonorRegistrationForm({ onSuccess }) {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/donors', {
+      const response = await apiFetch('/api/donors', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name.trim(),
           age: Number(formData.age),

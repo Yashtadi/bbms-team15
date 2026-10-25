@@ -3,6 +3,7 @@ const express = require('express');
 
 const router = require('../../src/modules/donor/donor.routes');
 const donorService = require('../../src/modules/donor/donor.service');
+const { authHeader } = require('../helpers/auth');
 
 jest.mock('../../src/modules/donor/donor.service');
 
@@ -23,7 +24,7 @@ describe('donor.routes: duplicate entry error handling (#46)', () => {
     donorService.registerDonor.mockRejectedValue(error);
 
     const res = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send({ name: 'Test' });
 
     expect(res.status).toBe(409);
@@ -37,7 +38,7 @@ describe('donor.routes: duplicate entry error handling (#46)', () => {
     donorService.registerDonor.mockRejectedValue(error);
 
     const res = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send({ name: 'Test' });
 
     expect(res.status).toBe(500);
@@ -51,7 +52,7 @@ describe('donor.routes: duplicate entry error handling (#46)', () => {
     donorService.registerDonor.mockRejectedValue(error);
 
     const res = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send({ name: 'Test' });
 
     expect(res.status).toBe(409);

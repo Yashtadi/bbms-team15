@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../../src/app');
 const db = require('../../src/db');
+const { authHeader } = require('../helpers/auth');
 
 describe('TC-Reg-04: digital donor consent (integration)', () => {
   afterAll(async () => {
@@ -13,7 +14,7 @@ describe('TC-Reg-04: digital donor consent (integration)', () => {
   beforeAll(async () => {
     // Register a donor without consent
     const res = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send({
         name: 'Consent Integration Donor',
         age: 30,
@@ -29,7 +30,7 @@ describe('TC-Reg-04: digital donor consent (integration)', () => {
 
   it('rejects attempting a donation without consent with 422 (AC 1 & AC 3)', async () => {
     const res = await request(app)
-      .post('/api/donations')
+      .post('/api/donations').set(authHeader('LAB_TECH'))
       .send({
         donorId: createdDonorId,
         volumeMl: 450,
@@ -42,7 +43,7 @@ describe('TC-Reg-04: digital donor consent (integration)', () => {
 
   it('digitally records consent with a timestamp linked to the donor ID (AC 2)', async () => {
     const res = await request(app)
-      .post(`/api/donors/${createdDonorId}/consent`)
+      .post(`/api/donors/${createdDonorId}/consent`).set(authHeader('LAB_TECH'))
       .send({ consent: true });
 
     expect(res.status).toBe(200);
@@ -63,7 +64,7 @@ describe('TC-Reg-04: digital donor consent (integration)', () => {
 
   it('allows donation session once consent has been digitally captured (AC 1)', async () => {
     const res = await request(app)
-      .post('/api/donations')
+      .post('/api/donations').set(authHeader('LAB_TECH'))
       .send({
         donorId: createdDonorId,
         volumeMl: 450,
