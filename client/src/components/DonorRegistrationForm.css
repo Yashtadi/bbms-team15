@@ -204,7 +204,7 @@
 .registration-success-card {
   max-width: 540px;
   margin: 3rem auto;
-  padding: 3.5rem 2.5rem;
+  padding: 3rem 2rem;
   background: #ffffff;
   border-radius: 20px;
   box-shadow: 0 20px 40px -10px rgba(0, 73, 183, 0.2);
@@ -233,44 +233,150 @@
 }
 
 .success-badge {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: linear-gradient(135deg, #00DDFF 0%, #0049B7 100%);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.25rem;
+  font-size: 2rem;
   font-weight: bold;
-  margin: 0 auto 1.5rem;
+  margin: 0 auto 1.25rem;
   box-shadow: 0 8px 25px rgba(0, 221, 255, 0.4);
+}
+
+/* BBMS-F-003: Donor Identity Card */
+.donor-card {
+  margin: 1.75rem auto 2rem;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 2px solid rgba(0, 221, 255, 0.5);
+  box-shadow: 0 10px 25px -5px rgba(0, 73, 183, 0.15);
+  overflow: hidden;
+  text-align: left;
+}
+
+@media (prefers-color-scheme: dark) {
+  .donor-card {
+    background: #0d1a38;
+    border-color: #00DDFF;
+    box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.donor-card-top-bar {
+  height: 6px;
+  background: linear-gradient(90deg, #FF1D58 0%, #F75990 25%, #FFF685 50%, #00DDFF 75%, #0049B7 100%);
+}
+
+.donor-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: rgba(0, 73, 183, 0.04);
+  border-bottom: 1px solid rgba(0, 221, 255, 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  .donor-card-header {
+    background: rgba(0, 221, 255, 0.05);
+  }
+}
+
+.card-brand {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #0049B7;
+}
+
+@media (prefers-color-scheme: dark) {
+  .card-brand {
+    color: #00DDFF;
+  }
+}
+
+.card-subbrand {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .card-subbrand {
+    color: #94a3b8;
+  }
+}
+
+.card-logo {
+  font-size: 1.4rem;
+}
+
+.donor-card-body {
+  padding: 1.25rem;
+}
+
+.donor-info-row {
+  margin-bottom: 1rem;
+}
+
+.info-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 0.2rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .info-label {
+    color: #94a3b8;
+  }
+}
+
+.info-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .info-value {
+    color: #f8fafc;
+  }
 }
 
 .donor-id-display {
   display: flex;
   flex-direction: column;
-  padding: 1.5rem;
-  margin: 1.75rem 0;
+  padding: 1.25rem;
+  margin: 1rem 0;
   background: linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%);
   border-radius: 12px;
   border: 2px dashed #00DDFF;
+  text-align: center;
 }
 
 @media (prefers-color-scheme: dark) {
   .donor-id-display {
-    background: #0d1a38;
+    background: #081226;
     border-color: #00DDFF;
   }
 }
 
 .donor-id-display span {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #0049B7;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -280,25 +386,35 @@
 }
 
 .donor-id-display strong {
-  font-size: 2.35rem;
+  font-size: 2.25rem;
   color: #FF1D58;
   font-family: ui-monospace, monospace;
   letter-spacing: 0.05em;
 }
 
-.status-indicator {
-  margin-bottom: 2.25rem;
-  font-size: 0.95rem;
+.donor-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed rgba(203, 213, 225, 0.8);
+}
+
+@media (prefers-color-scheme: dark) {
+  .donor-card-meta {
+    border-top-color: rgba(51, 65, 85, 0.8);
+  }
 }
 
 .status-pill {
   display: inline-block;
-  padding: 0.3rem 0.85rem;
+  padding: 0.25rem 0.75rem;
   background-color: #FFF685;
   color: #713f12;
   border-radius: 9999px;
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   border: 1px solid rgba(234, 179, 8, 0.4);
   box-shadow: 0 2px 8px rgba(255, 246, 133, 0.5);
 }
