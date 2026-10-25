@@ -3,12 +3,12 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DonorRegistrationForm from './DonorRegistrationForm';
 
-describe('TC-Reg-01 & TC-Reg-03: DonorRegistrationForm (client)', () => {
+describe('TC-Reg-01, TC-Reg-03 & TC-Reg-04: DonorRegistrationForm (client)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('renders all required registration fields', () => {
+  it('renders all required registration fields including consent checkbox (BBMS-F-004)', () => {
     render(<DonorRegistrationForm />);
 
     expect(screen.getByLabelText(/Full Name/i)).toBeInTheDocument();
@@ -17,6 +17,7 @@ describe('TC-Reg-01 & TC-Reg-03: DonorRegistrationForm (client)', () => {
     expect(screen.getByLabelText(/Contact Number/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/ID Proof Number/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Medical History/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/I digitally provide consent/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Register Donor/i })).toBeInTheDocument();
   });
 
@@ -46,7 +47,7 @@ describe('TC-Reg-01 & TC-Reg-03: DonorRegistrationForm (client)', () => {
     expect(await screen.findByTestId('error-age')).toHaveTextContent('Age must be between 18 and 65');
   });
 
-  it('displays the success screen and donor card with new Donor ID on successful registration', async () => {
+  it('displays the success screen and donor card with new Donor ID and verified consent status', async () => {
     const user = userEvent.setup();
 
     global.fetch = vi.fn().mockResolvedValue({
@@ -70,6 +71,7 @@ describe('TC-Reg-01 & TC-Reg-03: DonorRegistrationForm (client)', () => {
     expect(screen.getByTestId('donor-card')).toBeInTheDocument();
     expect(screen.getByTestId('card-donor-name')).toHaveTextContent('Ramesh Patel');
     expect(screen.getByTestId('donor-id')).toHaveTextContent('D-000123');
+    expect(screen.getByTestId('consent-status')).toHaveTextContent('Recorded ✓');
     expect(screen.getByText('PENDING')).toBeInTheDocument();
   });
 

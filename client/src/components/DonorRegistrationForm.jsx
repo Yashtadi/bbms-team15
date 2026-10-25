@@ -8,6 +8,7 @@ export default function DonorRegistrationForm({ onSuccess }) {
     contact: '',
     idProof: '',
     medicalHistory: '',
+    consentGiven: true,
   });
 
   const [fieldErrors, setFieldErrors] = useState({});
@@ -16,8 +17,11 @@ export default function DonorRegistrationForm({ onSuccess }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
     if (fieldErrors[name]) {
       setFieldErrors((prev) => {
         const next = { ...prev };
@@ -64,6 +68,7 @@ export default function DonorRegistrationForm({ onSuccess }) {
           contact: formData.contact.trim(),
           idProof: formData.idProof.trim(),
           medicalHistory: formData.medicalHistory.trim() || undefined,
+          consentGiven: formData.consentGiven,
         }),
       });
 
@@ -95,13 +100,14 @@ export default function DonorRegistrationForm({ onSuccess }) {
       contact: '',
       idProof: '',
       medicalHistory: '',
+      consentGiven: true,
     });
     setRegistrationResult(null);
     setFieldErrors({});
     setGeneralError('');
   };
 
-  // AC 5: Shown on the success screen / donor card (BBMS-F-001 & BBMS-F-003)
+  // AC 5: Shown on the success screen / donor card (BBMS-F-001, F-003, F-004)
   if (registrationResult) {
     const today = new Date().toISOString().split('T')[0];
 
@@ -124,7 +130,7 @@ export default function DonorRegistrationForm({ onSuccess }) {
 
           <div className="donor-card-body">
             <div className="donor-info-row">
-              <span className="info-label">Full Name</span>
+              <span className="info-label">Donor Name</span>
               <span className="info-value" data-testid="card-donor-name">
                 {formData.name || registrationResult.fullName || 'Registered Donor'}
               </span>
@@ -141,8 +147,10 @@ export default function DonorRegistrationForm({ onSuccess }) {
                 <span className="status-pill">{registrationResult.status}</span>
               </div>
               <div className="text-right">
-                <span className="info-label">Issued Date</span>
-                <span className="info-value text-sm">{today}</span>
+                <span className="info-label">Digital Consent (F-004)</span>
+                <span className="consent-pill" data-testid="consent-status">
+                  {formData.consentGiven ? 'Recorded ✓' : 'Pending'}
+                </span>
               </div>
             </div>
           </div>
@@ -263,6 +271,20 @@ export default function DonorRegistrationForm({ onSuccess }) {
             value={formData.medicalHistory}
             onChange={handleChange}
           />
+        </div>
+
+        {/* BBMS-F-004: Digital Donor Consent */}
+        <div className="form-group-consent">
+          <label htmlFor="consentGiven" className="checkbox-label">
+            <input
+              id="consentGiven"
+              name="consentGiven"
+              type="checkbox"
+              checked={formData.consentGiven}
+              onChange={handleChange}
+            />
+            <span>I digitally provide consent to donate blood and agree to medical records logging (BBMS-F-004)</span>
+          </label>
         </div>
 
         <button type="submit" className="btn-primary" disabled={isSubmitting}>

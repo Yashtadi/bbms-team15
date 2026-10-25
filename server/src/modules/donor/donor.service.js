@@ -196,6 +196,8 @@ function isEligible(criteria) {
  * Registers a new donor following BBMS-F-001 (SRS §4.1, SAD §4.3).
  * BBMS-F-003:
  * - Automatically generates a unique, human-readable Donor ID.
+ * BBMS-F-004:
+ * - Captures digital consent if given at registration.
  */
 async function registerDonor(input, repository = defaultRepository) {
   const validation = validateDonorRegistration(input);
@@ -225,6 +227,10 @@ async function registerDonor(input, repository = defaultRepository) {
   const address = input.address ? input.address.toString().trim() : null;
   const medicalHistory = input.medicalHistory ? input.medicalHistory.toString().trim() : null;
 
+  // BBMS-F-004: Optional consent on registration
+  const consentGiven = Boolean(input.consentGiven || input.consent);
+  const consentAt = consentGiven ? new Date() : null;
+
   // Generate unique human-readable donor code (e.g. D-000123)
   const donorCode = await repository.generateNextDonorCode();
 
@@ -239,11 +245,48 @@ async function registerDonor(input, repository = defaultRepository) {
     idProof,
     medicalHistory,
     eligibilityStatus: 'PENDING',
+    consentGiven,
+    consentAt,
   });
 
   return {
     donorId: donorCode,
     status: 'PENDING',
+  };
+}
+
+/**
+ * BBMS-F-004: Digitally captures and links consent to a donor with a timestamp.
+ * Acceptance criteria:
+ * 1. Consent must be captured before a donation can proceed.
+ * 2. Consent stored with a timestamp and linked to the Donor ID.
+ * 
+ * @param {number|string} donorIdOrCode
+ * @param {boolean} consentGiven
+ * @param {object} repository
+ * @returns {Promise<{ donorId: string, consentGiven: boolean, consentAt: Date }>}
+ */
+async function recordConsent(donorIdOrCode, consentGiven = true, repository = defaultRepository) {
+  const donor = await repository.findByIdOrCode(donorIdOrCode);
+  if (!donor) {
+    const error = new Error('Donor not found');
+    error.status = 404;
+    throw error;
+  }
+
+  if (consentGiven !== true && consentGiven !== 'true' && consentGiven !== 1) {
+    const error = new Error('Consent must be explicitly granted (consentGiven: true)');
+    error.status = 400;
+    throw error;
+  }
+
+  const consentAt = new Date();
+  await repository.updateConsent(donor.id, true, consentAt);
+
+  return {
+    donorId: donor.donor_code,
+    consentGiven: true,
+    consentAt,
   };
 }
 
@@ -310,6 +353,7 @@ async function evaluateDonorEligibility(donorIdOrCode, vitals = {}, repository =
 module.exports = {
   validateDonorRegistration,
   registerDonor,
+  recordConsent,
   resolveDateOfBirth,
   formatDonorCode,
   isValidDonorCode,
