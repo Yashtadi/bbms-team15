@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DonorRegistrationForm from './DonorRegistrationForm';
 
-describe('TC-Reg-01: DonorRegistrationForm (client)', () => {
+describe('TC-Reg-01 & TC-Reg-03: DonorRegistrationForm (client)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -46,12 +46,12 @@ describe('TC-Reg-01: DonorRegistrationForm (client)', () => {
     expect(await screen.findByTestId('error-age')).toHaveTextContent('Age must be between 18 and 65');
   });
 
-  it('displays the success screen with new Donor ID on successful registration', async () => {
+  it('displays the success screen and donor card with new Donor ID on successful registration', async () => {
     const user = userEvent.setup();
 
     global.fetch = vi.fn().mockResolvedValue({
       status: 201,
-      json: async () => ({ donorId: 'D-000006', status: 'PENDING' }),
+      json: async () => ({ donorId: 'D-000123', status: 'PENDING', fullName: 'Ramesh Patel' }),
     });
 
     render(<DonorRegistrationForm />);
@@ -67,7 +67,9 @@ describe('TC-Reg-01: DonorRegistrationForm (client)', () => {
     await user.click(submitBtn);
 
     expect(await screen.findByTestId('success-screen')).toBeInTheDocument();
-    expect(screen.getByTestId('donor-id')).toHaveTextContent('D-000006');
+    expect(screen.getByTestId('donor-card')).toBeInTheDocument();
+    expect(screen.getByTestId('card-donor-name')).toHaveTextContent('Ramesh Patel');
+    expect(screen.getByTestId('donor-id')).toHaveTextContent('D-000123');
     expect(screen.getByText('PENDING')).toBeInTheDocument();
   });
 

@@ -63,6 +63,42 @@ function resolveDateOfBirth(age, dateOfBirth) {
 }
 
 /**
+ * BBMS-F-003: Formats a sequence number into the human-readable Donor ID.
+ * Standard format: D-XXXXXX (e.g. D-000123)
+ * @param {number|string} seqNumber
+ * @returns {string}
+ */
+function formatDonorCode(seqNumber) {
+  const num = Number(seqNumber);
+  if (!Number.isInteger(num) || num <= 0) {
+    throw new Error('Donor ID sequence number must be a positive integer');
+  }
+  return `D-${String(num).padStart(6, '0')}`;
+}
+
+/**
+ * BBMS-F-003: Validates whether a string matches the agreed human-readable Donor ID format.
+ * Acceptance criteria: Human-readable format (e.g. D-000123)
+ * @param {string} code
+ * @returns {boolean}
+ */
+function isValidDonorCode(code) {
+  if (typeof code !== 'string') return false;
+  return /^D-\d{6,}$/.test(code.trim());
+}
+
+/**
+ * BBMS-F-003: Parses the numeric sequence number out of a Donor ID.
+ * @param {string} code
+ * @returns {number|null}
+ */
+function parseDonorCode(code) {
+  if (typeof code !== 'string') return null;
+  const match = /^D-(\d+)$/.exec(code.trim());
+  return match ? parseInt(match[1], 10) : null;
+}
+
+/**
  * Calculates current age from a date of birth.
  * @param {string|Date} dateOfBirth
  * @returns {number}
@@ -80,24 +116,6 @@ function calculateAge(dateOfBirth) {
 
 /**
  * BBMS-F-002: Core donor eligibility rules (SRS §4.1).
- * 
- * Rules:
- * 1. Age: 18–65 accepted; 17 and 66 rejected.
- * 2. Weight: >= 45 kg required (44.9 rejected, 45 accepted).
- * 3. Haemoglobin: >= 12.5 g/dL required (NACO standard; 12.4 rejected, 12.5 accepted).
- * 4. Donation gap: at least 90 days since last whole-blood donation (89 rejected, 90 accepted).
- * 
- * @param {{
- *   age?: number,
- *   dateOfBirth?: string|Date,
- *   weight?: number,
- *   weight_kg?: number,
- *   hemoglobin?: number,
- *   hemoglobin_g_dl?: number,
- *   daysSinceLastDonation?: number|null,
- *   lastDonationDate?: string|Date|null
- * }} criteria
- * @returns {{ eligible: boolean, reason: string|null, reasons: string[] }}
  */
 function checkEligibility(criteria = {}) {
   const reasons = [];
@@ -169,9 +187,6 @@ function checkEligibility(criteria = {}) {
 
 /**
  * Convenience helper returning boolean eligibility.
- * Referenced in CONTRIBUTING.md ("isEligible({ age: 17 }) returns false").
- * @param {object} criteria
- * @returns {boolean}
  */
 function isEligible(criteria) {
   return checkEligibility(criteria).eligible;
@@ -179,6 +194,8 @@ function isEligible(criteria) {
 
 /**
  * Registers a new donor following BBMS-F-001 (SRS §4.1, SAD §4.3).
+ * BBMS-F-003:
+ * - Automatically generates a unique, human-readable Donor ID.
  */
 async function registerDonor(input, repository = defaultRepository) {
   const validation = validateDonorRegistration(input);
@@ -208,6 +225,7 @@ async function registerDonor(input, repository = defaultRepository) {
   const address = input.address ? input.address.toString().trim() : null;
   const medicalHistory = input.medicalHistory ? input.medicalHistory.toString().trim() : null;
 
+  // Generate unique human-readable donor code (e.g. D-000123)
   const donorCode = await repository.generateNextDonorCode();
 
   await repository.createDonor({
@@ -231,12 +249,6 @@ async function registerDonor(input, repository = defaultRepository) {
 
 /**
  * BBMS-F-002: Evaluates eligibility for an existing donor in the database.
- * Updates donor's status in MySQL to ELIGIBLE or DEFERRED.
- * 
- * @param {number|string} donorIdOrCode
- * @param {{ weight?: number, hemoglobin?: number, age?: number }} vitals
- * @param {object} repository
- * @returns {Promise<{ eligible: boolean, status: string, message: string }>}
  */
 async function evaluateDonorEligibility(donorIdOrCode, vitals = {}, repository = defaultRepository) {
   const donor = await repository.findByIdOrCode(donorIdOrCode);
@@ -246,7 +258,6 @@ async function evaluateDonorEligibility(donorIdOrCode, vitals = {}, repository =
     throw error;
   }
 
-  // Find last donation to compute interval
   const lastDonation = await repository.findLastDonation(donor.id);
   const lastDonationDate = lastDonation ? lastDonation.collected_at : null;
 
@@ -300,6 +311,9 @@ module.exports = {
   validateDonorRegistration,
   registerDonor,
   resolveDateOfBirth,
+  formatDonorCode,
+  isValidDonorCode,
+  parseDonorCode,
   calculateAge,
   checkEligibility,
   isEligible,

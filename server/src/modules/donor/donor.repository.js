@@ -70,17 +70,71 @@ async function updateEligibility(id, { status, deferralReason = null, deferredUn
 }
 
 /**
- * Generates the next sequential donor code (e.g. D-000006).
+ * BBMS-F-003: Generates the next sequential, human-readable donor code (e.g. D-000123).
+ * Acceptance criteria:
+ * 1. Automatic generation on registration.
+ * 2. Unique across the system (enforced by DB UNIQUE constraint).
+ * 3. Never reused, even if a donor record is removed.
+ * 4. Human-readable format (e.g. D-000123).
+ *
+ * Strategy:
+ * - Checks AUTO_INCREMENT from information_schema (InnoDB monotonically advances even after deletion).
+ * - Checks current MAX(id) in donors table.
+ * - Checks audit_log to ensure deleted donor IDs are never recycled.
+ * 
  * @returns {Promise<string>}
  */
 async function generateNextDonorCode() {
-  const [rows] = await db.query('SELECT MAX(id) AS maxId FROM donors');
-  const nextId = (rows[0]?.maxId || 0) + 1;
-  return `D-${String(nextId).padStart(6, '0')}`;
+  let nextSeq = 1;
+
+  // 1. Check AUTO_INCREMENT from information_schema
+  try {
+    const [tableRows] = await db.query(
+      `SELECT AUTO_INCREMENT 
+       FROM information_schema.TABLES 
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'donors'`
+    );
+    if (tableRows[0]?.AUTO_INCREMENT) {
+      nextSeq = Math.max(nextSeq, Number(tableRows[0].AUTO_INCREMENT));
+    }
+  } catch (err) {
+    // Fallback if information_schema is restricted
+  }
+
+  // 2. Check current MAX(id) in donors table
+  try {
+    const [maxRows] = await db.query('SELECT MAX(id) AS maxId FROM donors');
+    const maxId = maxRows[0]?.maxId ? Number(maxRows[0].maxId) + 1 : 1;
+    nextSeq = Math.max(nextSeq, maxId);
+  } catch (err) {
+    // Fallback
+  }
+
+  // 3. Check audit_log to ensure deleted donor IDs are never re-issued
+  try {
+    const [auditRows] = await db.query(
+      `SELECT entity_id FROM audit_log 
+       WHERE entity_type = 'donor' AND action = 'DONOR_REGISTERED'`
+    );
+    for (const row of auditRows) {
+      const match = /^D-(\d+)$/.exec(row.entity_id);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num >= nextSeq) {
+          nextSeq = num + 1;
+        }
+      }
+    }
+  } catch (err) {
+    // Non-fatal if audit_log is unavailable
+  }
+
+  return `D-${String(nextSeq).padStart(6, '0')}`;
 }
 
 /**
  * Inserts a new donor record into MySQL using parameterized query.
+ * Logs event into audit_log to ensure auditability and permanent ID non-reuse.
  * @param {object} donor
  * @returns {Promise<object>}
  */
@@ -117,11 +171,36 @@ async function createDonor(donor) {
     ]
   );
 
+  // Permanently audit registration so donor_code is never recycled even if donor is deleted
+  try {
+    await db.query(
+      `INSERT INTO audit_log (action, entity_type, entity_id, details)
+       VALUES ('DONOR_REGISTERED', 'donor', ?, ?)`,
+      [donorCode, JSON.stringify({ fullName, idProof, insertId: result.insertId })]
+    );
+  } catch (err) {
+    // Non-fatal if audit log fails
+  }
+
   return {
     id: result.insertId,
     donorCode,
     eligibilityStatus,
   };
+}
+
+/**
+ * Deletes a donor record (used for verifying ID non-reuse after deletion).
+ * @param {number|string} idOrCode
+ * @returns {Promise<boolean>}
+ */
+async function deleteDonor(idOrCode) {
+  const isNumeric = /^\d+$/.test(String(idOrCode));
+  const query = isNumeric
+    ? 'DELETE FROM donors WHERE id = ?'
+    : 'DELETE FROM donors WHERE donor_code = ?';
+  const [result] = await db.query(query, [idOrCode]);
+  return result.affectedRows > 0;
 }
 
 module.exports = {
@@ -132,4 +211,5 @@ module.exports = {
   updateEligibility,
   generateNextDonorCode,
   createDonor,
+  deleteDonor,
 };

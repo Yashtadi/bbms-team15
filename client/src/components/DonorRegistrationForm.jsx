@@ -101,20 +101,53 @@ export default function DonorRegistrationForm({ onSuccess }) {
     setGeneralError('');
   };
 
-  // AC 5: Success screen shows the new Donor ID
+  // AC 5: Shown on the success screen / donor card (BBMS-F-001 & BBMS-F-003)
   if (registrationResult) {
+    const today = new Date().toISOString().split('T')[0];
+
     return (
       <div className="registration-success-card" data-testid="success-screen">
         <div className="success-badge">✓</div>
         <h2>Registration Successful!</h2>
-        <p>The donor has been successfully registered in the system.</p>
-        <div className="donor-id-display">
-          <span>Donor ID</span>
-          <strong data-testid="donor-id">{registrationResult.donorId}</strong>
+        <p className="subtitle">The donor has been permanently assigned their official system ID.</p>
+
+        {/* Official BBMS Donor Card Display */}
+        <div className="donor-card" data-testid="donor-card">
+          <div className="donor-card-top-bar"></div>
+          <div className="donor-card-header">
+            <div>
+              <span className="card-brand">BBMS DONOR IDENTITY CARD</span>
+              <p className="card-subbrand">Blood Bank Management System · Team 15</p>
+            </div>
+            <span className="card-logo">🩸</span>
+          </div>
+
+          <div className="donor-card-body">
+            <div className="donor-info-row">
+              <span className="info-label">Full Name</span>
+              <span className="info-value" data-testid="card-donor-name">
+                {formData.name || registrationResult.fullName || 'Registered Donor'}
+              </span>
+            </div>
+
+            <div className="donor-id-display">
+              <span>Unique Donor ID</span>
+              <strong data-testid="donor-id">{registrationResult.donorId}</strong>
+            </div>
+
+            <div className="donor-card-meta">
+              <div>
+                <span className="info-label">Initial Status</span>
+                <span className="status-pill">{registrationResult.status}</span>
+              </div>
+              <div className="text-right">
+                <span className="info-label">Issued Date</span>
+                <span className="info-value text-sm">{today}</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <p className="status-indicator">
-          Status: <span className="status-pill">{registrationResult.status}</span>
-        </p>
+
         <button type="button" className="btn-primary" onClick={handleReset}>
           Register Another Donor
         </button>
