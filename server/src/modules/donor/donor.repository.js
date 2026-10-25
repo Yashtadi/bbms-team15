@@ -138,13 +138,14 @@ async function generateNextDonorCode() {
 }
 
 /**
- * Inserts a new donor record into MySQL using parameterized query.
+ * Inserts a new donor record into MySQL using a transaction to guarantee atomic, race-free donor_code generation.
+ * BBMS-F-003 / #46: Sets donor_code = CONCAT('D-', LPAD(id, 6, '0')) within the same transaction.
  * @param {object} donor
  * @returns {Promise<object>}
  */
 async function createDonor(donor) {
   const {
-    donorCode,
+    donorCode = null,
     fullName,
     dateOfBirth,
     gender,
@@ -158,44 +159,67 @@ async function createDonor(donor) {
     consentAt = null,
   } = donor;
 
-  const [result] = await db.query(
-    `INSERT INTO donors (
-      donor_code, full_name, date_of_birth, gender, phone, email,
-      address, id_proof, medical_history, eligibility_status,
-      consent_given, consent_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      donorCode,
-      fullName,
-      dateOfBirth,
-      gender,
-      phone,
-      email,
-      address,
-      idProof,
-      medicalHistory,
-      eligibilityStatus,
-      consentGiven,
-      consentAt,
-    ]
-  );
-
-  // Permanently audit registration
+  const connection = await db.getConnection();
   try {
-    await db.query(
-      `INSERT INTO audit_log (action, entity_type, entity_id, details)
-       VALUES ('DONOR_REGISTERED', 'donor', ?, ?)`,
-      [donorCode, JSON.stringify({ fullName, idProof, insertId: result.insertId, consentGiven })]
-    );
-  } catch (err) {
-    // Non-fatal if audit log fails
-  }
+    await connection.beginTransaction();
 
-  return {
-    id: result.insertId,
-    donorCode,
-    eligibilityStatus,
-  };
+    const [result] = await connection.query(
+      `INSERT INTO donors (
+        donor_code, full_name, date_of_birth, gender, phone, email,
+        address, id_proof, medical_history, eligibility_status,
+        consent_given, consent_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        donorCode,
+        fullName,
+        dateOfBirth,
+        gender,
+        phone,
+        email,
+        address,
+        idProof,
+        medicalHistory,
+        eligibilityStatus,
+        consentGiven,
+        consentAt,
+      ]
+    );
+
+    const insertId = result.insertId;
+    let finalDonorCode = donorCode;
+
+    if (!finalDonorCode) {
+      await connection.query(
+        "UPDATE donors SET donor_code = CONCAT('D-', LPAD(id, 6, '0')) WHERE id = ?",
+        [insertId]
+      );
+      finalDonorCode = `D-${String(insertId).padStart(6, '0')}`;
+    }
+
+    // Permanently audit registration
+    try {
+      await connection.query(
+        `INSERT INTO audit_log (action, entity_type, entity_id, details)
+         VALUES ('DONOR_REGISTERED', 'donor', ?, ?)`,
+        [finalDonorCode, JSON.stringify({ fullName, idProof, insertId, consentGiven })]
+      );
+    } catch (err) {
+      // Non-fatal if audit log fails
+    }
+
+    await connection.commit();
+
+    return {
+      id: insertId,
+      donorCode: finalDonorCode,
+      eligibilityStatus,
+    };
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 }
 
 /**

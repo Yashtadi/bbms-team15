@@ -20,9 +20,22 @@ router.post('/', requireRole('DONOR', 'LAB_TECH', 'ADMIN'), async (req, res) => 
       });
     }
 
-    if (error.status === 409 || error.code === 'ER_DUP_ENTRY') {
+    if (error.status === 409) {
       return res.status(409).json({
         message: error.message || 'A donor with this ID proof is already registered',
+      });
+    }
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      const isIdProofDuplicate = /id_proof/i.test(error.sqlMessage || error.message || '');
+      if (isIdProofDuplicate) {
+        return res.status(409).json({
+          message: 'A donor with this ID proof is already registered',
+        });
+      }
+      return res.status(500).json({
+        message: 'Failed to register donor',
+        error: error.message,
       });
     }
 

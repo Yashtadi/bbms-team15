@@ -64,11 +64,10 @@ describe('TC-Reg-03: unique donor ID generation (unit)', () => {
   });
 
   describe('Automatic assignment on registration', () => {
-    it('automatically generates and returns human-readable donorId on successful registration', async () => {
+    it('automatically generates and returns human-readable donorId via atomic createDonor', async () => {
       const mockRepo = {
         findByIdProof: jest.fn().mockResolvedValue(null),
-        generateNextDonorCode: jest.fn().mockResolvedValue('D-000123'),
-        createDonor: jest.fn().mockResolvedValue({ id: 123, donorCode: 'D-000123' }),
+        createDonor: jest.fn().mockResolvedValue({ id: 123, donorCode: 'D-000123', eligibilityStatus: 'PENDING' }),
       };
 
       const payload = {
@@ -81,11 +80,13 @@ describe('TC-Reg-03: unique donor ID generation (unit)', () => {
 
       const result = await registerDonor(payload, mockRepo);
 
-      expect(mockRepo.generateNextDonorCode).toHaveBeenCalled();
       expect(result).toHaveProperty('donorId', 'D-000123');
       expect(isValidDonorCode(result.donorId)).toBe(true);
       expect(mockRepo.createDonor).toHaveBeenCalledWith(
-        expect.objectContaining({ donorCode: 'D-000123' })
+        expect.objectContaining({
+          fullName: 'Rahul Dravid',
+          idProof: 'GOVT-ID-123',
+        })
       );
     });
   });

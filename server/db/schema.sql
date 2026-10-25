@@ -25,7 +25,7 @@ CREATE TABLE users (
 -- 2. donors: F-001 registration, F-002 eligibility, F-004 consent
 CREATE TABLE donors (
   id                  INT AUTO_INCREMENT PRIMARY KEY,
-  donor_code          VARCHAR(20) NOT NULL UNIQUE,   -- e.g. D-000001
+  donor_code          VARCHAR(20) NULL UNIQUE,   -- e.g. D-000001 (generated post-insert in same transaction)
   user_id             INT NULL UNIQUE,               -- set if the donor has a login
   full_name           VARCHAR(100) NOT NULL,
   date_of_birth       DATE NOT NULL,
