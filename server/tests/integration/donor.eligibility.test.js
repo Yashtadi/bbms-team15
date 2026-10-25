@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../../src/app');
 const db = require('../../src/db');
+const { authHeader } = require('../helpers/auth');
 
 describe('TC-Reg-02: eligibility API (integration)', () => {
   afterAll(async () => {
@@ -10,7 +11,7 @@ describe('TC-Reg-02: eligibility API (integration)', () => {
   describe('POST /api/donors/eligibility', () => {
     it('returns 422 with the reason for an ineligible donor (underage 17)', async () => {
       const res = await request(app)
-        .post('/api/donors/eligibility')
+        .post('/api/donors/eligibility').set(authHeader('LAB_TECH'))
         .send({
           age: 17,
           weight: 55,
@@ -26,7 +27,7 @@ describe('TC-Reg-02: eligibility API (integration)', () => {
 
     it('returns 422 with the reason for an ineligible donor (weight below 45 kg)', async () => {
       const res = await request(app)
-        .post('/api/donors/eligibility')
+        .post('/api/donors/eligibility').set(authHeader('LAB_TECH'))
         .send({
           age: 24,
           weight: 44.5,
@@ -41,7 +42,7 @@ describe('TC-Reg-02: eligibility API (integration)', () => {
 
     it('returns 422 with the reason for an ineligible donor (low haemoglobin < 12.5)', async () => {
       const res = await request(app)
-        .post('/api/donors/eligibility')
+        .post('/api/donors/eligibility').set(authHeader('LAB_TECH'))
         .send({
           age: 24,
           weight: 55,
@@ -56,7 +57,7 @@ describe('TC-Reg-02: eligibility API (integration)', () => {
 
     it('returns 422 with the reason when donation gap is less than 90 days', async () => {
       const res = await request(app)
-        .post('/api/donors/eligibility')
+        .post('/api/donors/eligibility').set(authHeader('LAB_TECH'))
         .send({
           age: 28,
           weight: 65,
@@ -71,7 +72,7 @@ describe('TC-Reg-02: eligibility API (integration)', () => {
 
     it('returns 200 when all criteria are satisfied', async () => {
       const res = await request(app)
-        .post('/api/donors/eligibility')
+        .post('/api/donors/eligibility').set(authHeader('LAB_TECH'))
         .send({
           age: 25,
           weight: 62,
@@ -89,7 +90,7 @@ describe('TC-Reg-02: eligibility API (integration)', () => {
   describe('POST /api/donors/:id/eligibility', () => {
     it('returns 404 if donor does not exist', async () => {
       const res = await request(app)
-        .post('/api/donors/999999/eligibility')
+        .post('/api/donors/999999/eligibility').set(authHeader('LAB_TECH'))
         .send({ weight: 60, hemoglobin: 13.5 });
 
       expect(res.status).toBe(404);

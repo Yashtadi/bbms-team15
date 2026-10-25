@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../../src/app');
 const db = require('../../src/db');
+const { authHeader } = require('../helpers/auth');
 
 describe('TC-Reg-01: POST /api/donors (integration)', () => {
   afterAll(async () => {
@@ -19,7 +20,7 @@ describe('TC-Reg-01: POST /api/donors (integration)', () => {
 
   it('creates a new donor in database and returns 201 { donorId, status }', async () => {
     const res = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send(validPayload);
 
     expect(res.status).toBe(201);
@@ -36,7 +37,7 @@ describe('TC-Reg-01: POST /api/donors (integration)', () => {
 
   it('rejects registering twice with the same ID proof with 409 Conflict', async () => {
     const res = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send(validPayload);
 
     expect(res.status).toBe(409);
@@ -45,7 +46,7 @@ describe('TC-Reg-01: POST /api/donors (integration)', () => {
 
   it('returns 400 with field-level error messages on invalid input', async () => {
     const res = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send({
         name: '',
         age: 15,

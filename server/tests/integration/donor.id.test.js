@@ -2,6 +2,7 @@ const request = require('supertest');
 const app = require('../../src/app');
 const db = require('../../src/db');
 const { deleteDonor } = require('../../src/modules/donor/donor.repository');
+const { authHeader } = require('../helpers/auth');
 
 describe('TC-Reg-03: unique donor ID (integration)', () => {
   afterAll(async () => {
@@ -13,7 +14,7 @@ describe('TC-Reg-03: unique donor ID (integration)', () => {
 
     // Registration 1
     const res1 = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send({
         name: 'First Consecutive Donor',
         age: 27,
@@ -29,7 +30,7 @@ describe('TC-Reg-03: unique donor ID (integration)', () => {
 
     // Registration 2
     const res2 = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send({
         name: 'Second Consecutive Donor',
         age: 32,
@@ -79,7 +80,7 @@ describe('TC-Reg-03: unique donor ID (integration)', () => {
 
     // Register a donor
     const res = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send({
         name: 'Temporary Donor',
         age: 29,
@@ -98,7 +99,7 @@ describe('TC-Reg-03: unique donor ID (integration)', () => {
 
     // Register the next donor
     const nextRes = await request(app)
-      .post('/api/donors')
+      .post('/api/donors').set(authHeader('LAB_TECH'))
       .send({
         name: 'Subsequent Donor',
         age: 30,
@@ -122,7 +123,7 @@ describe('TC-Reg-03: unique donor ID (integration)', () => {
 
     const registrations = Array.from({ length: count }, (_, i) =>
       request(app)
-        .post('/api/donors')
+        .post('/api/donors').set(authHeader('LAB_TECH'))
         .send({
           name: `Concurrent Donor ${i}`,
           age: 25 + i,
