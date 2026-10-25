@@ -115,4 +115,35 @@ describe('TC-Reg-03: unique donor ID (integration)', () => {
     expect(nextId).not.toBe(deletedId);
     expect(nextSeq).toBeGreaterThan(deletedSeq);
   });
+
+  it('registers ~5 donors concurrently with Promise.all and assigns 5 distinct IDs (#46)', async () => {
+    const timestamp = Date.now();
+    const count = 5;
+
+    const registrations = Array.from({ length: count }, (_, i) =>
+      request(app)
+        .post('/api/donors')
+        .send({
+          name: `Concurrent Donor ${i}`,
+          age: 25 + i,
+          gender: i % 2 === 0 ? 'MALE' : 'FEMALE',
+          contact: `980000000${i}`,
+          idProof: `ID-PARALLEL-${timestamp}-${i}`,
+        })
+    );
+
+    const responses = await Promise.all(registrations);
+
+    // All registrations must succeed with 201 Created without race condition errors
+    for (const res of responses) {
+      expect(res.status).toBe(201);
+      expect(res.body).toHaveProperty('donorId');
+      expect(res.body.donorId).toMatch(/^D-\d{6,}$/);
+    }
+
+    // All generated donor IDs must be strictly unique
+    const donorIds = responses.map((r) => r.body.donorId);
+    const uniqueIds = new Set(donorIds);
+    expect(uniqueIds.size).toBe(count);
+  });
 });

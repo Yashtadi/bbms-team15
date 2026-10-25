@@ -231,11 +231,8 @@ async function registerDonor(input, repository = defaultRepository) {
   const consentGiven = Boolean(input.consentGiven || input.consent);
   const consentAt = consentGiven ? new Date() : null;
 
-  // Generate unique human-readable donor code (e.g. D-000123)
-  const donorCode = await repository.generateNextDonorCode();
-
-  await repository.createDonor({
-    donorCode,
+  // BBMS-F-003 / #46: createDonor atomically assigns and returns the unique donorCode in a transaction
+  const createdDonor = await repository.createDonor({
     fullName,
     dateOfBirth,
     gender,
@@ -250,7 +247,7 @@ async function registerDonor(input, repository = defaultRepository) {
   });
 
   return {
-    donorId: donorCode,
+    donorId: createdDonor.donorCode,
     status: 'PENDING',
   };
 }
