@@ -7,7 +7,7 @@ const db = require('../../db');
  */
 async function findByIdProof(idProof) {
   const [rows] = await db.query(
-    'SELECT id, donor_code, id_proof, full_name, eligibility_status FROM donors WHERE id_proof = ?',
+    'SELECT id, donor_code, id_proof, full_name, eligibility_status, consent_given, consent_at FROM donors WHERE id_proof = ?',
     [idProof]
   );
   return rows[0] || null;
@@ -70,18 +70,23 @@ async function updateEligibility(id, { status, deferralReason = null, deferredUn
 }
 
 /**
+ * BBMS-F-004: Digitally captures and updates donor consent with timestamp.
+ * @param {number|string} idOrCode
+ * @param {boolean} consentGiven
+ * @param {Date|string} consentAt
+ * @returns {Promise<boolean>}
+ */
+async function updateConsent(idOrCode, consentGiven = true, consentAt = new Date()) {
+  const isNumeric = /^\d+$/.test(String(idOrCode));
+  const query = isNumeric
+    ? 'UPDATE donors SET consent_given = ?, consent_at = ? WHERE id = ?'
+    : 'UPDATE donors SET consent_given = ?, consent_at = ? WHERE donor_code = ?';
+  const [result] = await db.query(query, [consentGiven, consentAt, idOrCode]);
+  return result.affectedRows > 0;
+}
+
+/**
  * BBMS-F-003: Generates the next sequential, human-readable donor code (e.g. D-000123).
- * Acceptance criteria:
- * 1. Automatic generation on registration.
- * 2. Unique across the system (enforced by DB UNIQUE constraint).
- * 3. Never reused, even if a donor record is removed.
- * 4. Human-readable format (e.g. D-000123).
- *
- * Strategy:
- * - Checks AUTO_INCREMENT from information_schema (InnoDB monotonically advances even after deletion).
- * - Checks current MAX(id) in donors table.
- * - Checks audit_log to ensure deleted donor IDs are never recycled.
- * 
  * @returns {Promise<string>}
  */
 async function generateNextDonorCode() {
@@ -134,7 +139,6 @@ async function generateNextDonorCode() {
 
 /**
  * Inserts a new donor record into MySQL using parameterized query.
- * Logs event into audit_log to ensure auditability and permanent ID non-reuse.
  * @param {object} donor
  * @returns {Promise<object>}
  */
@@ -150,13 +154,16 @@ async function createDonor(donor) {
     idProof,
     medicalHistory = null,
     eligibilityStatus = 'PENDING',
+    consentGiven = false,
+    consentAt = null,
   } = donor;
 
   const [result] = await db.query(
     `INSERT INTO donors (
       donor_code, full_name, date_of_birth, gender, phone, email,
-      address, id_proof, medical_history, eligibility_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      address, id_proof, medical_history, eligibility_status,
+      consent_given, consent_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       donorCode,
       fullName,
@@ -168,15 +175,17 @@ async function createDonor(donor) {
       idProof,
       medicalHistory,
       eligibilityStatus,
+      consentGiven,
+      consentAt,
     ]
   );
 
-  // Permanently audit registration so donor_code is never recycled even if donor is deleted
+  // Permanently audit registration
   try {
     await db.query(
       `INSERT INTO audit_log (action, entity_type, entity_id, details)
        VALUES ('DONOR_REGISTERED', 'donor', ?, ?)`,
-      [donorCode, JSON.stringify({ fullName, idProof, insertId: result.insertId })]
+      [donorCode, JSON.stringify({ fullName, idProof, insertId: result.insertId, consentGiven })]
     );
   } catch (err) {
     // Non-fatal if audit log fails
@@ -209,6 +218,7 @@ module.exports = {
   findByIdOrCode,
   findLastDonation,
   updateEligibility,
+  updateConsent,
   generateNextDonorCode,
   createDonor,
   deleteDonor,

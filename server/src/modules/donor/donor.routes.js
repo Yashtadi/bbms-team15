@@ -34,6 +34,39 @@ router.post('/', requireRole('DONOR', 'LAB_TECH', 'ADMIN'), async (req, res) => 
 });
 
 /**
+ * BBMS-F-004: Digitally capture and record donor consent
+ * SAD §4.3: POST /api/donors/:id/consent -> 200 { donorId, consentGiven: true, consentAt }
+ */
+router.post('/:id/consent', requireRole('DONOR', 'LAB_TECH', 'ADMIN'), async (req, res) => {
+  try {
+    const consent = req.body.consent !== undefined 
+      ? req.body.consent 
+      : req.body.consentGiven !== undefined 
+        ? req.body.consentGiven 
+        : true;
+
+    const result = await donorService.recordConsent(req.params.id, consent);
+    return res.status(200).json({
+      ...result,
+      message: 'Consent digitally recorded',
+    });
+  } catch (error) {
+    if (error.status === 404) {
+      return res.status(404).json({ message: error.message || 'Donor not found' });
+    }
+
+    if (error.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    return res.status(500).json({
+      message: 'Failed to record donor consent',
+      error: error.message,
+    });
+  }
+});
+
+/**
  * BBMS-F-002: Evaluate donor eligibility by donor ID
  * SAD §4.3: POST /api/donors/:id/eligibility -> 200 { eligible, status } or 422 { eligible: false, reason }
  */
