@@ -1,4 +1,5 @@
 # Blood Bank Management System (BBMS) – Team 15
+![CI](https://github.com/Yashtadi/bbms-team15/actions/workflows/ci.yml/badge.svg)
 
 Software Engineering mini project, PES University.
 
