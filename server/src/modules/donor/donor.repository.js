@@ -24,6 +24,52 @@ async function findById(id) {
 }
 
 /**
+ * Finds a donor by numeric ID or donor_code string (e.g. 1 or 'D-000001').
+ * @param {number|string} idOrCode
+ * @returns {Promise<object|null>}
+ */
+async function findByIdOrCode(idOrCode) {
+  const isNumeric = /^\d+$/.test(String(idOrCode));
+  const query = isNumeric
+    ? 'SELECT * FROM donors WHERE id = ?'
+    : 'SELECT * FROM donors WHERE donor_code = ?';
+  const [rows] = await db.query(query, [idOrCode]);
+  return rows[0] || null;
+}
+
+/**
+ * Finds the latest completed donation for a given donor.
+ * @param {number} donorId
+ * @returns {Promise<object|null>}
+ */
+async function findLastDonation(donorId) {
+  const [rows] = await db.query(
+    `SELECT id, donor_id, collected_at, status, volume_ml
+     FROM donations
+     WHERE donor_id = ? AND status = 'COMPLETED'
+     ORDER BY collected_at DESC
+     LIMIT 1`,
+    [donorId]
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Updates a donor's eligibility status, deferral reason, and deferral end date.
+ * @param {number} id
+ * @param {{ status: string, deferralReason?: string|null, deferredUntil?: string|null }} data
+ * @returns {Promise<void>}
+ */
+async function updateEligibility(id, { status, deferralReason = null, deferredUntil = null }) {
+  await db.query(
+    `UPDATE donors
+     SET eligibility_status = ?, deferral_reason = ?, deferred_until = ?
+     WHERE id = ?`,
+    [status, deferralReason, deferredUntil, id]
+  );
+}
+
+/**
  * Generates the next sequential donor code (e.g. D-000006).
  * @returns {Promise<string>}
  */
@@ -81,6 +127,9 @@ async function createDonor(donor) {
 module.exports = {
   findByIdProof,
   findById,
+  findByIdOrCode,
+  findLastDonation,
+  updateEligibility,
   generateNextDonorCode,
   createDonor,
 };
