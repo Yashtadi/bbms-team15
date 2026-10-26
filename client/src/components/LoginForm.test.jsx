@@ -41,4 +41,37 @@ describe('TC-Sec-02: LoginForm', () => {
     expect(onLogin).not.toHaveBeenCalled();
     expect(sessionStorage.getItem('bbms.session')).toBeNull();
   });
+
+  it('shows descriptive server error message when server returns 500', async () => {
+    const user = userEvent.setup();
+    global.fetch = vi.fn().mockResolvedValue({
+      status: 500,
+      json: async () => ({ message: 'Server error during login. Please verify database connection and configuration.' }),
+    });
+    const onLogin = vi.fn();
+
+    render(<LoginForm onLogin={onLogin} />);
+    await user.type(screen.getByLabelText('Email'), 'labtech@bbms.test');
+    await user.type(screen.getByLabelText('Password'), 'Password@123');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Server error during login');
+    expect(onLogin).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('bbms.session')).toBeNull();
+  });
+
+  it('shows connection error when backend server is unreachable', async () => {
+    const user = userEvent.setup();
+    global.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
+    const onLogin = vi.fn();
+
+    render(<LoginForm onLogin={onLogin} />);
+    await user.type(screen.getByLabelText('Email'), 'labtech@bbms.test');
+    await user.type(screen.getByLabelText('Password'), 'Password@123');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to connect to server');
+    expect(onLogin).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('bbms.session')).toBeNull();
+  });
 });

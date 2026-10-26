@@ -113,8 +113,10 @@ npm run db:setup
 You should see `Database "bbms" is ready.`
 
 This creates the `bbms` database, all tables (`server/db/schema.sql`) and fake test data
-(`server/db/seed.sql`). **Run it again any time you want a fresh database. It deletes all data.**
-Run it again after pulling changes to `schema.sql` or `seed.sql`.
+(`server/db/seed.sql`).
+
+> ⚠️ **IMPORTANT: Re-run `npm run db:setup` (inside `server/`) after any pull that updates `schema.sql`, `seed.sql`, or auth.**
+> Whenever changes to tables, seeds, or password hashes are pulled from `main`, your local MySQL database must be refreshed. If you skip this, queries may fail or demo logins will return `500 Server error` because the database lacks the updated columns or password hashes. **It deletes all data and gives you a fresh demo database.**
 
 ### 2.5 Check everything works
 
@@ -420,6 +422,11 @@ The `-u` is only needed the first time. After that, plain `git push` works.
 git switch main
 git pull
 git branch -d feature/F-001-donor-registration
+
+# If package.json, schema.sql or seed.sql changed:
+cd server
+npm install
+npm run db:setup
 ```
 
 Check that your card moved to **Done** on the board.
@@ -433,6 +440,10 @@ git switch main
 git pull
 git switch feature/F-001-donor-registration
 git merge main
+
+# If schema.sql or seed.sql changed:
+cd server
+npm run db:setup
 ```
 
 ---
@@ -553,6 +564,8 @@ Also test that the **wrong role gets 403**, e.g. `.set(authHeader('HOSPITAL'))`.
 | You staged `.env` or `node_modules` by accident | — | `git reset` (unstages everything, your files are kept) |
 | You **committed** `.env` | — | `git rm --cached server/.env`, commit, and tell Yash. If it was pushed, change the passwords in it. |
 | `requireRole` throws `Unknown role "..."` | Misspelt role | Use one of `DONOR`, `LAB_TECH`, `MANAGER`, `HOSPITAL`, `ADMIN` |
+| `Login failed` / `Server error during login` | DB missing latest schema/seeds or missing `JWT_SECRET` | 1. In `server/`, run `npm run db:setup` to refresh schema and password hashes.<br>2. Ensure `JWT_SECRET` is defined in `server/.env`.<br>3. Verify MySQL is running. |
+| `Unable to connect to server` in browser | Backend is not running | In `server/`, run `npm run dev` to start API on port 4000. |
 | Your commits don't show your GitHub profile picture | Wrong git email | See [2.2](#22-tell-git-who-you-are-once-per-laptop) |
 
 ---
@@ -563,6 +576,7 @@ Also test that the **wrong role gets 403**, e.g. `.set(authHeader('HOSPITAL'))`.
 # --- start of a new issue ---
 git switch main
 git pull
+cd server && npm install && npm run db:setup   # refresh dependencies & DB if changed
 git switch -c feature/<id>-<short-name>
 
 # --- while working (inside server/) ---

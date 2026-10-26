@@ -29,14 +29,28 @@ export function apiFetch(path, options = {}) {
 }
 
 export async function login(email, password) {
-  const response = await apiFetch('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
-  const data = await response.json();
+  let response;
+  try {
+    response = await apiFetch('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  } catch (err) {
+    throw new Error('Unable to connect to server. Please ensure the backend is running on port 4000.');
+  }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
 
   if (response.status !== 200) {
-    throw new Error(data.message || 'Login failed');
+    if (response.status === 500) {
+      throw new Error(data?.message || 'Server error during login. Please verify database connection and configuration.');
+    }
+    throw new Error(data?.message || 'Login failed');
   }
 
   saveSession(data);
