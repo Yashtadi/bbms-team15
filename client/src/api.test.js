@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { apiFetch, saveSession } from './api';
+import { apiFetch, saveSession, login } from './api';
 
 describe('TC-Sec-02: apiFetch', () => {
   afterEach(() => {
@@ -24,5 +24,24 @@ describe('TC-Sec-02: apiFetch', () => {
 
     const [, options] = global.fetch.mock.calls[0];
     expect(options.headers).not.toHaveProperty('Authorization');
+  });
+
+  it('handles network failure in login gracefully', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+    await expect(login('user@bbms.test', 'pass')).rejects.toThrow(
+      'Unable to connect to server. Please ensure the backend is running on port 4000.'
+    );
+  });
+
+  it('handles 500 server error in login with descriptive message', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      status: 500,
+      json: async () => ({ message: 'Database connection failed' }),
+    });
+
+    await expect(login('user@bbms.test', 'pass')).rejects.toThrow(
+      'Database connection failed'
+    );
   });
 });

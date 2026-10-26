@@ -18,7 +18,11 @@ router.post('/login', async (req, res) => {
     if (error.status === 400 || error.status === 401) {
       return res.status(error.status).json({ message: error.message });
     }
-    return res.status(500).json({ message: 'Login failed' });
+    console.error('Login error (500):', error);
+    return res.status(500).json({
+      message: 'Server error during login. Please verify database connection and configuration.',
+      error: process.env.NODE_ENV === 'production' ? undefined : error.message,
+    });
   }
 });
 
