@@ -36,4 +36,18 @@ describe('App', () => {
       expect(screen.queryByRole('heading', { name: 'Donation Vitals' })).not.toBeInTheDocument();
     },
   );
+
+  it.each(['LAB_TECH', 'MANAGER', 'ADMIN'])('TC-Don-03: shows the blood unit label panel to %s', (role) => {
+    logInAs(role);
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'Blood Unit Label' })).toBeInTheDocument();
+  });
+
+  it.each(['HOSPITAL', 'DONOR'])('TC-Don-03: hides the blood unit label panel from %s', (role) => {
+    logInAs(role);
+    render(<App />);
+
+    expect(screen.queryByRole('heading', { name: 'Blood Unit Label' })).not.toBeInTheDocument();
+  });
 });

@@ -1,0 +1,130 @@
+/* BBMS-F-012: blood-unit label and lookup panel.
+   The panel reuses the form classes in DonorRegistrationForm.css. */
+
+.unit-record {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.75rem 0 0;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  background: rgba(0, 73, 183, 0.06);
+  border: 1.5px solid rgba(0, 73, 183, 0.2);
+  text-align: left;
+}
+
+.unit-record dt,
+.unit-label-fields dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.unit-record dd {
+  margin: 0.2rem 0 0;
+  font-weight: 700;
+}
+
+/* The label itself: black on white so it prints and scans the same as it looks */
+.unit-label {
+  box-sizing: border-box;
+  width: 100mm;
+  max-width: 100%;
+  margin: 1.5rem auto;
+  padding: 3mm 4mm;
+  background: #ffffff;
+  color: #000000;
+  border: 1.5px solid #000000;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.unit-label-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin-bottom: 2mm;
+}
+
+.unit-label-barcode {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.unit-label-id {
+  font-family: ui-monospace, monospace;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  margin: 1mm 0 2mm;
+}
+
+.unit-label-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2mm;
+  margin: 0;
+  padding-top: 2mm;
+  border-top: 1px dashed #000000;
+}
+
+.unit-label-fields dt {
+  color: #000000;
+}
+
+.unit-label-fields dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.unit-label-group {
+  font-size: 1.25rem;
+}
+
+/* Blood group not known yet: outlined so it can't be mistaken for a real group */
+.unit-label-group-pending {
+  display: inline-block;
+  font-size: 0.85rem;
+  padding: 0 1.5mm;
+  border: 1.5px solid #000000;
+  border-radius: 3px;
+}
+
+/* Print only the label, at its real size, when one is on screen */
+@media print {
+  body:has(.unit-label) {
+    background: none;
+    padding: 0;
+    display: block;
+    min-height: 0;
+  }
+
+  body:has(.unit-label) main > :not(.unit-lookup-container),
+  body:has(.unit-label) .unit-lookup-container > :not(.unit-label) {
+    display: none;
+  }
+
+  body:has(.unit-label) .unit-lookup-container {
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: none;
+  }
+
+  body:has(.unit-label) .unit-lookup-container::before {
+    display: none;
+  }
+
+  body:has(.unit-label) .unit-label {
+    height: 50mm;
+    margin: 0;
+    max-width: none;
+  }
+}
