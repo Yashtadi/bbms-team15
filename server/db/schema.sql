@@ -62,10 +62,11 @@ CREATE TABLE donations (
   bp_diastolic       SMALLINT NULL,
   pulse_bpm          SMALLINT NULL,
   temperature_c      DECIMAL(4,1) NULL,
-  -- post-donation
+  -- post-donation vitals
   post_bp_systolic   SMALLINT NULL,
   post_bp_diastolic  SMALLINT NULL,
   post_pulse_bpm     SMALLINT NULL,
+  post_hemoglobin_g_dl DECIMAL(4,1) NULL,           -- F-011
   adverse_reaction   VARCHAR(255) NULL,
   FOREIGN KEY (donor_id) REFERENCES donors(id),
   FOREIGN KEY (collected_by) REFERENCES users(id)
