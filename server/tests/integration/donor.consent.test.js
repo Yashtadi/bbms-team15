@@ -63,6 +63,12 @@ describe('TC-Reg-04: digital donor consent (integration)', () => {
   });
 
   it('allows donation session once consent has been digitally captured (AC 1)', async () => {
+    // F-010: a session also needs the donor to pass eligibility screening (F-002)
+    const screening = await request(app)
+      .post(`/api/donors/${createdDonorId}/eligibility`).set(authHeader('LAB_TECH'))
+      .send({ weight: 70, hemoglobin: 14 });
+    expect(screening.status).toBe(200);
+
     const res = await request(app)
       .post('/api/donations').set(authHeader('LAB_TECH'))
       .send({
