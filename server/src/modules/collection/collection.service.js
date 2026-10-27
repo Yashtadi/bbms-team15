@@ -202,6 +202,189 @@ async function startDonation(
   };
 }
 
+/**
+ * BBMS-F-011: Vitals are recorded before (PRE) and after (POST) the donation.
+ */
+const VITAL_PHASES = ['PRE', 'POST'];
+
+const PHASE_LABELS = { PRE: 'pre-donation', POST: 'post-donation' };
+
+/**
+ * BBMS-F-011: Rules for each vital sign.
+ * valid: anything outside this is impossible input and is rejected with 400.
+ * safe:  anything outside this is stored, but flagged with a warning.
+ * Bounds are inclusive. The safe ranges are team assumptions (see DEVIATIONS.md).
+ */
+const VITAL_RULES = {
+  bpSystolic: { label: 'Systolic BP', unit: 'mmHg', decimals: 0, valid: { min: 1, max: 300 }, safe: { min: 100, max: 140 } },
+  bpDiastolic: { label: 'Diastolic BP', unit: 'mmHg', decimals: 0, valid: { min: 1, max: 200 }, safe: { min: 60, max: 90 } },
+  pulseBpm: { label: 'Pulse', unit: 'bpm', decimals: 0, valid: { min: 1, max: 250 }, safe: { min: 60, max: 100 } },
+  hemoglobinGDl: { label: 'Haemoglobin', unit: 'g/dL', decimals: 1, valid: { min: 0.1, max: 25 }, safe: { min: 12.5, max: 18 } },
+};
+
+const VITAL_FIELDS = Object.keys(VITAL_RULES);
+
+// Haemoglobin is expected to drop right after donating, so a low post-donation
+// reading is not flagged. A high one still is (see DEVIATIONS.md).
+const POST_SAFE_RANGE_OVERRIDES = { hemoglobinGDl: { min: null } };
+
+/**
+ * BBMS-F-011: The safe range for one vital in one phase. min or max is null when there is no limit.
+ * @param {string} field
+ * @param {string} phase PRE or POST
+ * @returns {{ min: number|null, max: number|null }}
+ */
+function safeRangeFor(field, phase) {
+  const override = phase === 'POST' ? POST_SAFE_RANGE_OVERRIDES[field] : undefined;
+  return { ...VITAL_RULES[field].safe, ...override };
+}
+
+function hasAtMostDecimals(value, decimals) {
+  const scaled = value * 10 ** decimals;
+  return Math.abs(scaled - Math.round(scaled)) < 1e-9;
+}
+
+function invalidVitalMessage({ label, unit, decimals, valid }) {
+  if (decimals === 0) {
+    return `${label} must be a whole number between ${valid.min} and ${valid.max} ${unit}`;
+  }
+  return `${label} must be between ${valid.min} and ${valid.max} ${unit}, with at most ${decimals} decimal place`;
+}
+
+/**
+ * BBMS-F-011: Validates a set of vitals (400 on failure). All four readings are required.
+ * Numbers and numeric strings are accepted; negative, non-numeric and impossible values are not.
+ * @param {object} input
+ * @returns {{ isValid: boolean, errors: object, vitals: object }}
+ */
+function validateVitals(input = {}) {
+  const errors = {};
+  const vitals = {};
+
+  VITAL_FIELDS.forEach((field) => {
+    const rule = VITAL_RULES[field];
+    const raw = input[field];
+
+    if (raw === undefined || raw === null || (typeof raw === 'string' && raw.trim() === '')) {
+      errors[field] = `${rule.label} is required`;
+      return;
+    }
+
+    // Only numbers and numeric strings count; anything else (e.g. true) becomes NaN
+    const value = typeof raw === 'number' || typeof raw === 'string' ? Number(raw) : NaN;
+    if (!Number.isFinite(value)) {
+      errors[field] = `${rule.label} must be a number`;
+      return;
+    }
+
+    if (value < rule.valid.min || value > rule.valid.max || !hasAtMostDecimals(value, rule.decimals)) {
+      errors[field] = invalidVitalMessage(rule);
+      return;
+    }
+
+    vitals[field] = value;
+  });
+
+  if (!errors.bpSystolic && !errors.bpDiastolic && vitals.bpDiastolic >= vitals.bpSystolic) {
+    errors.bpDiastolic = 'Diastolic BP must be lower than systolic BP';
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+    vitals,
+  };
+}
+
+/**
+ * BBMS-F-011: Flags readings outside the safe range for the given phase.
+ * @param {object} vitals validated vitals
+ * @param {string} phase PRE or POST
+ * @returns {Array<{ field: string, value: number, min: number|null, max: number|null, message: string }>}
+ */
+function checkVitalsSafety(vitals, phase = 'PRE') {
+  const warnings = [];
+
+  VITAL_FIELDS.forEach((field) => {
+    const value = vitals[field];
+    if (value === undefined || value === null) return;
+
+    const { label, unit } = VITAL_RULES[field];
+    const { min, max } = safeRangeFor(field, phase);
+    let problem = null;
+    if (min !== null && value < min) problem = `below the safe minimum of ${min} ${unit}`;
+    if (max !== null && value > max) problem = `above the safe maximum of ${max} ${unit}`;
+
+    if (problem) {
+      warnings.push({
+        field,
+        value,
+        min,
+        max,
+        message: `${label} ${value} ${unit} is ${problem} (${PHASE_LABELS[phase]})`,
+      });
+    }
+  });
+
+  return warnings;
+}
+
+/**
+ * BBMS-F-011: Records pre- or post-donation vitals against a donation session.
+ *
+ * Acceptance criteria (BBMS-F-011):
+ * 1. Captures pre- and post-donation BP, pulse and haemoglobin.
+ * 2. Vitals stored against the donation session.
+ * 3. Out-of-safe-range values are flagged with a visible warning (returned in `warnings`).
+ * 4. Invalid values (negative, non-numeric) rejected with 400.
+ *
+ * Out-of-range values are still stored. Recording a phase again overwrites it, so typos can be fixed.
+ *
+ * @param {number|string} donationId
+ * @param {string} phase PRE or POST
+ * @param {object} input
+ * @param {object} collectionRepo
+ * @returns {Promise<{ donationId: number, phase: string, vitals: object, warnings: Array }>}
+ */
+async function recordVitals(donationId, phase, input, collectionRepo = defaultCollectionRepository) {
+  if (!VITAL_PHASES.includes(phase)) {
+    throw new Error(`Unknown vitals phase "${phase}"`);
+  }
+
+  // A non-numeric id can never match a donation (and MySQL would cast '12abc' to 12)
+  const id = /^\d+$/.test(String(donationId)) ? Number(donationId) : NaN;
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    const error = new Error('Donation not found');
+    error.status = 404;
+    throw error;
+  }
+
+  const validation = validateVitals(input);
+  if (!validation.isValid) {
+    const error = new Error('Validation failed');
+    error.status = 400;
+    error.errors = validation.errors;
+    throw error;
+  }
+  const { vitals } = validation;
+
+  const donation = await collectionRepo.findById(id);
+  if (!donation) {
+    const error = new Error('Donation not found');
+    error.status = 404;
+    throw error;
+  }
+
+  await collectionRepo.updateVitals(id, phase, vitals);
+
+  return {
+    donationId: id,
+    phase,
+    vitals,
+    warnings: checkVitalsSafety(vitals, phase),
+  };
+}
+
 module.exports = {
   DONATION_TYPES,
   UNIT_SPEC_BY_DONATION_TYPE,
@@ -210,4 +393,8 @@ module.exports = {
   validateSessionInput,
   buildUnitForSession,
   startDonation,
+  safeRangeFor,
+  validateVitals,
+  checkVitalsSafety,
+  recordVitals,
 };

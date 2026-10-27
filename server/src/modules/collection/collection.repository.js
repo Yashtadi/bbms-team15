@@ -76,7 +76,39 @@ async function createSession(data) {
   }
 }
 
+// BBMS-F-011: One fixed statement per phase, so column names never come from input.
+const UPDATE_VITALS_SQL = {
+  PRE: `UPDATE donations
+        SET bp_systolic = ?, bp_diastolic = ?, pulse_bpm = ?, hemoglobin_g_dl = ?
+        WHERE id = ?`,
+  POST: `UPDATE donations
+         SET post_bp_systolic = ?, post_bp_diastolic = ?, post_pulse_bpm = ?, post_hemoglobin_g_dl = ?
+         WHERE id = ?`,
+};
+
+/**
+ * BBMS-F-011: Stores pre- or post-donation vitals on a donation, overwriting earlier readings.
+ * @param {number} donationId
+ * @param {string} phase PRE or POST
+ * @param {{ bpSystolic: number, bpDiastolic: number, pulseBpm: number, hemoglobinGDl: number }} vitals
+ * @returns {Promise<void>}
+ */
+async function updateVitals(donationId, phase, vitals) {
+  const sql = UPDATE_VITALS_SQL[phase];
+  if (!sql) {
+    throw new Error(`Unknown vitals phase "${phase}"`);
+  }
+  await db.query(sql, [
+    vitals.bpSystolic,
+    vitals.bpDiastolic,
+    vitals.pulseBpm,
+    vitals.hemoglobinGDl,
+    donationId,
+  ]);
+}
+
 module.exports = {
   createSession,
   findById,
+  updateVitals,
 };
