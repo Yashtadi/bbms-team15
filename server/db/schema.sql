@@ -5,7 +5,7 @@
 -- Run it inside the bbms database (see CONTRIBUTING.md).
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS audit_log, issuances, crossmatches, lab_results,
+DROP TABLE IF EXISTS notifications, audit_log, issuances, crossmatches, lab_results,
                      blood_units, blood_requests, donations, donors, users;
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -41,6 +41,8 @@ CREATE TABLE donors (
   deferred_until      DATE NULL,
   consent_given       BOOLEAN NOT NULL DEFAULT FALSE,
   consent_at          DATETIME NULL,
+  follow_up_required  BOOLEAN NOT NULL DEFAULT FALSE,
+  follow_up_reason    VARCHAR(255) NULL,
   created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
@@ -115,14 +117,25 @@ CREATE TABLE lab_results (
   donation_id  INT NOT NULL,
   test_type    ENUM('ABO_RH','HIV','HBV','HCV','SYPHILIS','MALARIA') NOT NULL,
   result       VARCHAR(20) NOT NULL,      -- ABO_RH: 'A+', 'O-', ...   others: 'NON_REACTIVE' / 'REACTIVE'
+  method       ENUM('NAT','ELISA') NULL,   -- Required by the API for TTI results
   tested_by    INT NOT NULL,
   tested_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   verified_by  INT NULL,                  -- F-020 two-step check: must be a different technician
   verified_at  DATETIME NULL,
+  verification_result VARCHAR(5) NULL,    -- Captures a mismatched ABO/Rh verification attempt
+  verification_status ENUM('PENDING','MISMATCH','VERIFIED') NOT NULL DEFAULT 'PENDING',
   UNIQUE (donation_id, test_type),        -- each test recorded once per donation
   FOREIGN KEY (donation_id) REFERENCES donations(id),
   FOREIGN KEY (tested_by) REFERENCES users(id),
-  FOREIGN KEY (verified_by) REFERENCES users(id)
+  FOREIGN KEY (verified_by) REFERENCES users(id),
+  CHECK (
+    (test_type = 'ABO_RH' AND result IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'))
+    OR (test_type <> 'ABO_RH' AND result IN ('REACTIVE', 'NON_REACTIVE'))
+  ),
+  CHECK (
+    (test_type = 'ABO_RH' AND method IS NULL)
+    OR (test_type <> 'ABO_RH' AND method IS NOT NULL)
+  )
 );
 
 -- 7. crossmatches: F-041, a unit must be compatible with the patient before issue
@@ -164,4 +177,18 @@ CREATE TABLE audit_log (
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id),
   INDEX idx_audit_entity (entity_type, entity_id)
+);
+
+-- Confidential in-app alerts are delivered only to their intended staff recipient.
+CREATE TABLE notifications (
+  id                 BIGINT AUTO_INCREMENT PRIMARY KEY,
+  recipient_user_id  INT NOT NULL,
+  event_type         ENUM('REACTIVE_TTI') NOT NULL,
+  message            VARCHAR(255) NOT NULL,
+  entity_type        VARCHAR(30) NOT NULL,
+  entity_id          VARCHAR(30) NOT NULL,
+  created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  read_at            DATETIME NULL,
+  FOREIGN KEY (recipient_user_id) REFERENCES users(id),
+  INDEX idx_notifications_recipient (recipient_user_id, created_at)
 );
