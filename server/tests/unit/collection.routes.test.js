@@ -78,3 +78,94 @@ describe('TC-Don-01: collection.routes access and error mapping (unit)', () => {
     expect(res.body).toEqual({ message: 'Validation failed', errors: error.errors });
   });
 });
+
+describe('TC-Don-02: vitals routes access and error mapping (unit)', () => {
+  let app;
+  const vitals = { bpSystolic: 120, bpDiastolic: 80, pulseBpm: 72, hemoglobinGDl: 13.5 };
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/donations', router);
+    jest.clearAllMocks();
+  });
+
+  it.each(['pre', 'post'])('returns 401 without a token (%s)', async (phase) => {
+    const res = await request(app).put(`/api/donations/21/vitals/${phase}`).send(vitals);
+
+    expect(res.status).toBe(401);
+    expect(collectionService.recordVitals).not.toHaveBeenCalled();
+  });
+
+  it.each(['ADMIN', 'MANAGER', 'HOSPITAL', 'DONOR'])('returns 403 for the %s role', async (role) => {
+    const res = await request(app).put('/api/donations/21/vitals/pre').set(authHeader(role)).send(vitals);
+
+    expect(res.status).toBe(403);
+    expect(collectionService.recordVitals).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['pre', 'PRE'],
+    ['post', 'POST'],
+  ])('lets LAB_TECH record %s-donation vitals (AC 1)', async (path, phase) => {
+    const result = { donationId: 21, phase, vitals, warnings: [] };
+    collectionService.recordVitals.mockResolvedValue(result);
+
+    const res = await request(app).put(`/api/donations/21/vitals/${path}`).set(authHeader('LAB_TECH')).send(vitals);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(result);
+    expect(collectionService.recordVitals).toHaveBeenCalledWith('21', phase, vitals);
+  });
+
+  it('passes warnings through with 200 (AC 3)', async () => {
+    const warnings = [{ field: 'pulseBpm', value: 101, min: 60, max: 100, message: 'Pulse 101 bpm is above ...' }];
+    collectionService.recordVitals.mockResolvedValue({ donationId: 21, phase: 'PRE', vitals, warnings });
+
+    const res = await request(app).put('/api/donations/21/vitals/pre').set(authHeader('LAB_TECH')).send(vitals);
+
+    expect(res.status).toBe(200);
+    expect(res.body.warnings).toEqual(warnings);
+  });
+
+  it('returns 400 with field errors (AC 4)', async () => {
+    const error = new Error('Validation failed');
+    error.status = 400;
+    error.errors = { pulseBpm: 'Pulse must be a number' };
+    collectionService.recordVitals.mockRejectedValue(error);
+
+    const res = await request(app)
+      .put('/api/donations/21/vitals/pre').set(authHeader('LAB_TECH'))
+      .send({ ...vitals, pulseBpm: 'abc' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ message: 'Validation failed', errors: error.errors });
+  });
+
+  it('returns 404 for an unknown donation', async () => {
+    const error = new Error('Donation not found');
+    error.status = 404;
+    collectionService.recordVitals.mockRejectedValue(error);
+
+    const res = await request(app).put('/api/donations/999999/vitals/post').set(authHeader('LAB_TECH')).send(vitals);
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ message: 'Donation not found' });
+  });
+
+  it('returns 500 on an unexpected error', async () => {
+    collectionService.recordVitals.mockRejectedValue(new Error('DB down'));
+
+    const res = await request(app).put('/api/donations/21/vitals/pre').set(authHeader('LAB_TECH')).send(vitals);
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Failed to record vitals');
+  });
+
+  it('has no route for other phases', async () => {
+    const res = await request(app).put('/api/donations/21/vitals/during').set(authHeader('LAB_TECH')).send(vitals);
+
+    expect(res.status).toBe(404);
+    expect(collectionService.recordVitals).not.toHaveBeenCalled();
+  });
+});
