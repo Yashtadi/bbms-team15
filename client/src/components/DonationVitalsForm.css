@@ -1,0 +1,25 @@
+/* BBMS-F-011: Donation vitals form.
+   Layout, inputs and buttons reuse the classes in DonorRegistrationForm.css. */
+
+.alert-success {
+  background-color: rgba(0, 73, 183, 0.08);
+  color: #0049B7;
+  border: 1.5px solid rgba(0, 73, 183, 0.3);
+}
+
+/* Out-of-safe-range readings: must stand out from the rest of the form */
+.alert-warning {
+  background-color: #FFF685;
+  color: #5c4a00;
+  border: 2px solid #e0b800;
+}
+
+.alert-warning ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  font-weight: 500;
+}
+
+.alert-warning li + li {
+  margin-top: 0.25rem;
+}
