@@ -69,4 +69,30 @@ function recordVitalsHandler(phase) {
 router.put('/:id/vitals/pre', requireRole('LAB_TECH'), recordVitalsHandler('PRE'));
 router.put('/:id/vitals/post', requireRole('LAB_TECH'), recordVitalsHandler('POST'));
 
+/**
+ * BBMS-F-012: Look up a blood unit by its barcode (scanned or typed unit ID)
+ * GET /api/donations/units/:unitId -> 200 { unitId, barcode, bloodGroup, collectedAt, ... }
+ * LAB_TECH prints labels; MANAGER and ADMIN may also look units up. Others get 403.
+ * A malformed code gets 400, an unknown one 404.
+ */
+router.get('/units/:unitId', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const unit = await collectionService.getUnitByBarcode(req.params.unitId);
+    return res.status(200).json(unit);
+  } catch (error) {
+    if (error.status === 404) {
+      return res.status(404).json({ message: error.message || 'Blood unit not found' });
+    }
+
+    if (error.status === 400) {
+      return res.status(400).json({ message: error.message, errors: error.errors || {} });
+    }
+
+    return res.status(500).json({
+      message: 'Failed to look up blood unit',
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

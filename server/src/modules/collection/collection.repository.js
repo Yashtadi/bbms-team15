@@ -107,8 +107,24 @@ async function updateVitals(donationId, phase, vitals) {
   ]);
 }
 
+/**
+ * BBMS-F-012: Finds a blood unit by its unit code (the value encoded in its barcode).
+ * @param {string} unitCode e.g. U-2026-000001
+ * @returns {Promise<object|null>}
+ */
+async function findUnitByCode(unitCode) {
+  const [rows] = await db.query(
+    `SELECT id, unit_code, donation_id, component, blood_group, volume_ml,
+            collected_at, expires_at, status
+     FROM blood_units WHERE unit_code = ?`,
+    [unitCode]
+  );
+  return rows[0] || null;
+}
+
 module.exports = {
   createSession,
   findById,
   updateVitals,
+  findUnitByCode,
 };

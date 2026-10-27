@@ -385,6 +385,80 @@ async function recordVitals(donationId, phase, input, collectionRepo = defaultCo
   };
 }
 
+/**
+ * BBMS-F-012: Barcode symbology for blood-unit labels. Code 128 can encode the
+ * letters, digits and dashes of a unit code (see DEVIATIONS.md).
+ */
+const BARCODE_FORMAT = 'CODE128';
+
+/**
+ * BBMS-F-012: A unit code as built by formatUnitCode, e.g. U-2026-000123.
+ */
+const UNIT_CODE_PATTERN = /^U-\d{4}-\d{6,}$/;
+
+/**
+ * BBMS-F-012: Cleans up a scanned or typed unit code. Surrounding spaces and lower case
+ * are accepted, so 'u-2026-000007 ' finds U-2026-000007.
+ * @param {*} value
+ * @returns {string|null} the unit code, or null if it is not a valid unit code
+ */
+function normaliseUnitCode(value) {
+  if (typeof value !== 'string') return null;
+  const code = value.trim().toUpperCase();
+  return UNIT_CODE_PATTERN.test(code) ? code : null;
+}
+
+/**
+ * BBMS-F-012: Turns a blood_units row into the unit record used for lookups and labels.
+ * The barcode encodes exactly the unit ID. Blood group shows PENDING until lab testing (F-020).
+ * @param {object} row
+ * @returns {object}
+ */
+function buildUnitRecord(row) {
+  return {
+    unitId: row.unit_code,
+    barcode: { format: BARCODE_FORMAT, value: row.unit_code },
+    bloodGroup: row.blood_group || 'PENDING',
+    component: row.component,
+    volumeMl: row.volume_ml,
+    status: row.status,
+    collectedAt: row.collected_at,
+    expiresAt: row.expires_at,
+    donationId: row.donation_id,
+  };
+}
+
+/**
+ * BBMS-F-012: Looks up a blood unit by its barcode (its unit ID).
+ *
+ * Acceptance criteria (BBMS-F-012):
+ * 1. Each unit's barcode encodes its unit ID (unit IDs are unique, F-010).
+ * 2. The record has the unit ID, blood group (PENDING until lab testing) and collection date.
+ * 4. Scanning or entering the code returns the matching unit record.
+ *
+ * @param {*} rawCode scanned or typed code
+ * @param {object} collectionRepo
+ * @returns {Promise<object>}
+ */
+async function getUnitByBarcode(rawCode, collectionRepo = defaultCollectionRepository) {
+  const unitCode = normaliseUnitCode(rawCode);
+  if (!unitCode) {
+    const error = new Error('Validation failed');
+    error.status = 400;
+    error.errors = { unitId: 'Unit ID must look like U-2026-000123' };
+    throw error;
+  }
+
+  const unit = await collectionRepo.findUnitByCode(unitCode);
+  if (!unit) {
+    const error = new Error('Blood unit not found');
+    error.status = 404;
+    throw error;
+  }
+
+  return buildUnitRecord(unit);
+}
+
 module.exports = {
   DONATION_TYPES,
   UNIT_SPEC_BY_DONATION_TYPE,
@@ -397,4 +471,8 @@ module.exports = {
   validateVitals,
   checkVitalsSafety,
   recordVitals,
+  BARCODE_FORMAT,
+  normaliseUnitCode,
+  buildUnitRecord,
+  getUnitByBarcode,
 };
