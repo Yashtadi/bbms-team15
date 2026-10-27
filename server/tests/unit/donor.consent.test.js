@@ -67,18 +67,18 @@ describe('TC-Reg-04: digital donor consent (unit)', () => {
         }),
       };
       const mockCollectionRepo = {
-        createDonation: jest.fn(),
+        createSession: jest.fn(),
       };
 
       await expect(
-        startDonation({ donorId: 'D-000005' }, mockDonorRepo, mockCollectionRepo)
+        startDonation({ donorId: 'D-000005', staffId: 3, volumeMl: 450 }, mockDonorRepo, mockCollectionRepo)
       ).rejects.toMatchObject({
         status: 422,
         code: 'CONSENT_REQUIRED',
         message: 'Consent must be captured before a donation can proceed',
       });
 
-      expect(mockCollectionRepo.createDonation).not.toHaveBeenCalled();
+      expect(mockCollectionRepo.createSession).not.toHaveBeenCalled();
     });
 
     it('allows donation when consent is present, returning 201 payload (AC 1)', async () => {
@@ -87,30 +87,29 @@ describe('TC-Reg-04: digital donor consent (unit)', () => {
           id: 1,
           donor_code: 'D-000001',
           consent_given: 1, // consent granted
+          eligibility_status: 'ELIGIBLE', // F-010: sessions also need an eligible donor
         }),
       };
       const mockCollectionRepo = {
-        createDonation: jest.fn().mockResolvedValue({
-          id: 42,
-          donorId: 1,
-          status: 'IN_PROGRESS',
+        createSession: jest.fn().mockResolvedValue({
+          donationId: 42,
+          unit: { id: 9, unitCode: 'U-2026-000009' },
         }),
       };
 
       const result = await startDonation(
-        { donorId: 'D-000001', volumeMl: 450 },
+        { donorId: 'D-000001', staffId: 3, volumeMl: 450 },
         mockDonorRepo,
         mockCollectionRepo
       );
 
-      expect(mockCollectionRepo.createDonation).toHaveBeenCalledWith(
+      expect(mockCollectionRepo.createSession).toHaveBeenCalledWith(
         expect.objectContaining({
           donorId: 1,
-          status: 'IN_PROGRESS',
           volumeMl: 450,
         })
       );
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         donationId: 42,
         donorId: 'D-000001',
         status: 'IN_PROGRESS',
@@ -129,7 +128,7 @@ describe('TC-Reg-04: digital donor consent (unit)', () => {
         findByIdOrCode: jest.fn().mockResolvedValue(null),
       };
 
-      await expect(startDonation({ donorId: 999 }, mockDonorRepo)).rejects.toMatchObject({
+      await expect(startDonation({ donorId: 999, staffId: 3, volumeMl: 450 }, mockDonorRepo)).rejects.toMatchObject({
         status: 404,
         message: 'Donor not found',
       });
