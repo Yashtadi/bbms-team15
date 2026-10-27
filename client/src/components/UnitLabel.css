@@ -110,21 +110,36 @@
     display: none;
   }
 
+  /* Put the label at the top-left of the printable area */
+  body:has(.unit-label) #root {
+    max-width: none;
+    margin: 0;
+  }
+
+  /* The panel reuses .registration-form-container, which has overflow: hidden.
+     It must not clip the label when printing. */
   body:has(.unit-label) .unit-lookup-container {
+    max-width: none;
     margin: 0;
     padding: 0;
     border: none;
     box-shadow: none;
     background: none;
+    overflow: visible;
   }
 
   body:has(.unit-label) .unit-lookup-container::before {
     display: none;
   }
 
+  /* Height follows the content, so nothing is ever cut off; keep the label on one page.
+     No @page size is set: the label stock size isn't known yet (see DEVIATIONS.md),
+     and a fixed page smaller than the label would split it across pages. */
   body:has(.unit-label) .unit-label {
-    height: 50mm;
+    height: auto;
     margin: 0;
     max-width: none;
+    overflow: visible;
+    break-inside: avoid;
   }
 }
