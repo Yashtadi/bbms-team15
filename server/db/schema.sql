@@ -52,6 +52,7 @@ CREATE TABLE donations (
   collected_by       INT NULL,
   collected_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   camp_location      VARCHAR(150) NULL,             -- set when collected at a blood camp
+  donation_type      ENUM('WHOLE_BLOOD','APHERESIS') NOT NULL DEFAULT 'WHOLE_BLOOD',  -- F-010
   status             ENUM('IN_PROGRESS','COMPLETED','ABORTED') NOT NULL DEFAULT 'IN_PROGRESS',
   volume_ml          SMALLINT NULL,
   -- pre-donation vitals
