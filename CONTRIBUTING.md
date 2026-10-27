@@ -423,10 +423,14 @@ git switch main
 git pull
 git branch -d feature/F-001-donor-registration
 
-# If package.json, schema.sql or seed.sql changed:
+# If server/package.json, schema.sql or seed.sql changed:
 cd server
 npm install
 npm run db:setup
+
+# If client/package.json changed (e.g. a new library like jsbarcode):
+cd client
+npm install
 ```
 
 Check that your card moved to **Done** on the board.
@@ -444,6 +448,8 @@ git merge main
 # If schema.sql or seed.sql changed:
 cd server
 npm run db:setup
+
+# If server/package.json or client/package.json changed, run npm install in that folder
 ```
 
 ---
@@ -556,6 +562,7 @@ Also test that the **wrong role gets 403**, e.g. `.set(authHeader('HOSPITAL'))`.
 | Problem | What it means | Fix |
 |---|---|---|
 | `'jest' is not recognized` / `Cannot find module 'express'` | Packages not installed | `cd server` then `npm install` |
+| Vite: `Failed to resolve import "jsbarcode"` (or another package) | Client packages not installed | `cd client` then `npm install` |
 | `npm test` says "no tests found" | You're in the wrong folder | `cd server` first |
 | `EADDRINUSE: address already in use :::4000` | Another server is already running on 4000 | Close the other terminal running `npm run dev`. Or find it: Windows `netstat -ano \| findstr :4000`, then `taskkill /PID <pid> /F`. Mac `lsof -i :4000`, then `kill <pid>` |
 | `git push` rejected: "fetch first" / "non-fast-forward" | GitHub has commits you don't have | `git pull`, then `git push` again |
@@ -577,6 +584,7 @@ Also test that the **wrong role gets 403**, e.g. `.set(authHeader('HOSPITAL'))`.
 git switch main
 git pull
 cd server && npm install && npm run db:setup   # refresh dependencies & DB if changed
+cd ../client && npm install && cd ..           # refresh client dependencies if changed
 git switch -c feature/<id>-<short-name>
 
 # --- while working (inside server/) ---
