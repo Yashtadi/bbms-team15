@@ -1,0 +1,91 @@
+.lab-workflow {
+  max-width: 1000px;
+}
+
+.lab-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.lab-form-grid form {
+  padding: 1.25rem;
+  border: 1px solid rgba(0, 73, 183, 0.18);
+  border-radius: 12px;
+}
+
+.lab-form-grid h3,
+.lab-notifications h3 {
+  margin: 0 0 1rem;
+  color: #0049B7;
+}
+
+.btn-secondary {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid #0049B7;
+  border-radius: 10px;
+  color: #0049B7;
+  background: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.lab-notifications {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(0, 73, 183, 0.2);
+}
+
+.lab-notifications ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lab-notifications li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid rgba(0, 73, 183, 0.12);
+}
+
+.lab-notifications time {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .lab-form-grid form {
+    border-color: rgba(0, 221, 255, 0.2);
+  }
+
+  .lab-form-grid h3,
+  .lab-notifications h3 {
+    color: #00DDFF;
+  }
+
+  .btn-secondary {
+    border-color: #00DDFF;
+    color: #00DDFF;
+    background: #0f1a36;
+  }
+
+  .lab-notifications {
+    border-color: rgba(0, 221, 255, 0.2);
+  }
+
+  .lab-notifications li {
+    border-color: rgba(0, 221, 255, 0.12);
+  }
+}

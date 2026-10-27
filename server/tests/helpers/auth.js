@@ -11,8 +11,13 @@ function tokenFor(role) {
   return jwt.sign({ sub: SEED_USER_IDS[role], role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 }
 
+function authHeaderForUser(id, role) {
+  const token = jwt.sign({ sub: id, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  return { Authorization: `Bearer ${token}` };
+}
+
 function authHeader(role) {
   return { Authorization: `Bearer ${tokenFor(role)}` };
 }
 
-module.exports = { tokenFor, authHeader };
+module.exports = { tokenFor, authHeader, authHeaderForUser };

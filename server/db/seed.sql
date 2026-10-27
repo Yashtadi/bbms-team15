@@ -14,12 +14,13 @@ INSERT INTO users (id, email, password_hash, full_name, role, organisation) VALU
 
 -- Donors in different states
 INSERT INTO donors (id, donor_code, user_id, full_name, date_of_birth, gender, blood_group, phone,
-                    id_proof, medical_history, eligibility_status, deferral_reason, consent_given, consent_at) VALUES
-  (1, 'D-000001', 6,    'Ravi Kumar',   '1995-04-12', 'MALE',   'O-', '9000000001', 'ID-000001', 'None',         'ELIGIBLE', NULL,                  TRUE,  NOW()),
-  (2, 'D-000002', NULL, 'Priya Sharma', '1990-08-30', 'FEMALE', 'A+', '9000000002', 'ID-000002', 'None',         'ELIGIBLE', NULL,                  TRUE,  NOW()),
-  (3, 'D-000003', NULL, 'Arjun Rao',    '1988-01-05', 'MALE',   'B+', '9000000003', 'ID-000003', 'None',         'DEFERRED', 'Reactive TTI (HIV)', TRUE,  NOW()),
-  (4, 'D-000004', NULL, 'Neha Iyer',    '2001-11-20', 'FEMALE', NULL, '9000000004', 'ID-000004', 'None',         'ELIGIBLE', NULL,                  TRUE,  NOW()),
-  (5, 'D-000005', NULL, 'Sameer Khan',  '2004-02-14', 'MALE',   NULL, '9000000005', 'ID-000005', 'None',         'PENDING',  NULL,                  FALSE, NULL);
+                    id_proof, medical_history, eligibility_status, deferral_reason, consent_given, consent_at,
+                    follow_up_required, follow_up_reason) VALUES
+  (1, 'D-000001', 6,    'Ravi Kumar',   '1995-04-12', 'MALE',   'O-', '9000000001', 'ID-000001', 'None',         'ELIGIBLE', NULL,                  TRUE,  NOW(), FALSE, NULL),
+  (2, 'D-000002', NULL, 'Priya Sharma', '1990-08-30', 'FEMALE', 'A+', '9000000002', 'ID-000002', 'None',         'ELIGIBLE', NULL,                  TRUE,  NOW(), FALSE, NULL),
+  (3, 'D-000003', NULL, 'Arjun Rao',    '1988-01-05', 'MALE',   'B+', '9000000003', 'ID-000003', 'None',         'DEFERRED', 'Reactive TTI (HIV)', TRUE,  NOW(), TRUE, 'Confidential follow-up required after reactive TTI'),
+  (4, 'D-000004', NULL, 'Neha Iyer',    '2001-11-20', 'FEMALE', NULL, '9000000004', 'ID-000004', 'None',         'ELIGIBLE', NULL,                  TRUE,  NOW(), FALSE, NULL),
+  (5, 'D-000005', NULL, 'Sameer Khan',  '2004-02-14', 'MALE',   NULL, '9000000005', 'ID-000005', 'None',         'PENDING',  NULL,                  FALSE, NULL, FALSE, NULL);
 
 -- Donations (collected by lab tech 3)
 INSERT INTO donations (id, donor_id, collected_by, collected_at, status, volume_ml,
@@ -42,25 +43,26 @@ INSERT INTO blood_units (id, unit_code, donation_id, component, blood_group, vol
   (7, 'U-2026-000007', 4, 'WHOLE_BLOOD', NULL, 350, NOW(),                   NOW() + INTERVAL 35 DAY,  'QUARANTINE', NULL);  -- awaiting lab tests
 
 -- Lab results: donations 1 and 2 passed everything, donation 3 is HIV reactive, donation 4 not tested yet
-INSERT INTO lab_results (donation_id, test_type, result, tested_by, verified_by, verified_at) VALUES
-  (1, 'ABO_RH',   'O-',           3, 4, NOW()),
-  (1, 'HIV',      'NON_REACTIVE', 3, NULL, NULL),
-  (1, 'HBV',      'NON_REACTIVE', 3, NULL, NULL),
-  (1, 'HCV',      'NON_REACTIVE', 3, NULL, NULL),
-  (1, 'SYPHILIS', 'NON_REACTIVE', 3, NULL, NULL),
-  (1, 'MALARIA',  'NON_REACTIVE', 3, NULL, NULL),
-  (2, 'ABO_RH',   'A+',           3, 4, NOW()),
-  (2, 'HIV',      'NON_REACTIVE', 3, NULL, NULL),
-  (2, 'HBV',      'NON_REACTIVE', 3, NULL, NULL),
-  (2, 'HCV',      'NON_REACTIVE', 3, NULL, NULL),
-  (2, 'SYPHILIS', 'NON_REACTIVE', 3, NULL, NULL),
-  (2, 'MALARIA',  'NON_REACTIVE', 3, NULL, NULL),
-  (3, 'ABO_RH',   'B+',           3, 4, NOW()),
-  (3, 'HIV',      'REACTIVE',     3, NULL, NULL),
-  (3, 'HBV',      'NON_REACTIVE', 3, NULL, NULL),
-  (3, 'HCV',      'NON_REACTIVE', 3, NULL, NULL),
-  (3, 'SYPHILIS', 'NON_REACTIVE', 3, NULL, NULL),
-  (3, 'MALARIA',  'NON_REACTIVE', 3, NULL, NULL);
+INSERT INTO lab_results (donation_id, test_type, result, method, tested_by, verified_by, verified_at,
+                         verification_status) VALUES
+  (1, 'ABO_RH',   'O-',           NULL,    3, 4, NOW(), 'VERIFIED'),
+  (1, 'HIV',      'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (1, 'HBV',      'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (1, 'HCV',      'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (1, 'SYPHILIS', 'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (1, 'MALARIA',  'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (2, 'ABO_RH',   'A+',           NULL,    3, 4, NOW(), 'VERIFIED'),
+  (2, 'HIV',      'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (2, 'HBV',      'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (2, 'HCV',      'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (2, 'SYPHILIS', 'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (2, 'MALARIA',  'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (3, 'ABO_RH',   'B+',           NULL,    3, 4, NOW(), 'VERIFIED'),
+  (3, 'HIV',      'REACTIVE',     'ELISA', 3, NULL, NULL, 'PENDING'),
+  (3, 'HBV',      'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (3, 'HCV',      'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (3, 'SYPHILIS', 'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
+  (3, 'MALARIA',  'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING');
 
 -- Hospital requests: one routine, one emergency (F-044)
 INSERT INTO blood_requests (id, request_code, hospital_user_id, patient_name, patient_blood_group,

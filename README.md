@@ -38,3 +38,20 @@ npm run test:watch         # re-run tests every time you save a file
 | **Client** | `client/src/**/*.test.jsx` | React components rendered in a simulated browser (jsdom), next to the component they test. |
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#6-writing-tests) for how to write tests.
+
+## Lab screening and inventory
+
+The lab API requires a `LAB_TECH` token to record test results:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/lab/donations/:id/blood-group` | Enter `aboGroup` (`A`, `B`, `AB`, `O`) and `rh` (`+`, `-`) |
+| `POST` | `/api/lab/donations/:id/blood-group/verify` | A different technician verifies the same ABO/Rh values |
+| `POST` | `/api/lab/donations/:id/tti-results` | Record `testType`, `result`, and `method` (`NAT` or `ELISA`) |
+| `GET` | `/api/lab/notifications` | Read confidential notifications addressed to the logged-in staff member |
+| `GET` | `/api/inventory` | List unexpired, fully screened `AVAILABLE` units |
+
+TTI `testType` values are `HIV`, `HBV`, `HCV`, `SYPHILIS`, and `MALARIA`; `result` is
+`REACTIVE` or `NON_REACTIVE`. Units stay quarantined until the ABO/Rh result is verified
+and all five TTI results are non-reactive. A reactive result discards all units from the
+donation and creates confidential staff notifications.
