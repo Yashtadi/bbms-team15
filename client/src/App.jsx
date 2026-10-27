@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import DonorRegistrationForm from './components/DonorRegistrationForm';
 import DonationVitalsForm from './components/DonationVitalsForm';
+import UnitLabelLookup from './components/UnitLabelLookup';
 import LoginForm from './components/LoginForm';
 import { getSession, clearSession } from './api';
 import './components/DonorRegistrationForm.css';
+
+// BBMS-F-012: roles that may look up blood units and print their labels (same as the API)
+const UNIT_LABEL_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 
 function App() {
   const [session, setSession] = useState(getSession);
@@ -33,6 +37,8 @@ function App() {
 
       {/* BBMS-F-011: only LAB_TECH may record vitals */}
       {session.user.role === 'LAB_TECH' && <DonationVitalsForm />}
+
+      {UNIT_LABEL_ROLES.includes(session.user.role) && <UnitLabelLookup />}
     </main>
   );
 }
