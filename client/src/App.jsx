@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import DonorRegistrationForm from './components/DonorRegistrationForm';
+import DonationVitalsForm from './components/DonationVitalsForm';
 import LoginForm from './components/LoginForm';
 import { getSession, clearSession } from './api';
 import './components/DonorRegistrationForm.css';
@@ -29,6 +30,9 @@ function App() {
       </div>
 
       <DonorRegistrationForm />
+
+      {/* BBMS-F-011: only LAB_TECH may record vitals */}
+      {session.user.role === 'LAB_TECH' && <DonationVitalsForm />}
     </main>
   );
 }
