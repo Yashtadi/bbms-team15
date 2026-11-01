@@ -1,75 +1,41 @@
-/* Minimal Colors Theme (Dumma Branding palette)
-   #FF1D58 - Crimson / Blood Red
-   #F75990 - Coral Pink
-   #FFF685 - Warm Butter Yellow
-   #00DDFF - Electric Cyan
-   #0049B7 - Royal Deep Blue
-*/
-
-:root {
-  --color-crimson: #FF1D58;
-  --color-pink: #F75990;
-  --color-yellow: #FFF685;
-  --color-cyan: #00DDFF;
-  --color-blue: #0049B7;
-}
+/* Clean Sky Glassmorphic Theme matching LoginForm */
 
 .registration-form-container {
-  max-width: 660px;
-  margin: 2rem auto;
-  padding: 2.75rem;
-  background: #ffffff;
-  border-radius: 20px;
-  box-shadow: 0 15px 35px -5px rgba(0, 73, 183, 0.15), 0 0 0 1px rgba(0, 221, 255, 0.2);
-  border: 1px solid rgba(0, 221, 255, 0.3);
+  max-width: 680px;
+  margin: 1.5rem auto 2.5rem;
+  padding: 2.5rem 2.25rem;
+  background: linear-gradient(180deg, rgba(212, 240, 252, 0.94) 0%, rgba(255, 255, 255, 0.97) 45%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 24px 60px rgba(30, 80, 130, 0.16), 0 2px 6px rgba(30, 80, 130, 0.06);
+  border-radius: 28px;
+  backdrop-filter: blur(12px);
   position: relative;
-  overflow: hidden;
-}
-
-.registration-form-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-  background: linear-gradient(90deg, #FF1D58 0%, #F75990 25%, #FFF685 50%, #00DDFF 75%, #0049B7 100%);
-}
-
-@media (prefers-color-scheme: dark) {
-  .registration-form-container {
-    background: #091124;
-    border-color: rgba(0, 221, 255, 0.25);
-    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 221, 255, 0.08);
-    color: #f1f5f9;
-  }
+  box-sizing: border-box;
+  text-align: left;
+  color: #111827;
 }
 
 .registration-form-container h2 {
   margin-top: 0;
   margin-bottom: 0.35rem;
-  font-size: 1.85rem;
-  font-weight: 800;
-  color: #FF1D58;
-  letter-spacing: -0.02em;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.01em;
 }
 
 .registration-form-container .subtitle {
-  color: #64748b;
-  font-size: 0.95rem;
-  margin-bottom: 2rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  .registration-form-container .subtitle {
-    color: #94a3b8;
-  }
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-top: 0;
+  margin-bottom: 1.75rem;
+  line-height: 1.4;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  margin-bottom: 1.35rem;
+  margin-bottom: 1.25rem;
   text-align: left;
 }
 
@@ -79,225 +45,254 @@
   gap: 1.25rem;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .form-row {
     grid-template-columns: 1fr;
+    gap: 0;
   }
 }
 
 .form-group label {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
-  color: #0049B7;
-}
-
-@media (prefers-color-scheme: dark) {
-  .form-group label {
-    color: #00DDFF;
-  }
+  letter-spacing: 0.01em;
+  margin-bottom: 0.4rem;
+  color: #374151;
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.75rem 1rem;
-  border-radius: 10px;
-  border: 1.5px solid #cbd5e1;
-  font-size: 0.98rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
   font-family: inherit;
+  font-size: 0.95rem;
+  color: #111827;
+  background-color: #eef1f4;
   outline: none;
-  transition: all 0.2s ease;
-  background-color: #f8fafc;
-  color: inherit;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
-@media (prefers-color-scheme: dark) {
-  .form-group input,
-  .form-group select,
-  .form-group textarea {
-    background-color: #0f1a36;
-    border-color: #1e2e54;
-    color: #f8fafc;
-  }
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #9ca3af;
 }
 
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
-  border-color: #00DDFF;
-  box-shadow: 0 0 0 3px rgba(0, 221, 255, 0.25);
   background-color: #ffffff;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
-@media (prefers-color-scheme: dark) {
-  .form-group input:focus,
-  .form-group select:focus,
-  .form-group textarea:focus {
-    background-color: #142247;
-    border-color: #00DDFF;
-  }
+.form-group input.input-error,
+.form-group select.input-error {
+  background-color: #fef2f2;
+  border-color: #fca5a5;
 }
 
-.input-error {
-  border-color: #FF1D58 !important;
-  box-shadow: 0 0 0 3px rgba(255, 29, 88, 0.15) !important;
+.form-group input.input-error:focus,
+.form-group select.input-error:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
 }
 
 .field-error {
-  color: #FF1D58;
+  color: #b91c1c;
   font-size: 0.825rem;
   margin-top: 0.4rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .alert-box {
-  padding: 0.9rem 1.1rem;
-  border-radius: 10px;
-  margin-bottom: 1.75rem;
-  font-size: 0.95rem;
-  font-weight: 600;
+  padding: 0.85rem 1.15rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
   text-align: left;
 }
 
 .alert-error {
-  background-color: rgba(255, 29, 88, 0.1);
-  color: #FF1D58;
-  border: 1.5px solid rgba(255, 29, 88, 0.4);
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
-/* Primary Button */
+.alert-success {
+  background-color: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.alert-warning {
+  background-color: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+/* Primary Graphite Action Button matching LoginForm */
 .btn-primary {
   width: 100%;
-  padding: 0.95rem;
-  background: linear-gradient(135deg, #FF1D58 0%, #F75990 100%);
+  height: 46px;
+  padding: 0 1.5rem;
+  background: linear-gradient(180deg, #2b2d33 0%, #111216 100%);
   color: #ffffff;
   border: none;
-  border-radius: 10px;
-  font-size: 1.05rem;
-  font-weight: 700;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
-  letter-spacing: 0.02em;
-  box-shadow: 0 8px 20px -4px rgba(255, 29, 88, 0.4);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 4px 10px rgba(17, 18, 22, 0.25);
+  transition: opacity 0.15s, transform 0.1s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px -4px rgba(255, 29, 88, 0.5);
-  background: linear-gradient(135deg, #e01549 0%, #FF1D58 100%);
+  opacity: 0.92;
 }
 
 .btn-primary:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(1px);
 }
 
 .btn-primary:disabled {
-  opacity: 0.65;
+  opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+.btn-secondary {
+  width: 100%;
+  height: 44px;
+  padding: 0 1.5rem;
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+/* BBMS-F-004: Consent Checkbox */
+.form-group-consent {
+  margin: 1.25rem 0 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(209, 213, 219, 0.8);
+  border-radius: 14px;
+  text-align: left;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 0.15rem;
+  accent-color: #dc2645;
+  cursor: pointer;
 }
 
 /* Success Card */
 .registration-success-card {
   max-width: 540px;
-  margin: 3rem auto;
-  padding: 3rem 2rem;
-  background: #ffffff;
-  border-radius: 20px;
-  box-shadow: 0 20px 40px -10px rgba(0, 73, 183, 0.2);
-  border: 1px solid rgba(0, 221, 255, 0.3);
+  margin: 2rem auto;
+  padding: 2.75rem 2rem;
+  background: linear-gradient(180deg, rgba(212, 240, 252, 0.94) 0%, rgba(255, 255, 255, 0.97) 45%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 28px;
+  box-shadow: 0 24px 60px rgba(30, 80, 130, 0.16);
+  backdrop-filter: blur(12px);
   text-align: center;
   position: relative;
-  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.registration-success-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-  background: linear-gradient(90deg, #00DDFF 0%, #0049B7 100%);
+.registration-success-card h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.35rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  .registration-success-card {
-    background: #091124;
-    border-color: rgba(0, 221, 255, 0.3);
-    color: #f1f5f9;
-  }
+.registration-success-card .subtitle {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-top: 0;
+  margin-bottom: 1.75rem;
 }
 
 .success-badge {
-  width: 64px;
-  height: 64px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #00DDFF 0%, #0049B7 100%);
+  background: #22c55e;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: bold;
   margin: 0 auto 1.25rem;
-  box-shadow: 0 8px 25px rgba(0, 221, 255, 0.4);
+  box-shadow: 0 6px 18px rgba(34, 197, 94, 0.35);
 }
 
 /* BBMS-F-003: Donor Identity Card */
 .donor-card {
   margin: 1.75rem auto 2rem;
-  border-radius: 16px;
+  border-radius: 20px;
   background: #ffffff;
-  border: 2px solid rgba(0, 221, 255, 0.5);
-  box-shadow: 0 10px 25px -5px rgba(0, 73, 183, 0.15);
+  border: 1px solid rgba(186, 230, 253, 0.9);
+  box-shadow: 0 12px 30px rgba(30, 80, 130, 0.12);
   overflow: hidden;
   text-align: left;
 }
 
-@media (prefers-color-scheme: dark) {
-  .donor-card {
-    background: #0d1a38;
-    border-color: #00DDFF;
-    box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.6);
-  }
-}
-
 .donor-card-top-bar {
-  height: 6px;
-  background: linear-gradient(90deg, #FF1D58 0%, #F75990 25%, #FFF685 50%, #00DDFF 75%, #0049B7 100%);
+  height: 5px;
+  background: linear-gradient(90deg, #dc2645 0%, #3b82f6 100%);
 }
 
 .donor-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.25rem;
-  background: rgba(0, 73, 183, 0.04);
-  border-bottom: 1px solid rgba(0, 221, 255, 0.2);
-}
-
-@media (prefers-color-scheme: dark) {
-  .donor-card-header {
-    background: rgba(0, 221, 255, 0.05);
-  }
+  padding: 0.9rem 1.25rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .card-brand {
   display: block;
   font-size: 0.8rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  color: #0049B7;
-}
-
-@media (prefers-color-scheme: dark) {
-  .card-brand {
-    color: #00DDFF;
-  }
+  letter-spacing: 0.06em;
+  color: #0f172a;
 }
 
 .card-subbrand {
@@ -306,14 +301,8 @@
   color: #64748b;
 }
 
-@media (prefers-color-scheme: dark) {
-  .card-subbrand {
-    color: #94a3b8;
-  }
-}
-
 .card-logo {
-  font-size: 1.4rem;
+  font-size: 1.3rem;
 }
 
 .donor-card-body {
@@ -334,22 +323,10 @@
   margin-bottom: 0.2rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  .info-label {
-    color: #94a3b8;
-  }
-}
-
 .info-value {
   font-size: 1.1rem;
   font-weight: 700;
   color: #0f172a;
-}
-
-@media (prefers-color-scheme: dark) {
-  .info-value {
-    color: #f8fafc;
-  }
 }
 
 .donor-id-display {
@@ -358,36 +335,23 @@
   padding: 1.25rem;
   margin: 1rem 0;
   background: linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%);
-  border-radius: 12px;
-  border: 2px dashed #00DDFF;
+  border-radius: 14px;
+  border: 1.5px dashed #0284c7;
   text-align: center;
 }
 
-@media (prefers-color-scheme: dark) {
-  .donor-id-display {
-    background: #081226;
-    border-color: #00DDFF;
-  }
-}
-
 .donor-id-display span {
-  font-size: 0.8rem;
-  color: #0049B7;
+  font-size: 0.75rem;
+  color: #0369a1;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 0.25rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  .donor-id-display span {
-    color: #00DDFF;
-  }
-}
-
 .donor-id-display strong {
   font-size: 2.25rem;
-  color: #FF1D58;
+  color: #dc2645;
   font-family: ui-monospace, monospace;
   letter-spacing: 0.05em;
 }
@@ -398,67 +362,27 @@
   align-items: center;
   margin-top: 1rem;
   padding-top: 0.75rem;
-  border-top: 1px dashed rgba(203, 213, 225, 0.8);
-}
-
-@media (prefers-color-scheme: dark) {
-  .donor-card-meta {
-    border-top-color: rgba(51, 65, 85, 0.8);
-  }
+  border-top: 1px dashed #cbd5e1;
 }
 
 .status-pill {
   display: inline-block;
-  padding: 0.25rem 0.75rem;
-  background-color: #FFF685;
-  color: #713f12;
+  padding: 0.2rem 0.65rem;
+  background-color: #fef3c7;
+  color: #92400e;
   border-radius: 9999px;
-  font-weight: 800;
-  font-size: 0.8rem;
-  border: 1px solid rgba(234, 179, 8, 0.4);
-  box-shadow: 0 2px 8px rgba(255, 246, 133, 0.5);
-}
-
-
-/* BBMS-F-004: Consent Checkbox & Status Pill */
-.form-group-consent {
-  margin: 1.25rem 0 1.5rem;
-  text-align: left;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #0049B7;
-  cursor: pointer;
-  line-height: 1.4;
-}
-
-@media (prefers-color-scheme: dark) {
-  .checkbox-label {
-    color: #00DDFF;
-  }
-}
-
-.checkbox-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  margin-top: 0.15rem;
-  accent-color: #FF1D58;
-  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.75rem;
+  border: 1px solid #fde68a;
 }
 
 .consent-pill {
   display: inline-block;
-  padding: 0.25rem 0.75rem;
-  background-color: #00DDFF;
-  color: #0049B7;
+  padding: 0.2rem 0.65rem;
+  background-color: #dcfce7;
+  color: #166534;
   border-radius: 9999px;
-  font-weight: 800;
-  font-size: 0.8rem;
-  border: 1px solid rgba(0, 73, 183, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 221, 255, 0.4);
+  font-weight: 700;
+  font-size: 0.75rem;
+  border: 1px solid #bbf7d0;
 }
