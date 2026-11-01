@@ -6,10 +6,11 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
   margin: 1.75rem 0 0;
-  padding: 1rem 1.25rem;
-  border-radius: 12px;
-  background: rgba(0, 73, 183, 0.06);
-  border: 1.5px solid rgba(0, 73, 183, 0.2);
+  padding: 1.15rem 1.25rem;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(30, 80, 130, 0.05);
   text-align: left;
 }
 

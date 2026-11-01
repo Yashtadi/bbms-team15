@@ -1,48 +1,42 @@
 .lab-workflow {
-  max-width: 1000px;
+  max-width: 860px;
 }
 
 .lab-form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1.5rem;
   margin-bottom: 1.5rem;
 }
 
 .lab-form-grid form {
-  padding: 1.25rem;
-  border: 1px solid rgba(0, 73, 183, 0.18);
-  border-radius: 12px;
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 18px;
+  box-shadow: 0 6px 16px rgba(30, 80, 130, 0.06);
 }
 
 .lab-form-grid h3,
 .lab-notifications h3 {
-  margin: 0 0 1rem;
-  color: #0049B7;
-}
-
-.btn-secondary {
-  width: 100%;
-  margin-top: 0.75rem;
-  padding: 0.85rem;
-  border: 1px solid #0049B7;
-  border-radius: 10px;
-  color: #0049B7;
-  background: #ffffff;
-  font: inherit;
+  margin: 0 0 1.25rem;
+  color: #111827;
+  font-size: 1.15rem;
   font-weight: 700;
-  cursor: pointer;
+  letter-spacing: -0.01em;
 }
 
-.btn-secondary:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
+.lab-form-grid .btn-secondary {
+  margin-top: 0.75rem;
 }
 
 .lab-notifications {
   margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid rgba(0, 73, 183, 0.2);
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 18px;
+  box-shadow: 0 6px 16px rgba(30, 80, 130, 0.06);
 }
 
 .lab-notifications ul {
@@ -56,36 +50,17 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.9rem 0;
-  border-bottom: 1px solid rgba(0, 73, 183, 0.12);
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.9rem;
+}
+
+.lab-notifications li:last-child {
+  border-bottom: none;
 }
 
 .lab-notifications time {
   color: #64748b;
-  font-size: 0.85rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  .lab-form-grid form {
-    border-color: rgba(0, 221, 255, 0.2);
-  }
-
-  .lab-form-grid h3,
-  .lab-notifications h3 {
-    color: #00DDFF;
-  }
-
-  .btn-secondary {
-    border-color: #00DDFF;
-    color: #00DDFF;
-    background: #0f1a36;
-  }
-
-  .lab-notifications {
-    border-color: rgba(0, 221, 255, 0.2);
-  }
-
-  .lab-notifications li {
-    border-color: rgba(0, 221, 255, 0.12);
-  }
+  font-size: 0.8rem;
+  font-family: ui-monospace, monospace;
 }
