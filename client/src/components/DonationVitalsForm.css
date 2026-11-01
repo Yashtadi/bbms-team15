@@ -2,17 +2,17 @@
    Layout, inputs and buttons reuse the classes in DonorRegistrationForm.css. */
 
 .alert-success {
-  background-color: #f0fdf4;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  background-color: var(--alert-success-bg);
+  color: var(--alert-success-text);
+  border: 1px solid var(--alert-success-border);
   border-radius: 12px;
 }
 
 /* Out-of-safe-range readings: must stand out from the rest of the form */
 .alert-warning {
-  background-color: #fffbeb;
-  color: #92400e;
-  border: 1.5px solid #fde68a;
+  background-color: var(--alert-warning-bg);
+  color: var(--alert-warning-text);
+  border: 1.5px solid var(--alert-warning-border);
   border-radius: 12px;
 }
 

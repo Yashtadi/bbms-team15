@@ -11,16 +11,18 @@
 
 .lab-form-grid form {
   padding: 1.5rem;
-  background: #ffffff;
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
   border-radius: 18px;
-  box-shadow: 0 6px 16px rgba(30, 80, 130, 0.06);
+  box-shadow: var(--card-inner-shadow);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
 }
 
 .lab-form-grid h3,
 .lab-notifications h3 {
   margin: 0 0 1.25rem;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -33,10 +35,12 @@
 .lab-notifications {
   margin-top: 2rem;
   padding: 1.5rem;
-  background: #ffffff;
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
   border-radius: 18px;
-  box-shadow: 0 6px 16px rgba(30, 80, 130, 0.06);
+  box-shadow: var(--card-inner-shadow);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
 }
 
 .lab-notifications ul {
@@ -51,8 +55,12 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.85rem 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
   font-size: 0.9rem;
+}
+
+[data-theme="dark"] .lab-notifications li {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 .lab-notifications li:last-child {
@@ -60,7 +68,7 @@
 }
 
 .lab-notifications time {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 0.8rem;
   font-family: ui-monospace, monospace;
 }
