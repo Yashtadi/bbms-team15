@@ -5,8 +5,9 @@
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color: #111827;
+  font-family: var(--sans);
+  color: var(--text-primary);
+  transition: color 0.3s ease;
 }
 
 /* Concentric rings behind content, matching LoginForm.css */
@@ -17,10 +18,11 @@
   top: 40%;
   left: 50%;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--ring-1-border);
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 0;
+  transition: border-color 0.3s ease;
 }
 
 .app-layout::before {
@@ -31,7 +33,7 @@
 .app-layout::after {
   width: 1200px;
   height: 1200px;
-  border-color: rgba(255, 255, 255, 0.35);
+  border-color: var(--ring-2-border);
 }
 
 /* Sticky Top Navigation Bar */
@@ -39,12 +41,13 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--header-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 4px 20px rgba(30, 80, 130, 0.08);
+  border-bottom: 1px solid var(--header-border);
+  box-shadow: var(--header-shadow);
   padding: 0.75rem 1.5rem;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .header-container {
@@ -73,6 +76,14 @@
   background: #ffffff;
   color: #dc2645;
   box-shadow: 0 4px 12px rgba(30, 80, 130, 0.12);
+  transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .brand-icon {
+  background: rgba(220, 38, 69, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(220, 38, 69, 0.3);
+  box-shadow: 0 0 16px rgba(220, 38, 69, 0.25);
 }
 
 .brand-text h1 {
@@ -80,14 +91,14 @@
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #111827;
+  color: var(--text-primary);
   text-shadow: none;
 }
 
 .brand-text p {
   margin: 2px 0 0;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-muted);
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -99,69 +110,111 @@
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  background: #eef1f4;
+  background: var(--nav-tabs-bg);
   padding: 0.3rem;
   border-radius: 14px;
+  border: 1px solid var(--card-inner-border);
+  transition: background 0.3s ease;
 }
 
 .tab-btn {
   padding: 0.5rem 0.95rem;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
-  color: #4b5563;
+  color: var(--tab-inactive-text);
   font: inherit;
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.18s ease;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
 }
 
 .tab-btn:hover:not(.active) {
-  color: #111827;
-  background: rgba(255, 255, 255, 0.6);
+  color: var(--tab-inactive-hover);
+  background: var(--tab-inactive-hover-bg);
 }
 
 .tab-btn.active {
-  background: #ffffff;
-  color: #111827;
+  background: var(--tab-active-bg);
+  color: var(--tab-active-text);
+  border-color: var(--tab-active-border);
   font-weight: 600;
-  box-shadow: 0 2px 6px rgba(30, 80, 130, 0.1);
+  box-shadow: var(--tab-active-shadow);
 }
 
 .tab-icon {
   font-size: 0.95rem;
 }
 
-/* User Profile & Actions */
+/* User Profile, Theme Toggle & Actions */
 .user-bar {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
+/* Theme Toggle Button */
+.theme-toggle-btn {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 10px;
+  background: var(--theme-toggle-bg);
+  border: 1px solid var(--theme-toggle-border);
+  color: var(--theme-toggle-color);
+  box-shadow: var(--theme-toggle-shadow);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.theme-toggle-btn:active {
+  transform: translateY(1px);
+}
+
+.theme-icon {
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle-btn:hover .theme-icon {
+  transform: rotate(15deg);
+}
+
+/* User Pill */
 .user-pill {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: #ffffff;
+  background: var(--user-pill-bg);
   padding: 0.25rem 0.75rem 0.25rem 0.3rem;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--user-pill-border);
   box-shadow: 0 2px 8px rgba(30, 80, 130, 0.08);
+  transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .user-pill {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
 .user-avatar {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #e0f2fe;
-  color: #0369a1;
+  background: var(--user-avatar-bg);
+  color: var(--user-avatar-text);
   font-weight: 700;
   font-size: 0.75rem;
   display: grid;
@@ -171,7 +224,7 @@
 .user-name {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .role-badge {
@@ -183,6 +236,7 @@
   letter-spacing: 0.02em;
 }
 
+/* Light mode role badges */
 .role-badge-LAB_TECH {
   background: #f3e8ff;
   color: #7e22ce;
@@ -208,18 +262,49 @@
   color: #15803d;
 }
 
-/* Dark Logout button */
+/* Dark mode role badges */
+[data-theme="dark"] .role-badge-LAB_TECH {
+  background: rgba(147, 51, 234, 0.22);
+  color: #c084fc;
+  border: 1px solid rgba(147, 51, 234, 0.35);
+}
+
+[data-theme="dark"] .role-badge-ADMIN {
+  background: rgba(239, 68, 68, 0.22);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] .role-badge-MANAGER {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .role-badge-HOSPITAL {
+  background: rgba(14, 165, 233, 0.22);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+}
+
+[data-theme="dark"] .role-badge-DONOR {
+  background: rgba(34, 197, 94, 0.22);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+/* Logout button */
 .btn-logout {
   padding: 0.45rem 0.85rem;
   border: none;
   border-radius: 10px;
-  background: linear-gradient(180deg, #2b2d33 0%, #111216 100%);
-  color: #ffffff;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   font: inherit;
   font-size: 0.825rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 6px rgba(17, 18, 22, 0.2);
+  box-shadow: var(--btn-primary-shadow);
   transition: opacity 0.15s, transform 0.1s;
 }
 

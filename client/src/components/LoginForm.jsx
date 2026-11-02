@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { login } from '../api';
+import ThemeToggle from './ThemeToggle';
 import './LoginForm.css';
 
 export default function LoginForm({ onLogin }) {
@@ -25,6 +26,10 @@ export default function LoginForm({ onLogin }) {
 
   return (
     <main className="login-page">
+      <div className="login-theme-toggle">
+        <ThemeToggle />
+      </div>
+
       <form className="login-card" onSubmit={handleSubmit}>
         <div className="login-icon">
           <DropIcon />

@@ -4,6 +4,7 @@ import DonationVitalsForm from './components/DonationVitalsForm';
 import UnitLabelLookup from './components/UnitLabelLookup';
 import LabWorkflow from './components/LabWorkflow';
 import LoginForm from './components/LoginForm';
+import ThemeToggle from './components/ThemeToggle';
 import { getSession, clearSession } from './api';
 import './App.css';
 import './components/DonorRegistrationForm.css';
@@ -106,8 +107,9 @@ export default function App({ initialTab } = {}) {
             )}
           </nav>
 
-          {/* User Profile Bar */}
+          {/* User Profile Bar & Theme Toggle */}
           <div className="user-bar">
+            <ThemeToggle />
             <div className="user-pill">
               <div className="user-avatar">
                 {session.user?.fullName ? session.user.fullName[0].toUpperCase() : 'U'}

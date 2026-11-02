@@ -8,10 +8,12 @@
   margin: 1.75rem 0 0;
   padding: 1.15rem 1.25rem;
   border-radius: 14px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 12px rgba(30, 80, 130, 0.05);
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
+  box-shadow: var(--card-inner-shadow);
   text-align: left;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
 }
 
 .unit-record dt,
@@ -20,12 +22,13 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .unit-record dd {
   margin: 0.2rem 0 0;
   font-weight: 700;
+  color: var(--text-primary);
 }
 
 /* The label itself: black on white so it prints and scans the same as it looks */

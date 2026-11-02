@@ -11,6 +11,8 @@ function logInAs(role) {
 describe('App', () => {
   afterEach(() => {
     sessionStorage.clear();
+    localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
   });
 
   it('shows the page title', () => {
@@ -88,6 +90,27 @@ describe('App', () => {
     const donorsTab = screen.getByRole('tab', { name: /Donors/i });
     await user.click(donorsTab);
     expect(screen.getByRole('heading', { name: 'Donor Registration' })).toBeInTheDocument();
+  });
+
+  it('toggles theme between light and dark and persists to localStorage', async () => {
+    localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+    const user = userEvent.setup();
+    logInAs('LAB_TECH');
+    render(<App />);
+
+    const themeBtn = screen.getByRole('button', { name: /switch to dark mode/i });
+    expect(themeBtn).toBeInTheDocument();
+
+    await user.click(themeBtn);
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(localStorage.getItem('bbms_theme')).toBe('dark');
+
+    // Click again to switch to light mode
+    const lightBtn = screen.getByRole('button', { name: /switch to light mode/i });
+    await user.click(lightBtn);
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    expect(localStorage.getItem('bbms_theme')).toBe('light');
   });
 
   it('logs out and returns to the login screen on logout button click', async () => {
