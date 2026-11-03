@@ -1,11 +1,23 @@
 const express = require('express');
 const { requireRole } = require('../../middleware/auth');
 const inventoryRepository = require('./inventory.repository');
+const inventoryService = require('./inventory.service');
 
 const router = express.Router();
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const COMPONENTS = ['WHOLE_BLOOD', 'PRBC', 'FFP', 'PLATELETS', 'CRYO'];
+
+// BBMS-F-030: stock counts for the inventory dashboard. Blood-bank staff only
+// (SAD §4.5: manager screens show inventory; hospitals see request status instead).
+router.get('/summary', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const summary = await inventoryService.getStockSummary();
+    return res.status(200).json(summary);
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to load inventory summary' });
+  }
+});
 
 router.get('/', requireRole('LAB_TECH', 'MANAGER', 'HOSPITAL', 'ADMIN'), async (req, res) => {
   const { bloodGroup = null, component = null } = req.query;
