@@ -3,6 +3,7 @@ import DonorRegistrationForm from './components/DonorRegistrationForm';
 import DonationVitalsForm from './components/DonationVitalsForm';
 import UnitLabelLookup from './components/UnitLabelLookup';
 import LabWorkflow from './components/LabWorkflow';
+import InventoryDashboard from './components/InventoryDashboard';
 import LoginForm from './components/LoginForm';
 import ThemeToggle from './components/ThemeToggle';
 import { getSession, clearSession } from './api';
@@ -12,6 +13,8 @@ import './components/DonorRegistrationForm.css';
 // BBMS-F-012 & F-020: roles permitted to access unit labels and lab screening
 const UNIT_LABEL_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 const LAB_STAFF_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
+// BBMS-F-030: blood-bank staff see the inventory dashboard (SAD §4.5)
+const INVENTORY_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 
 export default function App({ initialTab } = {}) {
   const [session, setSession] = useState(getSession);
@@ -30,12 +33,14 @@ export default function App({ initialTab } = {}) {
   const canSeeVitals = role === 'LAB_TECH';
   const canSeeLabels = UNIT_LABEL_ROLES.includes(role);
   const canSeeLab = LAB_STAFF_ROLES.includes(role);
+  const canSeeInventory = INVENTORY_ROLES.includes(role);
 
   // Fallback to 'donors' tab if the activeTab is restricted for this role
   const effectiveTab =
     (activeTab === 'vitals' && !canSeeVitals) ||
     (activeTab === 'units' && !canSeeLabels) ||
-    (activeTab === 'lab' && !canSeeLab)
+    (activeTab === 'lab' && !canSeeLab) ||
+    (activeTab === 'inventory' && !canSeeInventory)
       ? 'donors'
       : activeTab;
 
@@ -105,6 +110,19 @@ export default function App({ initialTab } = {}) {
                 <span>Lab Screening</span>
               </button>
             )}
+
+            {canSeeInventory && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={effectiveTab === 'inventory'}
+                className={`tab-btn ${effectiveTab === 'inventory' ? 'active' : ''}`}
+                onClick={() => setActiveTab('inventory')}
+              >
+                <span className="tab-icon">📦</span>
+                <span>Inventory</span>
+              </button>
+            )}
           </nav>
 
           {/* User Profile Bar & Theme Toggle */}
@@ -132,6 +150,7 @@ export default function App({ initialTab } = {}) {
         {effectiveTab === 'lab' && canSeeLab && (
           <LabWorkflow canEnterResults={role === 'LAB_TECH'} />
         )}
+        {effectiveTab === 'inventory' && canSeeInventory && <InventoryDashboard />}
       </main>
     </div>
   );

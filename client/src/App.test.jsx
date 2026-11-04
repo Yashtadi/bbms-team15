@@ -72,6 +72,29 @@ describe('App', () => {
     },
   );
 
+  it.each(['LAB_TECH', 'MANAGER', 'ADMIN'])(
+    'TC-Inv-01: shows the inventory tab to %s and displays the dashboard on click',
+    async (role) => {
+      const user = userEvent.setup();
+      logInAs(role);
+      render(<App />);
+
+      await user.click(screen.getByRole('tab', { name: /Inventory/i }));
+      expect(screen.getByRole('heading', { name: 'Inventory Dashboard' })).toBeInTheDocument();
+    },
+  );
+
+  it.each(['HOSPITAL', 'DONOR'])(
+    'TC-Inv-01: hides the inventory tab from %s',
+    (role) => {
+      logInAs(role);
+      render(<App />);
+
+      expect(screen.queryByRole('tab', { name: /Inventory/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Inventory Dashboard' })).not.toBeInTheDocument();
+    },
+  );
+
   it('allows switching between tabs and renders active module', async () => {
     const user = userEvent.setup();
     logInAs('LAB_TECH');

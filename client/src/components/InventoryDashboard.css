@@ -1,0 +1,180 @@
+/* BBMS-F-030 inventory dashboard. Uses the shared theme tokens from index.css,
+   so light and dark mode work without extra rules. */
+
+.inventory-dashboard {
+  max-width: none;
+}
+
+.inventory-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem 1.5rem;
+}
+
+.inventory-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0 1.5rem;
+  padding: 0.35rem 0.8rem;
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
+  border-radius: 9999px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.inventory-live time {
+  font-family: ui-monospace, monospace;
+}
+
+.inventory-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  animation: inventory-pulse 2s ease-out infinite;
+}
+
+@keyframes inventory-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  70% { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inventory-live-dot {
+    animation: none;
+  }
+}
+
+.inventory-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.inventory-stat,
+.inventory-card {
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
+  border-radius: 18px;
+  box-shadow: var(--card-inner-shadow);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.inventory-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.1rem 1.25rem;
+}
+
+.inventory-stat-label {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.inventory-stat strong {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-card {
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.inventory-card:last-child {
+  margin-bottom: 0;
+}
+
+.inventory-card h3 {
+  margin: 0 0 1.25rem;
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Wide tables scroll sideways on phones instead of breaking the layout */
+.inventory-table-wrap {
+  overflow-x: auto;
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-table th,
+.inventory-table td {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+  text-align: left;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .inventory-table th,
+[data-theme="dark"] .inventory-table td {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.inventory-table tbody tr:last-child th,
+.inventory-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.inventory-table thead th {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.inventory-table tbody th {
+  font-weight: 700;
+}
+
+/* Stock grid: counts are centred; empty cells are dimmed but stay readable */
+.inventory-grid td,
+.inventory-grid thead th:not(:first-child) {
+  text-align: center;
+}
+
+.inventory-grid td {
+  font-weight: 700;
+}
+
+.inventory-grid td.is-empty {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.inventory-row-total {
+  background: var(--input-bg);
+}
+
+.inventory-code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+.inventory-muted {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
