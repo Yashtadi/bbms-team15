@@ -7,6 +7,79 @@ Software Engineering mini project, PES University.
 
 **Stack:** React (Vite) · Node.js + Express · MySQL
 
+---
+
+## Sprint 1 Demo Video
+
+A screen recording demonstrating the complete end-to-end clinical workflow implemented in Sprint 1:
+> **Register Donor** (`F-001`, `F-003`, `F-004`) → **Eligibility Check** (`F-002`) → **Donation Session & Vitals** (`F-010`, `F-011`) → **Barcode Unit Label** (`F-012`) → **Lab Screening (ABO/Rh & TTI)** (`F-020`, `F-021`) → **Quarantine Release / Discard** (`F-022`, `F-023`).
+
+- 📹 **Watch Video:** [docs/demo/sprint1.mp4](docs/demo/sprint1.mp4)
+
+---
+
+## Quick Start (Running Locally)
+
+### 1. Database & Server Setup
+```bash
+cd server
+npm install
+# Ensure MySQL is running and server/.env is configured
+npm run db:setup     # creates database, runs schema.sql and seed.sql
+npm start            # runs backend on http://localhost:5000
+```
+
+### 2. Client Setup
+```bash
+cd client
+npm install
+npm run dev          # runs frontend on http://localhost:5173
+```
+
+Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+---
+
+## Demo Accounts & User Roles
+
+All pre-seeded demo accounts use the default password: `Password@123` (populated via `npm run db:setup`).
+
+| Role | Demo Email | Display Name | Target Operating Group & Capabilities |
+|---|---|---|---|
+| `LAB_TECH` | `collector@bbms.test` | **Blood Collector** | **Frontline Blood Collection Desk:** Operates the 3-step Blood Collection Desk (walk-in donor check-in, registration, chair-side vitals, session recording, Code 128 barcode stickers) and Blood Label Tool |
+| `LAB_TECH` | `labtech@bbms.test`<br>`labtech2@bbms.test` | **Labtech 1**<br>**Labtech 2** | **Central Facility (Testing Lab):** Operates the Lab Screening workspace (FIFO testing queue, dual ABO/Rh verification, 5 mandatory TTI tests), and manages quarantine stock |
+| `HOSPITAL` | `hospital@bbms.test` | **City Hospital Desk** | **Hospital Clinical Desk:** Submits and tracks hospital patient blood unit requests |
+| `MANAGER` | `manager@bbms.test` | **Manoj Manager** | **Central Facility (Storage Manager):** Central storage & inventory oversight, stock levels by blood group and component, expiry monitoring, and unit barcode reprint tool |
+| `DONOR` | `donor@bbms.test` | **Ravi Kumar** | **Donor Portal:** View digital donor card and donation history (linked to pre-seeded donor `D-000001` / Ravi Kumar) |
+| `ADMIN` | `admin@bbms.test` | **Asha Admin** | **System Administrator:** Full administrative and operational oversight across all facility and frontline workspaces |
+
+> **Walk-in Donors vs. Portal Accounts:**  
+> Registering a donor at the collection desk creates a clinical record in the `donors` table and generates a permanent **Donor ID** (e.g. `D-000006`), but does *not* automatically create a web portal login account. Web login accounts reside in the `users` table, linked via the nullable `donors.user_id` foreign key.
+>
+> **Patient Blood Requests:**  
+> Patients do not log in directly. Hospital personnel log in via `hospital@bbms.test` to submit and manage blood unit requests on a patient's behalf.
+
+---
+
+## Sprint 1 Features Implemented
+
+| ID | Feature | Description |
+|---|---|---|
+| **F-001** | Donor Registration | Demographic details, contact, ID proof, medical history |
+| **F-002** | Donor Eligibility Check | Rule-based screening: age (18–65), weight (≥45 kg), Hb (≥12.5 g/dL), 90-day donation interval |
+| **F-003** | Donor ID Generation | Atomically generated, sequential human-readable identifier (`D-XXXXXX`) |
+| **F-004** | Digital Donor Consent | Explicit consent verification before donation session |
+| **SR-002** | Role-Based Authentication | Secure JWT auth with bcrypt passwords & strict role authorization |
+| **F-010** | Donation Session | Whole blood & apheresis session recording |
+| **F-011** | Donor Vitals Recording | Pre- and post-donation BP, pulse, and hemoglobin with clinical safe range alerts |
+| **F-012** | Unit Barcode Label | Printable Code 128 barcode unit label and keyboard/scanner lookup |
+| **F-020** | Dual ABO/Rh Verification | Blind double-entry verification of blood group prior to inventory release |
+| **F-021** | TTI Screening | Mandatory screening for 5 infectious markers (HIV, HBV, HCV, Syphilis, Malaria) |
+| **F-022** | Quarantine State Lock | Units remain locked in `QUARANTINE` until all verification steps pass |
+| **F-023** | Auto-Discard Reactive Units | Automatic disposal of reactive units and confidential staff alert logging |
+
+---
+
 ## Running tests
 
 ### Server (Jest + Supertest)
@@ -18,8 +91,7 @@ npm run test:unit          # only tests/unit
 npm run test:integration   # only tests/integration
 ```
 
-Integration tests need MySQL running, a filled-in `server/.env`, and the database created with
-`npm run db:setup`.
+Integration tests need MySQL running, a filled-in `server/.env`, and the database created with `npm run db:setup`.
 
 ### Client (Vitest + React Testing Library)
 
@@ -39,19 +111,38 @@ npm run test:watch         # re-run tests every time you save a file
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#6-writing-tests) for how to write tests.
 
-## Lab screening and inventory
+---
 
-The lab API requires a `LAB_TECH` token to record test results:
+## Lab screening and inventory API
 
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/api/lab/donations/:id/blood-group` | Enter `aboGroup` (`A`, `B`, `AB`, `O`) and `rh` (`+`, `-`) |
-| `POST` | `/api/lab/donations/:id/blood-group/verify` | A different technician verifies the same ABO/Rh values |
-| `POST` | `/api/lab/donations/:id/tti-results` | Record `testType`, `result`, and `method` (`NAT` or `ELISA`) |
-| `GET` | `/api/lab/notifications` | Read confidential notifications addressed to the logged-in staff member |
-| `GET` | `/api/inventory` | List unexpired, fully screened `AVAILABLE` units |
+The lab API requires a `LAB_TECH`, `MANAGER`, or `ADMIN` token:
+
+| Method | Path | Allowed Roles | Purpose |
+|---|---|---|---|
+| `GET` | `/api/lab/queue` | `LAB_TECH`, `MANAGER`, `ADMIN` | Retrieve FIFO quarantine testing queue and central facility storage units |
+| `POST` | `/api/lab/donations/:id/blood-group` | `LAB_TECH`, `ADMIN` | Enter `aboGroup` (`A`, `B`, `AB`, `O`) and `rh` (`+`, `-`) |
+| `POST` | `/api/lab/donations/:id/blood-group/verify` | `LAB_TECH`, `ADMIN` | A different technician verifies the same ABO/Rh values |
+| `POST` | `/api/lab/donations/:id/tti-results` | `LAB_TECH`, `ADMIN` | Record `testType`, `result`, and `method` (`NAT` or `ELISA`) |
+| `GET` | `/api/lab/notifications` | `LAB_TECH`, `MANAGER`, `ADMIN` | Read confidential notifications addressed to the logged-in staff member |
+| `GET` | `/api/inventory` | `LAB_TECH`, `MANAGER`, `ADMIN` | List unexpired, fully screened `AVAILABLE` units |
+| `GET` | `/api/inventory/summary` | `LAB_TECH`, `MANAGER`, `ADMIN` | Stock summary metrics and blood group × component grid |
 
 TTI `testType` values are `HIV`, `HBV`, `HCV`, `SYPHILIS`, and `MALARIA`; `result` is
 `REACTIVE` or `NON_REACTIVE`. Units stay quarantined until the ABO/Rh result is verified
 and all five TTI results are non-reactive. A reactive result discards all units from the
 donation and creates confidential staff notifications.
+
+---
+
+## Core UI Workflows
+
+### 1. Frontline Blood Collection Desk (`HOSPITAL`, `ADMIN`)
+A unified 3-step chair-side wizard replacing disconnected forms:
+1. **Donor Check-in:** Search existing donors by Donor ID / Phone, or register a new walk-in donor (`D-XXXXXX`).
+2. **Draw & Vitals:** Captures collection parameters (Whole Blood / Apheresis) and chair-side pre-vitals (BP, pulse, Hb). Automatically evaluates donor eligibility against clinical criteria (Hb ≥ 12.5 g/dL, age 18–65, 90-day cooldown) before initializing the collection session.
+3. **Unit Barcode Sticker:** Generates the unique `U-YYYY-XXXXXX` quarantine blood bag barcode with immediate browser print capability (100 mm thermal/laser sticker output).
+
+### 2. Central Lab Screening (`LAB_TECH`, `ADMIN`)
+* **FIFO Testing Queue:** Displays newly donated units awaiting screening sorted strictly **First In First Out** (`collected_at ASC, id ASC`) so older units are tested before expiring. Paginates to a maximum of **6 cards per page**.
+* **Clean Search-Driven Entry:** Below the queue, only the Donation ID / Unit Code search bar is visible by default. Clicking a queue ticket or entering an ID smoothly reveals the active unit banner and fill-in-the-blank options (**ABO/Rh Blood Grouping** and **5-TTI Infection Screening**).
+* **Quarantine Lock:** Completed and non-reactive units automatically transition from `QUARANTINE` to `AVAILABLE` in inventory.

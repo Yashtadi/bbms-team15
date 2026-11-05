@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event';
 import App from './App';
 import { saveSession } from './api';
 
-function logInAs(role) {
-  saveSession({ token: 'fake-token', user: { id: 3, fullName: 'Test User', role } });
+function logInAs(role, email = null, fullName = 'Test User') {
+  saveSession({ token: 'fake-token', user: { id: 3, fullName, role, email: email || `${role.toLowerCase()}@bbms.test` } });
 }
 
 describe('App', () => {
@@ -23,37 +23,72 @@ describe('App', () => {
     ).toBeInTheDocument();
   });
 
-  it('TC-Don-02: shows the donation vitals tab to LAB_TECH and displays form on click', async () => {
-    const user = userEvent.setup();
-    logInAs('LAB_TECH');
+  it('TC-Col-01: shows collection desk tab to collector@bbms.test (Blood Collector) and lands on it by default', () => {
+    logInAs('LAB_TECH', 'collector@bbms.test', 'Blood Collector');
     render(<App />);
 
-    const vitalsTab = screen.getByRole('tab', { name: /Donation Vitals/i });
-    expect(vitalsTab).toBeInTheDocument();
-
-    await user.click(vitalsTab);
-    expect(screen.getByRole('heading', { name: 'Donation Vitals' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Collection Desk/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Blood Collection Desk' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Lab Screening/i })).not.toBeInTheDocument();
   });
 
-  it.each(['ADMIN', 'MANAGER', 'HOSPITAL', 'DONOR'])(
-    'TC-Don-02: hides the donation vitals tab from %s',
+  it('TC-Col-01: hides collection desk tab from labtech@bbms.test (Labtech 1), landing on Lab Screening by default', () => {
+    logInAs('LAB_TECH', 'labtech@bbms.test', 'Labtech 1');
+    render(<App />);
+
+    expect(screen.queryByRole('tab', { name: /Collection Desk/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Lab Screening/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Lab Screening' })).toBeInTheDocument();
+  });
+
+  it.each(['MANAGER', 'HOSPITAL', 'DONOR'])(
+    'TC-Col-01: hides collection desk tab from non-collector role %s',
+    (role) => {
+      logInAs(role);
+      render(<App />);
+
+      expect(screen.queryByRole('tab', { name: /Collection Desk/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 2, name: 'Blood Collection Desk' })).not.toBeInTheDocument();
+    },
+  );
+
+  it('lands MANAGER on the inventory dashboard by default without collection desk access', () => {
+    logInAs('MANAGER');
+    render(<App />);
+
+    expect(screen.queryByRole('tab', { name: /Collection Desk/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Inventory/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Inventory Dashboard' })).toBeInTheDocument();
+  });
+
+  it('hides the collection desk and inventory tabs from DONOR, showing My Donor Card instead', () => {
+    logInAs('DONOR');
+    render(<App />);
+
+    expect(screen.queryByRole('tab', { name: /Collection Desk/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Inventory/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /My Donor Card/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Donor Registration' })).toBeInTheDocument();
+  });
+
+  it.each(['LAB_TECH', 'ADMIN', 'MANAGER', 'HOSPITAL', 'DONOR'])(
+    'does not show a disconnected standalone donation vitals tab to %s (vitals unified in Collection Desk)',
     (role) => {
       logInAs(role);
       render(<App />);
 
       expect(screen.queryByRole('tab', { name: /Donation Vitals/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('heading', { name: 'Donation Vitals' })).not.toBeInTheDocument();
     },
   );
 
   it.each(['LAB_TECH', 'MANAGER', 'ADMIN'])(
-    'TC-Don-03: shows the blood unit label tab to %s and displays panel on click',
+    'TC-Don-03: shows the blood label tool tab to %s and displays panel on click',
     async (role) => {
       const user = userEvent.setup();
       logInAs(role);
       render(<App />);
 
-      const unitsTab = screen.getByRole('tab', { name: /Unit Labels/i });
+      const unitsTab = screen.getByRole('tab', { name: /Blood Label Tool/i });
       expect(unitsTab).toBeInTheDocument();
 
       await user.click(unitsTab);
@@ -61,16 +96,25 @@ describe('App', () => {
     },
   );
 
-  it.each(['HOSPITAL', 'DONOR'])(
-    'TC-Don-03: hides the blood unit label tab from %s',
-    (role) => {
-      logInAs(role);
-      render(<App />);
+  it('TC-Don-03: shows the blood label tool tab to collector@bbms.test', async () => {
+    const user = userEvent.setup();
+    logInAs('LAB_TECH', 'collector@bbms.test', 'Blood Collector');
+    render(<App />);
 
-      expect(screen.queryByRole('tab', { name: /Unit Labels/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('heading', { name: 'Blood Unit Label' })).not.toBeInTheDocument();
-    },
-  );
+    const unitsTab = screen.getByRole('tab', { name: /Blood Label Tool/i });
+    expect(unitsTab).toBeInTheDocument();
+
+    await user.click(unitsTab);
+    expect(screen.getByRole('heading', { name: 'Blood Unit Label' })).toBeInTheDocument();
+  });
+
+  it.each(['HOSPITAL', 'DONOR'])('TC-Don-03: hides the blood label tool tab from %s', (role) => {
+    logInAs(role);
+    render(<App />);
+
+    expect(screen.queryByRole('tab', { name: /Blood Label Tool/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Blood Unit Label' })).not.toBeInTheDocument();
+  });
 
   it.each(['LAB_TECH', 'MANAGER', 'ADMIN'])(
     'TC-Inv-01: shows the inventory tab to %s and displays the dashboard on click',
@@ -100,19 +144,19 @@ describe('App', () => {
     logInAs('LAB_TECH');
     render(<App />);
 
-    // Initial tab is Donors
-    expect(screen.getByRole('heading', { name: 'Donor Registration' })).toBeInTheDocument();
+    // Initial tab is Lab Screening for LAB_TECH
+    expect(screen.getByRole('heading', { name: 'Lab Screening' })).toBeInTheDocument();
 
-    // Switch to Lab Screening
+    // Switch to Inventory
+    const invTab = screen.getByRole('tab', { name: /Inventory/i });
+    await user.click(invTab);
+    expect(screen.getByRole('heading', { name: 'Inventory Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Lab Screening' })).not.toBeInTheDocument();
+
+    // Switch back to Lab Screening
     const labTab = screen.getByRole('tab', { name: /Lab Screening/i });
     await user.click(labTab);
     expect(screen.getByRole('heading', { name: 'Lab Screening' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Donor Registration' })).not.toBeInTheDocument();
-
-    // Switch back to Donors
-    const donorsTab = screen.getByRole('tab', { name: /Donors/i });
-    await user.click(donorsTab);
-    expect(screen.getByRole('heading', { name: 'Donor Registration' })).toBeInTheDocument();
   });
 
   it('toggles theme between light and dark and persists to localStorage', async () => {

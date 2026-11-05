@@ -11,7 +11,7 @@ describe('TC-Sec-02: LoginForm', () => {
 
   it('logs in, saves the session and calls onLogin', async () => {
     const user = userEvent.setup();
-    const session = { token: 'fake-token', user: { id: 3, fullName: 'Lata LabTech', role: 'LAB_TECH' } };
+    const session = { token: 'fake-token', user: { id: 3, fullName: 'Labtech 1', role: 'LAB_TECH' } };
     global.fetch = vi.fn().mockResolvedValue({ status: 200, json: async () => session });
     const onLogin = vi.fn();
 

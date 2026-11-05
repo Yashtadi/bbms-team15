@@ -125,7 +125,11 @@ export default function DonorRegistrationForm({ onSuccess }) {
               <span className="card-brand">BBMS DONOR IDENTITY CARD</span>
               <p className="card-subbrand">Blood Bank Management System · Team 15</p>
             </div>
-            <span className="card-logo">🩸</span>
+            <span className="card-logo">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#e63946" aria-hidden="true">
+                <path d="M12 2.5c-3.6 4.7-6.5 8.4-6.5 11.7a6.5 6.5 0 0 0 13 0c0-3.3-2.9-7-6.5-11.7z" />
+              </svg>
+            </span>
           </div>
 
           <div className="donor-card-body">

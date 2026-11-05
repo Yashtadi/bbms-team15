@@ -229,13 +229,26 @@ server.
 
 **Demo accounts** (from `server/db/seed.sql`). The password for all of them is `Password@123`:
 
-| Email | Role |
-|---|---|
-| `admin@bbms.test` | ADMIN |
-| `manager@bbms.test` | MANAGER |
-| `labtech@bbms.test`, `labtech2@bbms.test` | LAB_TECH |
-| `hospital@bbms.test` | HOSPITAL |
-| `donor@bbms.test` | DONOR |
+| Email | Role | Display Name | Target Group & Responsibilities |
+|---|---|---|---|
+| `collector@bbms.test` | LAB_TECH | **Blood Collector** | **Frontline Blood Collection Desk:** Operates Blood Collection Desk (walk-in donor check-in, chair-side vitals, donation session, barcode sticker generation) and Blood Label Tool |
+| `labtech@bbms.test`, `labtech2@bbms.test` | LAB_TECH | **Labtech 1**, **Labtech 2** | **Central Facility (Testing Lab):** Operates Lab Screening (FIFO testing queue, dual ABO/Rh verification, 5-TTI screening, quarantine stock) |
+| `hospital@bbms.test` | HOSPITAL | **City Hospital Desk** | **Hospital Clinical Desk:** Submits and tracks hospital patient blood requests |
+| `manager@bbms.test` | MANAGER | **Manoj Manager** | **Central Facility (Storage Manager):** Storage & inventory dashboard oversight, released stock by group/component, expiry alerts, and barcode reprints |
+| `donor@bbms.test` | DONOR | **Ravi Kumar** | **Donor Portal:** Self-service portal to view donor card and donation history |
+| `admin@bbms.test` | ADMIN | **Asha Admin** | **System Administrator:** Full administrative oversight across all facility and frontline workspaces |
+
+> **Role Separation & Workspaces:**
+> 1. **Frontline Blood Collector (`collector@bbms.test` / `LAB_TECH`):** Operates the Collection Desk and Blood Label Tool. Authorized on `/api/donations` and vitals (`PUT vitals`).
+> 2. **Central Facility Lab Technicians (`labtech@bbms.test`, `labtech2@bbms.test` / `LAB_TECH`):** Central facility staff operating Lab Screening (FIFO testing queue) and Storage & Inventory. Collection Desk is hidden.
+> 3. **Storage Managers (`MANAGER`):** Manage storage & inventory oversight and reprint unit barcode labels; forbidden from drawing blood.
+> 4. **Hospital Personnel (`HOSPITAL`):** External hospital clients submitting blood requests; forbidden from collection and vitals endpoints (403).
+>
+> **Note on Walk-in Donors vs Portal Logins:**  
+> Registering a donor at the collection desk creates a clinical record in the `donors` table and generates a permanent **Donor ID** (e.g. `D-000006`), but does not create a web portal login account in the `users` table. The `donors.user_id` foreign key is nullable.
+>
+> **Note on Patients:**  
+> Patients do not log in directly. Hospital personnel log in via `hospital@bbms.test` to submit and manage blood unit requests on a patient's behalf.
 
 **Frontend:** call the API with `apiFetch` from `client/src/api.js`, not `fetch`. It adds the token for you:
 
@@ -552,8 +565,10 @@ Also test that the **wrong role gets 403**, e.g. `.set(authHeader('HOSPITAL'))`.
 7. **Use the status codes from the SAD** (section 4).
 8. **Different from SRS/SAD/STP? Add a row to `DEVIATIONS.md`** with the date, the document and section,
    what changed and why. We must explain these at the demo.
-9. **Found a bug?** Open a GitHub Issue with the `bug` label.
-10. **Stuck for more than 20 minutes?** Ask in the group chat. Paste the exact error.
+9. **UI Design Standard: Never put emojis in buttons or tabs.** Use clean typography, accessible text labels, and standard SVGs where appropriate.
+10. **Testing Queue FIFO & Pagination:** Queue processing must always strictly follow First In First Out (`collected_at ASC, id ASC`) and display at most 6 tickets per page.
+11. **Found a bug?** Open a GitHub Issue with the `bug` label.
+12. **Stuck for more than 20 minutes?** Ask in the group chat. Paste the exact error.
 
 ---
 

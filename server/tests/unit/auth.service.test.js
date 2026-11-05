@@ -10,7 +10,7 @@ const fakeUser = {
   id: 3,
   email: 'labtech@bbms.test',
   password_hash: bcrypt.hashSync(PASSWORD, 4), // low cost = fast tests
-  full_name: 'Lata LabTech',
+  full_name: 'Labtech 1',
   role: 'LAB_TECH',
   is_active: 1,
 };
@@ -25,7 +25,7 @@ describe('TC-Sec-02: auth.service login (unit)', () => {
 
     const result = await login({ email: 'labtech@bbms.test', password: PASSWORD });
 
-    expect(result.user).toEqual({ id: 3, email: 'labtech@bbms.test', fullName: 'Lata LabTech', role: 'LAB_TECH' });
+    expect(result.user).toEqual({ id: 3, email: 'labtech@bbms.test', fullName: 'Labtech 1', role: 'LAB_TECH' });
     expect(result.user).not.toHaveProperty('password_hash');
     const payload = jwt.verify(result.token, process.env.JWT_SECRET);
     expect(payload).toMatchObject({ sub: 3, role: 'LAB_TECH' });

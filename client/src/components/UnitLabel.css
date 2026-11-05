@@ -103,47 +103,69 @@
 /* Print only the label, at its real size, when one is on screen */
 @media print {
   body:has(.unit-label) {
-    background: none;
-    padding: 0;
-    display: block;
-    min-height: 0;
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    min-height: 0 !important;
   }
 
-  body:has(.unit-label) main > :not(.unit-lookup-container),
-  body:has(.unit-label) .unit-lookup-container > :not(.unit-label) {
-    display: none;
+  /* Hide app chrome, background rings, headers, buttons, cards and banners */
+  body:has(.unit-label) .app-header,
+  body:has(.unit-label) .app-layout::before,
+  body:has(.unit-label) .app-layout::after,
+  body:has(.unit-label) .wizard-stepper,
+  body:has(.unit-label) .success-banner,
+  body:has(.unit-label) .quarantine-safety-card,
+  body:has(.unit-label) .label-actions-row,
+  body:has(.unit-label) .alert-box,
+  body:has(.unit-label) .unit-record,
+  body:has(.unit-label) .unit-lookup-container > h2,
+  body:has(.unit-label) .unit-lookup-container > .subtitle,
+  body:has(.unit-label) .unit-lookup-container > form,
+  body:has(.unit-label) .unit-lookup-container > button {
+    display: none !important;
   }
 
-  /* Put the label at the top-left of the printable area */
-  body:has(.unit-label) #root {
-    max-width: none;
-    margin: 0;
-  }
-
-  /* The panel reuses .registration-form-container, which has overflow: hidden.
-     It must not clip the label when printing. */
+  /* Reset layout wrappers so they don't clip, add margins, backgrounds, or borders */
+  body:has(.unit-label) #root,
+  body:has(.unit-label) .app-layout,
+  body:has(.unit-label) .app-content,
+  body:has(.unit-label) .collection-wizard-container,
+  body:has(.unit-label) .wizard-panel,
+  body:has(.unit-label) .label-success-panel,
+  body:has(.unit-label) .label-print-box,
   body:has(.unit-label) .unit-lookup-container {
-    max-width: none;
-    margin: 0;
-    padding: 0;
-    border: none;
-    box-shadow: none;
-    background: none;
-    overflow: visible;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: none !important;
+    overflow: visible !important;
+    display: block !important;
   }
 
   body:has(.unit-label) .unit-lookup-container::before {
-    display: none;
+    display: none !important;
   }
 
   /* Height follows the content, so nothing is ever cut off; keep the label on one page.
      No @page size is set: the label stock size isn't known yet (see DEVIATIONS.md),
      and a fixed page smaller than the label would split it across pages. */
   body:has(.unit-label) .unit-label {
-    height: auto;
-    margin: 0;
-    max-width: none;
-    overflow: visible;
-    break-inside: avoid;
+    width: 100mm !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 3mm 4mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 1.5px solid #000000 !important;
+    border-radius: 4px !important;
+    max-width: none !important;
+    overflow: visible !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }

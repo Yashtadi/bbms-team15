@@ -1,0 +1,495 @@
+/* BBMS-F-010 / F-011 / F-012 Guided Blood Collection Desk Wizard */
+
+.collection-wizard-container {
+  max-width: 760px;
+  margin: 1.5rem auto 2.5rem;
+  padding: 2.25rem 2rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  border-radius: 28px;
+  backdrop-filter: blur(12px);
+  position: relative;
+  box-sizing: border-box;
+  text-align: left;
+  color: var(--text-primary);
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
+}
+
+/* Stepper Progress Indicator */
+.wizard-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--card-inner-border);
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.step-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--input-bg);
+  border: 2px solid var(--input-border);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.step-item.active {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.step-item.active .step-circle {
+  background: var(--btn-primary-bg);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+}
+
+.step-item.completed {
+  color: var(--text-secondary);
+}
+
+.step-item.completed .step-circle {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #ffffff;
+}
+
+.step-connector {
+  flex: 1;
+  height: 2px;
+  background: var(--input-border);
+  margin: 0 0.85rem;
+  opacity: 0.6;
+}
+
+/* Panel Headers */
+.panel-header {
+  margin-bottom: 1.5rem;
+}
+
+.panel-header h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.panel-header .subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Mode Switcher Segmented Toggle */
+.checkin-mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.75rem;
+  background: var(--input-bg);
+  padding: 0.35rem;
+  border-radius: 14px;
+  border: 1px solid var(--input-border);
+}
+
+.mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn:hover:not(.active) {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mode-btn.active {
+  background: var(--card-inner-bg);
+  color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.btn-icon {
+  font-size: 1rem;
+}
+
+/* Lookup Form & Search Input */
+.search-bar-form {
+  margin-bottom: 1.25rem;
+}
+
+.search-input-wrapper {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.search-input {
+  flex: 1;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  background: var(--input-bg);
+  color: var(--input-text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.search-input:focus {
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 3px var(--input-focus-ring);
+}
+
+.search-btn {
+  white-space: nowrap;
+  padding: 0.8rem 1.4rem;
+}
+
+/* Found Donor Result Card */
+.found-donor-card {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border-radius: 16px;
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
+  box-shadow: var(--card-inner-shadow);
+  transition: all 0.3s ease;
+}
+
+.found-donor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.badge-donor-id {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  background: rgba(56, 189, 248, 0.15);
+  color: #0284c7;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  margin-bottom: 0.4rem;
+}
+
+[data-theme="dark"] .badge-donor-id {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.found-donor-header h3 {
+  margin: 0.2rem 0 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.donor-meta-text {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.status-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pill-status {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pill-ELIGIBLE {
+  background: var(--alert-success-bg);
+  color: var(--alert-success-text);
+  border: 1px solid var(--alert-success-border);
+}
+
+.pill-DEFERRED {
+  background: var(--alert-error-bg);
+  color: var(--alert-error-text);
+  border: 1px solid var(--alert-error-border);
+}
+
+.pill-consent {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .pill-consent {
+  color: #60a5fa;
+}
+
+.donor-action-row {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--card-inner-border);
+}
+
+/* Step 2: Active Donor Context Pill */
+.donor-context-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  border-radius: 14px;
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
+  box-shadow: var(--card-inner-shadow);
+  margin-bottom: 1.25rem;
+}
+
+.context-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+.context-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.context-name {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.context-id {
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  color: #0284c7;
+}
+
+[data-theme="dark"] .context-id {
+  color: #38bdf8;
+}
+
+.context-group {
+  padding: 0.15rem 0.5rem;
+  background: var(--input-bg);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #0284c7;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0.25rem 0.5rem;
+}
+
+[data-theme="dark"] .btn-link {
+  color: #38bdf8;
+}
+
+/* Vitals Form Grid */
+.vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 600px) {
+  .vitals-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.helper-notice {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  border: 1px solid var(--input-border);
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn-secondary {
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--input-border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+/* Step 3: Success Banner & Label Card */
+.label-success-panel {
+  text-align: left;
+}
+
+.success-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 16px;
+  background: var(--alert-success-bg);
+  border: 1px solid var(--alert-success-border);
+  color: var(--alert-success-text);
+  margin-bottom: 1.5rem;
+}
+
+.success-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.success-banner h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.success-banner p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Quarantine Card */
+.quarantine-safety-card {
+  padding: 1rem 1.25rem;
+  border-radius: 14px;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: var(--text-primary);
+  margin: 1.25rem 0;
+}
+
+.quarantine-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: rgba(234, 179, 8, 0.2);
+  color: #b45309;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  margin-bottom: 0.4rem;
+}
+
+[data-theme="dark"] .quarantine-badge {
+  color: #fbbf24;
+}
+
+.quarantine-safety-card p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.label-print-box {
+  margin: 1.75rem 0;
+  display: flex;
+  justify-content: center;
+}
+
+.label-actions-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.mt-3 {
+  margin-top: 0.75rem;
+}
+
+.mt-4 {
+  margin-top: 1.25rem;
+}
+
+/* Print Styles for Chair-side Barcode Label Printing */
+@media print {
+  .collection-wizard-container .wizard-stepper,
+  .collection-wizard-container .success-banner,
+  .collection-wizard-container .quarantine-safety-card,
+  .collection-wizard-container .label-actions-row,
+  .collection-wizard-container .alert-box {
+    display: none !important;
+  }
+}

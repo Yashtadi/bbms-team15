@@ -347,6 +347,44 @@ async function evaluateDonorEligibility(donorIdOrCode, vitals = {}, repository =
   };
 }
 
+/**
+ * Retrieves a donor by ID, donor code, or phone.
+ * @param {string|number} query
+ * @param {object} repository
+ * @returns {Promise<object>}
+ */
+async function getDonor(query, repository = defaultRepository) {
+  if (!query || !query.toString().trim()) {
+    const error = new Error('Donor ID or query is required');
+    error.status = 400;
+    throw error;
+  }
+  const queryStr = query.toString().trim();
+  const finder = repository.findByIdOrCodeOrPhone || repository.findByIdOrCode;
+  const donor = await finder(queryStr);
+  if (!donor) {
+    const error = new Error('Donor not found');
+    error.status = 404;
+    throw error;
+  }
+  return {
+    id: donor.id,
+    donorId: donor.donor_code || formatDonorCode(donor.id),
+    donorCode: donor.donor_code || formatDonorCode(donor.id),
+    fullName: donor.full_name,
+    dateOfBirth: donor.date_of_birth,
+    gender: donor.gender,
+    bloodGroup: donor.blood_group,
+    phone: donor.phone,
+    idProof: donor.id_proof,
+    medicalHistory: donor.medical_history,
+    eligibilityStatus: donor.eligibility_status,
+    deferralReason: donor.deferral_reason,
+    consentGiven: Boolean(donor.consent_given),
+    consentAt: donor.consent_at,
+  };
+}
+
 module.exports = {
   validateDonorRegistration,
   registerDonor,
@@ -359,4 +397,5 @@ module.exports = {
   checkEligibility,
   isEligible,
   evaluateDonorEligibility,
+  getDonor,
 };

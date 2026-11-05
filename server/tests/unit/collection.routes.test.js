@@ -36,6 +36,8 @@ describe('TC-Don-01: collection.routes access and error mapping (unit)', () => {
     }
   );
 
+
+
   it('lets LAB_TECH record a session, taking the staff ID from the token (AC 1 & AC 4)', async () => {
     collectionService.startDonation.mockResolvedValue({ donationId: 1, status: 'IN_PROGRESS' });
 

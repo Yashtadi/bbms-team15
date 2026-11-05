@@ -164,4 +164,26 @@ router.post('/eligibility', requireRole('LAB_TECH', 'ADMIN'), async (req, res) =
   }
 });
 
+/**
+ * BBMS-F-001/F-003: Lookup an existing donor by donorCode, phone, or id
+ * GET /api/donors/:query -> 200 { donorId, fullName, eligibilityStatus, ... } | 404
+ */
+router.get('/:query', requireRole('DONOR', 'LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const donor = await donorService.getDonor(req.params.query);
+    return res.status(200).json(donor);
+  } catch (error) {
+    if (error.status === 404) {
+      return res.status(404).json({ message: error.message || 'Donor not found' });
+    }
+    if (error.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({
+      message: 'Failed to find donor',
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

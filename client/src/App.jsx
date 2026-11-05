@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import CollectionDeskWizard from './components/CollectionDeskWizard';
 import DonorRegistrationForm from './components/DonorRegistrationForm';
-import DonationVitalsForm from './components/DonationVitalsForm';
 import UnitLabelLookup from './components/UnitLabelLookup';
 import LabWorkflow from './components/LabWorkflow';
 import InventoryDashboard from './components/InventoryDashboard';
@@ -10,39 +10,69 @@ import { getSession, clearSession } from './api';
 import './App.css';
 import './components/DonorRegistrationForm.css';
 
-// BBMS-F-012 & F-020: roles permitted to access unit labels and lab screening
-const UNIT_LABEL_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
+// Target Groups & Role Permissions:
+// 1. Blood Collector (collector@bbms.test / LAB_TECH): Collection Desk & Blood Label Tool
+// 2. Central Facility Testers (labtech@bbms.test, labtech2@bbms.test / LAB_TECH): Lab Screening, Inventory, Blood Label Tool
+// 3. Storage Manager (manager@bbms.test / MANAGER): Storage & Inventory, Blood Label Tool
+// 4. Hospital Desk (hospital@bbms.test / HOSPITAL): Storage & Inventory
+// 5. Donor (donor@bbms.test / DONOR): My Donor Card
+// 6. Admin (admin@bbms.test / ADMIN): Full system administration
 const LAB_STAFF_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
-// BBMS-F-030: blood-bank staff see the inventory dashboard (SAD §4.5)
 const INVENTORY_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
+const UNIT_LABEL_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 
 export default function App({ initialTab } = {}) {
   const [session, setSession] = useState(getSession);
-  const [activeTab, setActiveTab] = useState(initialTab || 'donors');
+
+  const role = session?.user?.role;
+  const email = session?.user?.email;
+
+  const isCollector = email === 'collector@bbms.test';
+  const isAdmin = role === 'ADMIN';
+
+  const canSeeCollection = isCollector || isAdmin;
+  const canSeeLab = !isCollector && LAB_STAFF_ROLES.includes(role);
+  const canSeeInventory = !isCollector && INVENTORY_ROLES.includes(role);
+  const canSeeLabels = isCollector || UNIT_LABEL_ROLES.includes(role);
+  const canSeeDonors = role === 'DONOR';
+
+  // Default landing tab per role & persona
+  const getDefaultTab = () => {
+    if (isCollector) return 'collection';
+    if (role === 'DONOR') return 'donors';
+    if (role === 'MANAGER') return 'inventory';
+    if (role === 'LAB_TECH') return 'lab';
+    return 'lab';
+  };
+
+  const defaultTab = getDefaultTab();
+  const [activeTab, setActiveTab] = useState(initialTab || null);
+  const currentTab = activeTab || defaultTab;
 
   const handleLogout = () => {
     clearSession();
     setSession(null);
+    setActiveTab(null);
+  };
+
+  const handleLogin = (newSession) => {
+    setSession(newSession);
+    setActiveTab(null);
   };
 
   if (!session) {
-    return <LoginForm onLogin={setSession} />;
+    return <LoginForm onLogin={handleLogin} />;
   }
 
-  const role = session.user?.role;
-  const canSeeVitals = role === 'LAB_TECH';
-  const canSeeLabels = UNIT_LABEL_ROLES.includes(role);
-  const canSeeLab = LAB_STAFF_ROLES.includes(role);
-  const canSeeInventory = INVENTORY_ROLES.includes(role);
-
-  // Fallback to 'donors' tab if the activeTab is restricted for this role
+  // Fallback if the activeTab is restricted for this role
   const effectiveTab =
-    (activeTab === 'vitals' && !canSeeVitals) ||
-    (activeTab === 'units' && !canSeeLabels) ||
-    (activeTab === 'lab' && !canSeeLab) ||
-    (activeTab === 'inventory' && !canSeeInventory)
-      ? 'donors'
-      : activeTab;
+    (currentTab === 'collection' && !canSeeCollection) ||
+    (currentTab === 'donors' && !canSeeDonors) ||
+    (currentTab === 'units' && !canSeeLabels) ||
+    (currentTab === 'lab' && !canSeeLab) ||
+    (currentTab === 'inventory' && !canSeeInventory)
+      ? defaultTab
+      : currentTab;
 
   return (
     <div className="app-layout">
@@ -61,40 +91,27 @@ export default function App({ initialTab } = {}) {
 
           {/* Segmented Navigation Tabs */}
           <nav className="nav-tabs" role="tablist" aria-label="Main Navigation">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={effectiveTab === 'donors'}
-              className={`tab-btn ${effectiveTab === 'donors' ? 'active' : ''}`}
-              onClick={() => setActiveTab('donors')}
-            >
-              <span className="tab-icon">📝</span>
-              <span>Donors</span>
-            </button>
-
-            {canSeeVitals && (
+            {canSeeCollection && (
               <button
                 type="button"
                 role="tab"
-                aria-selected={effectiveTab === 'vitals'}
-                className={`tab-btn ${effectiveTab === 'vitals' ? 'active' : ''}`}
-                onClick={() => setActiveTab('vitals')}
+                aria-selected={effectiveTab === 'collection'}
+                className={`tab-btn ${effectiveTab === 'collection' ? 'active' : ''}`}
+                onClick={() => setActiveTab('collection')}
               >
-                <span className="tab-icon">🩺</span>
-                <span>Donation Vitals</span>
+                <span>Collection Desk</span>
               </button>
             )}
 
-            {canSeeLabels && (
+            {canSeeDonors && (
               <button
                 type="button"
                 role="tab"
-                aria-selected={effectiveTab === 'units'}
-                className={`tab-btn ${effectiveTab === 'units' ? 'active' : ''}`}
-                onClick={() => setActiveTab('units')}
+                aria-selected={effectiveTab === 'donors'}
+                className={`tab-btn ${effectiveTab === 'donors' ? 'active' : ''}`}
+                onClick={() => setActiveTab('donors')}
               >
-                <span className="tab-icon">🏷️</span>
-                <span>Unit Labels</span>
+                <span>My Donor Card</span>
               </button>
             )}
 
@@ -106,7 +123,6 @@ export default function App({ initialTab } = {}) {
                 className={`tab-btn ${effectiveTab === 'lab' ? 'active' : ''}`}
                 onClick={() => setActiveTab('lab')}
               >
-                <span className="tab-icon">🔬</span>
                 <span>Lab Screening</span>
               </button>
             )}
@@ -119,8 +135,19 @@ export default function App({ initialTab } = {}) {
                 className={`tab-btn ${effectiveTab === 'inventory' ? 'active' : ''}`}
                 onClick={() => setActiveTab('inventory')}
               >
-                <span className="tab-icon">📦</span>
-                <span>Inventory</span>
+                <span>Storage & Inventory</span>
+              </button>
+            )}
+
+            {canSeeLabels && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={effectiveTab === 'units'}
+                className={`tab-btn ${effectiveTab === 'units' ? 'active' : ''}`}
+                onClick={() => setActiveTab('units')}
+              >
+                <span>Blood Label Tool</span>
               </button>
             )}
           </nav>
@@ -144,13 +171,16 @@ export default function App({ initialTab } = {}) {
 
       {/* Main Workspace Display */}
       <main className="app-content">
-        {effectiveTab === 'donors' && <DonorRegistrationForm />}
-        {effectiveTab === 'vitals' && canSeeVitals && <DonationVitalsForm />}
-        {effectiveTab === 'units' && canSeeLabels && <UnitLabelLookup />}
+        {effectiveTab === 'collection' && canSeeCollection && <CollectionDeskWizard />}
+        {effectiveTab === 'donors' && canSeeDonors && <DonorRegistrationForm />}
         {effectiveTab === 'lab' && canSeeLab && (
-          <LabWorkflow canEnterResults={role === 'LAB_TECH'} />
+          <LabWorkflow
+            canEnterResults={role === 'LAB_TECH'}
+            onOpenStorage={() => setActiveTab('inventory')}
+          />
         )}
         {effectiveTab === 'inventory' && canSeeInventory && <InventoryDashboard />}
+        {effectiveTab === 'units' && canSeeLabels && <UnitLabelLookup />}
       </main>
     </div>
   );
