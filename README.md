@@ -14,7 +14,7 @@ Software Engineering mini project, PES University.
 A screen recording demonstrating the complete end-to-end clinical workflow implemented in Sprint 1:
 > **Register Donor** (`F-001`, `F-003`, `F-004`) → **Eligibility Check** (`F-002`) → **Donation Session & Vitals** (`F-010`, `F-011`) → **Barcode Unit Label** (`F-012`) → **Lab Screening (ABO/Rh & TTI)** (`F-020`, `F-021`) → **Quarantine Release / Discard** (`F-022`, `F-023`).
 
-- 📹 **Watch Video:** [docs/demo/sprint1.mp4](docs/demo/sprint1.mp4)
+- 📹 **Watch Video:** [docs/Sprint-1_Demo.mp4](docs/Sprint-1_Demo.mp4)
 
 ---
 
@@ -53,8 +53,8 @@ All pre-seeded demo accounts use the default password: `Password@123` (populated
 | `DONOR` | `donor@bbms.test` | **Ravi Kumar** | **Donor Portal:** View digital donor card and donation history (linked to pre-seeded donor `D-000001` / Ravi Kumar) |
 | `ADMIN` | `admin@bbms.test` | **Asha Admin** | **System Administrator:** Full administrative and operational oversight across all facility and frontline workspaces |
 
-> **Walk-in Donors vs. Portal Accounts:**  
-> Registering a donor at the collection desk creates a clinical record in the `donors` table and generates a permanent **Donor ID** (e.g. `D-000006`), but does *not* automatically create a web portal login account. Web login accounts reside in the `users` table, linked via the nullable `donors.user_id` foreign key.
+> **Walk-in Donors & Self-Service Portal:**  
+> When a walk-in donor is registered at the collection desk, the system automatically creates their permanent **Donor ID** (e.g. `D-000006`), generates a printable CR80 physical identification card, and provisions their web portal account with a default password syntax `DDMMYYYY` (derived from their Date of Birth). Donors can sign in from home using their Donor ID or Email, download their digital card as a high-resolution PNG, view their lifetime donation stats, check their next eligible donation date, and securely change their password.
 >
 > **Patient Blood Requests:**  
 > Patients do not log in directly. Hospital personnel log in via `hospital@bbms.test` to submit and manage blood unit requests on a patient's behalf.
