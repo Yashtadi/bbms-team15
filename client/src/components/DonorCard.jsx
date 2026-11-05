@@ -24,6 +24,24 @@ function formatDate(dateStr) {
   }
 }
 
+/**
+ * Formats Government ID proof to ONLY display the last 4 characters.
+ * e.g. 385859302 -> ****9302, AADHAAR-1234-5678 -> ****5678
+ */
+function formatMaskedIdProof(idVal) {
+  if (!idVal) return 'N/A';
+  const str = String(idVal).trim();
+  const digitsAfterStars = str.match(/\*+([a-zA-Z0-9]+)$/);
+  if (digitsAfterStars) {
+    return `****${digitsAfterStars[1].slice(-4)}`;
+  }
+  const alnum = str.replace(/[^a-zA-Z0-9]/g, '');
+  if (alnum.length <= 4) {
+    return alnum ? `****${alnum}` : '****';
+  }
+  return `****${alnum.slice(-4)}`;
+}
+
 export default function DonorCard({
   donor = {},
   showActions = true,
@@ -38,7 +56,8 @@ export default function DonorCard({
   const bloodGroup = hasBloodGroup ? rawBloodGroup : null;
   const phone = donor.phone || donor.contact || 'N/A';
   const dateOfBirth = donor.dateOfBirth;
-  const maskedIdProof = donor.maskedIdProof || donor.idProof || 'N/A';
+  const rawIdProof = donor.maskedIdProof || donor.idProof || '';
+  const maskedIdProof = formatMaskedIdProof(rawIdProof);
 
   useEffect(() => {
     if (barcodeRef.current && donorCode) {

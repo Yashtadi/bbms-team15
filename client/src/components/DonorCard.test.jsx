@@ -15,7 +15,7 @@ describe('DonorCard component', () => {
     gender: 'MALE',
     bloodGroup: 'O-',
     phone: '9000000001',
-    maskedIdProof: 'ID-****01',
+    maskedIdProof: '****0001',
   };
 
   it('renders official donor identity card fields', () => {
@@ -26,7 +26,17 @@ describe('DonorCard component', () => {
     expect(screen.getByTestId('donor-id')).toHaveTextContent('D-000001');
     expect(screen.getByTestId('card-blood-group')).toHaveTextContent('O-');
     expect(screen.getByText('9000000001')).toBeInTheDocument();
-    expect(screen.getByText('ID-****01')).toBeInTheDocument();
+    expect(screen.getByText('****0001')).toBeInTheDocument();
+  });
+
+  it('masks raw government ID proof to only show last 4 characters', () => {
+    const rawDonor = {
+      ...mockDonor,
+      maskedIdProof: undefined,
+      idProof: '385859302',
+    };
+    render(<DonorCard donor={rawDonor} />);
+    expect(screen.getByText('****9302')).toBeInTheDocument();
   });
 
   it('does NOT display any password on the card itself (privacy & security)', () => {

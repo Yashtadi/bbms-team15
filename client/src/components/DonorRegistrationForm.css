@@ -175,8 +175,9 @@
 }
 
 .btn-secondary {
-  height: 44px;
-  padding: 0 1.5rem;
+  min-height: 44px;
+  height: auto;
+  padding: 0.65rem 1.5rem;
   background: #ffffff;
   color: #111827;
   border: 1px solid #d1d5db;
@@ -185,7 +186,12 @@
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.15s, border-color 0.15s;
+  box-sizing: border-box;
 }
 
 .btn-secondary.w-full {

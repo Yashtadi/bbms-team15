@@ -464,12 +464,13 @@ async function getDonorPortalData(userId, queryDonorId = null, repository = defa
     nextEligibleDate = null;
   }
 
-  // Mask ID proof for privacy
+  // Mask ID proof for privacy (only show last 4 characters)
   const idProof = donor.id_proof || '';
+  const alnumId = idProof.replace(/[^a-zA-Z0-9]/g, '');
   const maskedIdProof =
-    idProof.length > 4
-      ? `${idProof.slice(0, 3)}****${idProof.slice(-2)}`
-      : '****';
+    alnumId.length > 4
+      ? `****${alnumId.slice(-4)}`
+      : (alnumId ? `****${alnumId}` : '****');
 
   return {
     donor: {

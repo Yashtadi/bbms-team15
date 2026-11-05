@@ -687,7 +687,12 @@ export default function CollectionDeskWizard() {
             </div>
 
             <div className="button-group mt-4">
-              <button type="button" className="btn-secondary" onClick={() => setStep(1)}>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                onClick={() => setStep(1)}
+              >
                 ← Back to Donor
               </button>
               <button type="submit" className="btn-primary" disabled={isSavingSession}>

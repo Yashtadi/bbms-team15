@@ -60,6 +60,22 @@ describe('TC-Sec-02: LoginForm', () => {
     expect(sessionStorage.getItem('bbms.session')).toBeNull();
   });
 
+  it('allows logging in with permanent Donor ID without browser email validation error', async () => {
+    const user = userEvent.setup();
+    const donorSession = { token: 'donor-token', user: { id: 10, fullName: 'Ravi Kumar', role: 'DONOR' } };
+    global.fetch = vi.fn().mockResolvedValue({ status: 200, json: async () => donorSession });
+    const onLogin = vi.fn();
+
+    render(<LoginForm onLogin={onLogin} />);
+    expect(screen.getByPlaceholderText('Email / Donor ID')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('Email / Donor ID'), 'D-000131');
+    await user.type(screen.getByLabelText('Password'), '01012000');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    await waitFor(() => expect(onLogin).toHaveBeenCalledWith(donorSession));
+  });
+
   it('shows connection error when backend server is unreachable', async () => {
     const user = userEvent.setup();
     global.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch'));

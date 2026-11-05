@@ -204,7 +204,7 @@ describe('getDonorPortalData (unit)', () => {
     const data = await getDonorPortalData(6, null, mockRepo);
 
     expect(data.donor.donorCode).toBe('D-000001');
-    expect(data.donor.maskedIdProof).toBe('ID-****01');
+    expect(data.donor.maskedIdProof).toBe('****0001');
     expect(data.stats.totalDonations).toBe(1);
     expect(data.stats.totalVolumeMl).toBe(450);
     expect(data.stats.livesSaved).toBe(3);

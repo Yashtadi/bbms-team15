@@ -43,7 +43,7 @@ describe('Donor Portal & Account Provisioning (integration)', () => {
         fullName: 'Ravi Kumar',
         bloodGroup: 'O-',
       });
-      expect(res.body.donor.maskedIdProof).toBe('ID-****01');
+      expect(res.body.donor.maskedIdProof).toBe('****0001');
 
       expect(res.body).toHaveProperty('stats');
       expect(res.body.stats.totalDonations).toBeGreaterThanOrEqual(1);
