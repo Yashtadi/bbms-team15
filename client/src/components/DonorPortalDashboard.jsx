@@ -250,12 +250,6 @@ export default function DonorPortalDashboard({ onLogout }) {
           <span className="metric-sub">Pure whole blood/components</span>
         </div>
 
-        <div className="metric-card metric-impact" data-testid="metric-lives">
-          <span className="metric-label">Estimated Lives Saved</span>
-          <span className="metric-value">{stats.livesSaved}</span>
-          <span className="metric-sub">1 donation can save up to 3 lives</span>
-        </div>
-
         <div
           className={`metric-card ${stats.isEligibleNow ? 'metric-eligible' : 'metric-waiting'}`}
           data-testid="metric-eligibility"

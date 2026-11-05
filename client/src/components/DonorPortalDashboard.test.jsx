@@ -60,7 +60,6 @@ describe('DonorPortalDashboard (client)', () => {
     expect(await screen.findByTestId('portal-donor-name')).toHaveTextContent('Welcome, Ravi Kumar');
     expect(screen.getByTestId('metric-donations')).toHaveTextContent('2');
     expect(screen.getByTestId('metric-volume')).toHaveTextContent('900 mL');
-    expect(screen.getByTestId('metric-lives')).toHaveTextContent('6');
     expect(screen.getByTestId('metric-eligibility')).toHaveTextContent('In 54 Days');
 
     expect(screen.getByTestId('donor-card')).toBeInTheDocument();

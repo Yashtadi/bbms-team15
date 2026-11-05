@@ -342,11 +342,31 @@ export default function DonorCard({
       ctx.font = '10px system-ui, -apple-system, sans-serif';
       ctx.fillText('Team 15 · Official Donor Identification', 16, 36);
 
-      // Header Drop Icon Circle
-      ctx.fillStyle = '#e63946';
+      // Header Drop Icon (circular badge + SVG blood droplet)
+      ctx.save();
+      const iconCenterX = width - 24;
+      const iconCenterY = 23;
+      ctx.fillStyle = 'rgba(230, 57, 70, 0.2)';
       ctx.beginPath();
-      ctx.arc(width - 24, 24, 10, 0, Math.PI * 2);
+      ctx.arc(iconCenterX, iconCenterY, 14, 0, Math.PI * 2);
       ctx.fill();
+
+      // Render the blood droplet icon
+      ctx.translate(iconCenterX - 11, iconCenterY - 11);
+      ctx.scale(22 / 24, 22 / 24);
+      ctx.fillStyle = '#e63946';
+      if (typeof Path2D !== 'undefined') {
+        const dropPath = new Path2D('M12 2.5c-3.6 4.7-6.5 8.4-6.5 11.7a6.5 6.5 0 0 0 13 0c0-3.3-2.9-7-6.5-11.7z');
+        ctx.fill(dropPath);
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(12, 2.5);
+        ctx.bezierCurveTo(8.4, 7.2, 5.5, 10.9, 5.5, 14.2);
+        ctx.arc(12, 14.2, 6.5, Math.PI, 0, true);
+        ctx.bezierCurveTo(18.5, 10.9, 15.6, 7.2, 12, 2.5);
+        ctx.fill();
+      }
+      ctx.restore();
 
       // Avatar circle
       ctx.fillStyle = '#e2e8f0';
