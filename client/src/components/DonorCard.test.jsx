@@ -39,6 +39,19 @@ describe('DonorCard component', () => {
     expect(screen.getByText(/1800-BBMS-PES/i)).toBeInTheDocument();
   });
 
+  it('does NOT display any Pending Test badge when blood group is unassigned', () => {
+    const unassignedDonor = {
+      donorCode: 'D-000105',
+      fullName: 'Shaunak Mahajan',
+      dateOfBirth: '2005-10-21',
+      phone: '5858493980',
+    };
+    render(<DonorCard donor={unassignedDonor} />);
+
+    expect(screen.queryByText(/Pending/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('card-blood-group')).not.toBeInTheDocument();
+  });
+
   it('renders print and PNG download action buttons', () => {
     render(<DonorCard donor={mockDonor} showActions={true} />);
 

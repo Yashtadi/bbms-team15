@@ -32,7 +32,10 @@ export default function DonorCard({
 
   const donorCode = donor.donorCode || donor.donorId || 'D-000000';
   const fullName = donor.fullName || donor.name || 'Registered Donor';
-  const bloodGroup = donor.bloodGroup || 'PENDING';
+  const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  const rawBloodGroup = donor.bloodGroup ? String(donor.bloodGroup).trim().toUpperCase() : '';
+  const hasBloodGroup = VALID_BLOOD_GROUPS.includes(rawBloodGroup);
+  const bloodGroup = hasBloodGroup ? rawBloodGroup : null;
   const phone = donor.phone || donor.contact || 'N/A';
   const dateOfBirth = donor.dateOfBirth;
   const maskedIdProof = donor.maskedIdProof || donor.idProof || 'N/A';
@@ -172,10 +175,6 @@ export default function DonorCard({
               text-align: center;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
-            }
-            .blood-group-badge.badge-pending {
-              background: #f59e0b !important;
-              font-size: 6pt;
             }
             .blood-group-label {
               font-size: 5pt;
@@ -344,19 +343,21 @@ export default function DonorCard({
       ctx.textAlign = 'center';
       ctx.fillText(fullName ? fullName[0].toUpperCase() : 'D', 52, 101);
 
-      // Blood Group Badge
-      ctx.fillStyle = bloodGroup.includes('Pending') ? '#f59e0b' : '#e63946';
-      ctx.beginPath();
-      ctx.roundRect(16, 128, 72, 26, 6);
-      ctx.fill();
+      // Blood Group Badge (Only if verified/assigned blood group exists)
+      if (hasBloodGroup) {
+        ctx.fillStyle = '#e63946';
+        ctx.beginPath();
+        ctx.roundRect(16, 128, 72, 26, 6);
+        ctx.fill();
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 15px system-ui, sans-serif';
-      ctx.fillText(bloodGroup, 52, 146);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 15px system-ui, sans-serif';
+        ctx.fillText(bloodGroup, 52, 146);
 
-      ctx.fillStyle = '#64748b';
-      ctx.font = 'bold 9px system-ui, sans-serif';
-      ctx.fillText('BLOOD GROUP', 52, 166);
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 9px system-ui, sans-serif';
+        ctx.fillText('BLOOD GROUP', 52, 166);
+      }
 
       // Right Column: Details
       ctx.textAlign = 'left';
@@ -515,13 +516,17 @@ export default function DonorCard({
             <div className="donor-avatar-circle">
               {fullName ? fullName[0].toUpperCase() : 'D'}
             </div>
-            <div
-              className={`blood-group-badge ${bloodGroup === 'PENDING' || bloodGroup.includes('Pending') ? 'badge-pending' : ''}`}
-              data-testid="card-blood-group"
-            >
-              {bloodGroup}
-            </div>
-            <span className="blood-group-label">Blood Group</span>
+            {hasBloodGroup && (
+              <>
+                <div
+                  className="blood-group-badge"
+                  data-testid="card-blood-group"
+                >
+                  {bloodGroup}
+                </div>
+                <span className="blood-group-label">Blood Group</span>
+              </>
+            )}
           </div>
 
           {/* Right Column: Donor Data Grid */}

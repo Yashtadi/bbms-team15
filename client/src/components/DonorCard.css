@@ -153,12 +153,6 @@
   box-shadow: 0 2px 5px rgba(230, 57, 70, 0.3);
 }
 
-.blood-group-badge.badge-pending {
-  background: #f59e0b;
-  font-size: 0.72rem;
-  padding: 0.2rem 0.4rem;
-}
-
 .blood-group-label {
   font-size: 0.6rem;
   text-transform: uppercase;

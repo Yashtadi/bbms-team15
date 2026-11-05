@@ -139,7 +139,8 @@ export default function DonorPortalDashboard({ onLogout }) {
           <span className="welcome-tag">DONOR SELF-SERVICE PORTAL</span>
           <h2 data-testid="portal-donor-name">Welcome, {donor.fullName}</h2>
           <p className="welcome-subtitle">
-            Donor ID: <strong>{donor.donorCode}</strong> · Blood Group: <strong>{donor.bloodGroup}</strong>
+            Donor ID: <strong>{donor.donorCode}</strong>
+            {donor.bloodGroup ? <> · Blood Group: <strong>{donor.bloodGroup}</strong></> : null}
           </p>
         </div>
 

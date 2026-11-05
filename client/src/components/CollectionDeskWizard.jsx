@@ -18,6 +18,7 @@ const DEFAULT_NEW_DONOR = {
   fullName: '',
   dateOfBirth: '',
   gender: 'MALE',
+  bloodGroup: '',
   contact: '',
   email: '',
   idProof: '',
@@ -103,6 +104,7 @@ export default function CollectionDeskWizard() {
           name: newDonor.fullName.trim(),
           dateOfBirth: newDonor.dateOfBirth,
           gender: newDonor.gender,
+          bloodGroup: newDonor.bloodGroup || undefined,
           contact: newDonor.contact.trim(),
           email: newDonor.email.trim() || undefined,
           idProof: newDonor.idProof.trim(),
@@ -122,7 +124,7 @@ export default function CollectionDeskWizard() {
           phone: newDonor.contact.trim(),
           email: newDonor.email.trim() || undefined,
           idProof: newDonor.idProof.trim(),
-          bloodGroup: 'Pending Test',
+          bloodGroup: newDonor.bloodGroup || null,
           eligibilityStatus: data.status || 'PENDING',
           consentGiven: Boolean(newDonor.consentGiven),
         };
@@ -413,15 +415,36 @@ export default function CollectionDeskWizard() {
                 {donorFormErrors.idProof && <span className="field-error">{donorFormErrors.idProof}</span>}
               </div>
 
-              <div className="form-group">
-                <label htmlFor="email">Email Address (Optional - for online portal access)</label>
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="e.g. donor@example.com (or leave empty to use Donor ID for login)"
-                  value={newDonor.email}
-                  onChange={(e) => setNewDonor({ ...newDonor, email: e.target.value })}
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="bloodGroup">Blood Group (Optional / If Known)</label>
+                  <select
+                    id="bloodGroup"
+                    value={newDonor.bloodGroup}
+                    onChange={(e) => setNewDonor({ ...newDonor, bloodGroup: e.target.value })}
+                  >
+                    <option value="">Unknown / Pending Lab Test</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="email">Email Address (Optional)</label>
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder="e.g. donor@example.com (or login with Donor ID)"
+                    value={newDonor.email}
+                    onChange={(e) => setNewDonor({ ...newDonor, email: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -540,11 +563,13 @@ export default function CollectionDeskWizard() {
               <span className="context-id">({activeDonor.donorCode || activeDonor.donorId})</span>
             </div>
             <div className="context-right" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <span className="context-blood-group">{activeDonor.bloodGroup || 'PENDING'}</span>
+              {activeDonor.bloodGroup && (
+                <span className="context-blood-group">{activeDonor.bloodGroup}</span>
+              )}
               <button
                 type="button"
                 className="btn-secondary"
-                style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }}
+                style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', width: 'auto' }}
                 onClick={() => setShowDonorCardModal(true)}
               >
                 View / Print Card
@@ -732,36 +757,13 @@ export default function CollectionDeskWizard() {
 
       {/* Official Donor Card Preview / Print Modal */}
       {showDonorCardModal && activeDonor && (
-        <div className="modal-overlay" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '1rem',
-        }}>
-          <div style={{
-            background: 'var(--card-bg, #1e293b)',
-            borderRadius: '16px',
-            padding: '1.5rem',
-            maxWidth: '520px',
-            width: '100%',
-            border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Official Donor Card</h3>
+        <div className="donor-card-modal-overlay">
+          <div className="donor-card-modal-content">
+            <div className="donor-card-modal-header">
+              <h3>Official Donor Card</h3>
               <button
                 type="button"
-                className="btn-secondary"
+                className="modal-close-btn"
                 onClick={() => setShowDonorCardModal(false)}
               >
                 Close

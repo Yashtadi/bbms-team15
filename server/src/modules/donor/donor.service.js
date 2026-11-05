@@ -235,11 +235,14 @@ async function registerDonor(input, repository = defaultRepository) {
   const consentGiven = Boolean(input.consentGiven || input.consent);
   const consentAt = consentGiven ? new Date() : null;
 
+  const bloodGroup = input.bloodGroup ? String(input.bloodGroup).trim().toUpperCase() : null;
+
   // BBMS-F-003 / #46: createDonor atomically assigns and returns the unique donorCode in a transaction
   const createdDonor = await repository.createDonor({
     fullName,
     dateOfBirth,
     gender,
+    bloodGroup,
     phone,
     email,
     address,
@@ -256,6 +259,9 @@ async function registerDonor(input, repository = defaultRepository) {
   };
   if (createdDonor.portalUser) {
     result.portalUser = createdDonor.portalUser;
+  }
+  if (createdDonor.bloodGroup || bloodGroup) {
+    result.bloodGroup = createdDonor.bloodGroup || bloodGroup;
   }
   return result;
 }
@@ -472,7 +478,7 @@ async function getDonorPortalData(userId, queryDonorId = null, repository = defa
       fullName: donor.full_name,
       dateOfBirth: donor.date_of_birth,
       gender: donor.gender,
-      bloodGroup: donor.blood_group || 'Pending Typing',
+      bloodGroup: donor.blood_group || null,
       phone: donor.phone,
       email: donor.email,
       maskedIdProof,

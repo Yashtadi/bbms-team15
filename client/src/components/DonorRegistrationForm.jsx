@@ -138,7 +138,7 @@ export default function DonorRegistrationForm({ onSuccess }) {
             fullName: donorName,
             phone: formData.contact,
             maskedIdProof: formData.idProof,
-            bloodGroup: 'Pending Test',
+            bloodGroup: registrationResult.bloodGroup || null,
           }}
           showActions={true}
         />

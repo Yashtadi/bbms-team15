@@ -214,6 +214,7 @@ async function createDonor(donor) {
     fullName,
     dateOfBirth,
     gender,
+    bloodGroup = null,
     phone,
     email = null,
     address = null,
@@ -224,21 +225,25 @@ async function createDonor(donor) {
     consentAt = null,
   } = donor;
 
+  const validBloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  const sanitizedBloodGroup = validBloodGroups.includes(bloodGroup) ? bloodGroup : null;
+
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
 
     const [result] = await connection.query(
       `INSERT INTO donors (
-        donor_code, full_name, date_of_birth, gender, phone, email,
+        donor_code, full_name, date_of_birth, gender, blood_group, phone, email,
         address, id_proof, medical_history, eligibility_status,
         consent_given, consent_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         donorCode,
         fullName,
         dateOfBirth,
         gender,
+        sanitizedBloodGroup,
         phone,
         email,
         address,
