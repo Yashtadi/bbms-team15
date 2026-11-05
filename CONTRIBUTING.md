@@ -231,15 +231,16 @@ server.
 
 | Email | Role | Target Group & Responsibilities |
 |---|---|---|
-| `hospital@bbms.test` | HOSPITAL | **Frontline Clinical & Hospital (Collector + Hospital):** Operates Blood Collection Desk (walk-in donor check-in, registration, chair-side vitals, barcode sticker generation) and submits/tracks patient blood requests |
-| `labtech@bbms.test`, `labtech2@bbms.test` | LAB_TECH | **Central Facility (Tester):** Operates Lab Screening (FIFO testing queue, dual ABO/Rh verification, 5-TTI screening, quarantine stock) |
+| `labtech@bbms.test`, `labtech2@bbms.test` | LAB_TECH | **Central Facility & Phlebotomy (Collector + Tester):** Operates Blood Collection Desk (walk-in donor check-in, chair-side vitals, donation session, barcode sticker generation) and Lab Screening (FIFO testing queue, dual ABO/Rh verification, 5-TTI screening, quarantine stock) |
+| `hospital@bbms.test` | HOSPITAL | **Hospital Clinical Desk:** Submits and tracks hospital patient blood requests and inspects available blood inventory |
 | `manager@bbms.test` | MANAGER | **Central Facility (Storage Manager):** Storage & inventory dashboard oversight, released stock by group/component, expiry alerts, and barcode reprints |
 | `donor@bbms.test` | DONOR | **Donor Portal:** Self-service portal to view donor card and donation history |
 | `admin@bbms.test` | ADMIN | **System Administrator:** Full administrative oversight across all facility and frontline workspaces |
 
-> **Two Target Operating Groups:**
-> 1. **Frontline Clinical & Hospital (`HOSPITAL`):** Frontline staff and phlebotomists collect blood from walk-in donors. Authorized on `/api/donors` and `/api/donations`.
-> 2. **Central Blood Bank Facility (`LAB_TECH` & `MANAGER`):** Central facility staff test and manage inventory. Lab technicians and managers do *not* have the walk-in Collection Desk tab to prevent operational mix-up between chair-side donor draws and clean laboratory screening.
+> **Role Separation & Workspaces:**
+> 1. **Central Facility Phlebotomists & Technicians (`LAB_TECH`):** Central facility staff authorized on `/api/donations` and vitals (`PUT vitals`). In the UI, technicians land on the Lab Screening Testing Queue by default and can switch to the Collection Desk to check in donors and draw blood.
+> 2. **Storage Managers (`MANAGER`):** Manage storage & inventory oversight and reprint unit barcode labels; forbidden from drawing blood.
+> 3. **Hospital Personnel (`HOSPITAL`):** External hospital clients submitting blood requests; forbidden from collection and vitals endpoints (403).
 >
 > **Note on Walk-in Donors vs Portal Logins:**  
 > Registering a donor at the collection desk creates a clinical record in the `donors` table and generates a permanent **Donor ID** (e.g. `D-000006`), but does not create a web portal login account in the `users` table. The `donors.user_id` foreign key is nullable.

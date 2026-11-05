@@ -8,7 +8,7 @@ const router = express.Router();
  * BBMS-F-001: Donor registration
  * SAD §4.3: POST /api/donors -> 201 { donorId, status }
  */
-router.post('/', requireRole('DONOR', 'HOSPITAL', 'LAB_TECH', 'ADMIN'), async (req, res) => {
+router.post('/', requireRole('DONOR', 'LAB_TECH', 'ADMIN'), async (req, res) => {
   try {
     const result = await donorService.registerDonor(req.body);
     return res.status(201).json(result);
@@ -50,7 +50,7 @@ router.post('/', requireRole('DONOR', 'HOSPITAL', 'LAB_TECH', 'ADMIN'), async (r
  * BBMS-F-004: Digitally capture and record donor consent
  * SAD §4.3: POST /api/donors/:id/consent -> 200 { donorId, consentGiven: true, consentAt }
  */
-router.post('/:id/consent', requireRole('DONOR', 'HOSPITAL', 'LAB_TECH', 'ADMIN'), async (req, res) => {
+router.post('/:id/consent', requireRole('DONOR', 'LAB_TECH', 'ADMIN'), async (req, res) => {
   try {
     const consent = req.body.consent !== undefined 
       ? req.body.consent 
@@ -83,7 +83,7 @@ router.post('/:id/consent', requireRole('DONOR', 'HOSPITAL', 'LAB_TECH', 'ADMIN'
  * BBMS-F-002: Evaluate donor eligibility by donor ID
  * SAD §4.3: POST /api/donors/:id/eligibility -> 200 { eligible, status } or 422 { eligible: false, reason }
  */
-router.post('/:id/eligibility', requireRole('HOSPITAL', 'LAB_TECH', 'ADMIN'), async (req, res) => {
+router.post('/:id/eligibility', requireRole('LAB_TECH', 'ADMIN'), async (req, res) => {
   try {
     const result = await donorService.evaluateDonorEligibility(req.params.id, req.body);
     return res.status(200).json(result);
@@ -117,7 +117,7 @@ router.post('/:id/eligibility', requireRole('HOSPITAL', 'LAB_TECH', 'ADMIN'), as
  * BBMS-F-002: Check eligibility with provided vitals directly or via donorId in body
  * SAD §4.3: POST /api/donors/eligibility -> 200 or 422
  */
-router.post('/eligibility', requireRole('HOSPITAL', 'LAB_TECH', 'ADMIN'), async (req, res) => {
+router.post('/eligibility', requireRole('LAB_TECH', 'ADMIN'), async (req, res) => {
   try {
     const { donorId, ...vitals } = req.body;
 
@@ -168,7 +168,7 @@ router.post('/eligibility', requireRole('HOSPITAL', 'LAB_TECH', 'ADMIN'), async 
  * BBMS-F-001/F-003: Lookup an existing donor by donorCode, phone, or id
  * GET /api/donors/:query -> 200 { donorId, fullName, eligibilityStatus, ... } | 404
  */
-router.get('/:query', requireRole('DONOR', 'HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+router.get('/:query', requireRole('DONOR', 'LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
   try {
     const donor = await donorService.getDonor(req.params.query);
     return res.status(200).json(donor);

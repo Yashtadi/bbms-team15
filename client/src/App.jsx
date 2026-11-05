@@ -10,13 +10,15 @@ import { getSession, clearSession } from './api';
 import './App.css';
 import './components/DonorRegistrationForm.css';
 
-// Two Target Groups:
-// Group 1: Frontline Clinical & Hospital (Collector + Hospital) -> HOSPITAL role
-// Group 2: Central Blood Bank Facility (Tester + Storage Manager) -> LAB_TECH & MANAGER roles
-const COLLECTION_ROLES = ['HOSPITAL', 'ADMIN'];
+// Role Permissions aligned with SRS §4.2 / SAD §3.2 & §4.3:
+// LAB_TECH: Blood collection, vitals, lab screening, quarantine & barcode labels
+// MANAGER: Inventory oversight, read-only screening inspection
+// DONOR: Personal donor profile & donation history
+// ADMIN: Full system administration
+const COLLECTION_ROLES = ['LAB_TECH', 'ADMIN'];
 const LAB_STAFF_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 const INVENTORY_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
-const UNIT_LABEL_ROLES = ['HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'];
+const UNIT_LABEL_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 
 export default function App({ initialTab } = {}) {
   const [session, setSession] = useState(getSession);
@@ -33,7 +35,6 @@ export default function App({ initialTab } = {}) {
     if (role === 'DONOR') return 'donors';
     if (role === 'MANAGER') return 'inventory';
     if (role === 'LAB_TECH') return 'lab';
-    if (role === 'HOSPITAL') return 'collection';
     return 'lab';
   };
 

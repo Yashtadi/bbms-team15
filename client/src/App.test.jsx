@@ -23,17 +23,23 @@ describe('App', () => {
     ).toBeInTheDocument();
   });
 
-  it('TC-Col-01: shows collection desk tab to HOSPITAL (frontline collector) and lands on it by default', () => {
-    logInAs('HOSPITAL');
+  it('TC-Col-01: shows collection desk tab to LAB_TECH (frontline collector) and lands on Lab Screening by default', async () => {
+    const user = userEvent.setup();
+    logInAs('LAB_TECH');
     render(<App />);
+
+    expect(screen.getByRole('tab', { name: /Lab Screening/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Lab Screening' })).toBeInTheDocument();
 
     const collectionTab = screen.getByRole('tab', { name: /Collection Desk/i });
     expect(collectionTab).toBeInTheDocument();
+
+    await user.click(collectionTab);
     expect(screen.getByRole('heading', { level: 2, name: 'Blood Collection Desk' })).toBeInTheDocument();
   });
 
-  it.each(['LAB_TECH', 'MANAGER', 'DONOR'])(
-    'TC-Col-01: hides collection desk tab from central lab / non-collector role %s',
+  it.each(['MANAGER', 'HOSPITAL', 'DONOR'])(
+    'TC-Col-01: hides collection desk tab from non-collector role %s',
     (role) => {
       logInAs(role);
       render(<App />);
@@ -42,15 +48,6 @@ describe('App', () => {
       expect(screen.queryByRole('heading', { level: 2, name: 'Blood Collection Desk' })).not.toBeInTheDocument();
     },
   );
-
-  it('lands LAB_TECH on Lab Screening by default', () => {
-    logInAs('LAB_TECH');
-    render(<App />);
-
-    expect(screen.getByRole('tab', { name: /Lab Screening/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Lab Screening' })).toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: /Collection Desk/i })).not.toBeInTheDocument();
-  });
 
   it('lands MANAGER on the inventory dashboard by default without collection desk access', () => {
     logInAs('MANAGER');
@@ -81,7 +78,7 @@ describe('App', () => {
     },
   );
 
-  it.each(['HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'])(
+  it.each(['LAB_TECH', 'MANAGER', 'ADMIN'])(
     'TC-Don-03: shows the blood label tool tab to %s and displays panel on click',
     async (role) => {
       const user = userEvent.setup();
@@ -96,8 +93,8 @@ describe('App', () => {
     },
   );
 
-  it('TC-Don-03: hides the blood label tool tab from DONOR', () => {
-    logInAs('DONOR');
+  it.each(['HOSPITAL', 'DONOR'])('TC-Don-03: hides the blood label tool tab from %s', (role) => {
+    logInAs(role);
     render(<App />);
 
     expect(screen.queryByRole('tab', { name: /Blood Label Tool/i })).not.toBeInTheDocument();

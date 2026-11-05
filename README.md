@@ -46,8 +46,8 @@ All pre-seeded demo accounts use the default password: `Password@123` (populated
 
 | Role | Demo Email | Target Operating Group & Capabilities |
 |---|---|---|
-| `HOSPITAL` | `hospital@bbms.test` | **Frontline Clinical & Hospital Desk (Collector + Hospital):** Operates the 3-step Blood Collection Desk (walk-in donor check-in, registration, chair-side vitals, barcode label tool), prints barcode labels, and submits/tracks hospital patient blood unit requests |
-| `LAB_TECH` | `labtech@bbms.test`<br>`labtech2@bbms.test` | **Central Facility (Tester):** Operates the Lab Screening workspace: inspects newly donated units in the FIFO testing queue, verifies ABO/Rh blood groups, records 5 mandatory TTI infection tests, and manages quarantine stock |
+| `LAB_TECH` | `labtech@bbms.test`<br>`labtech2@bbms.test` | **Central Facility & Phlebotomy (Collector + Tester):** Operates the 3-step Blood Collection Desk (walk-in donor check-in, chair-side vitals, session recording, Code 128 barcode stickers), operates the Lab Screening workspace (FIFO testing queue, dual ABO/Rh verification, 5 mandatory TTI tests), and manages quarantine stock |
+| `HOSPITAL` | `hospital@bbms.test` | **Hospital Clinical Desk:** Submits and tracks hospital patient blood unit requests and inspects available blood inventory |
 | `MANAGER` | `manager@bbms.test` | **Central Facility (Storage Manager):** Central storage & inventory oversight, stock levels by blood group and component, expiry monitoring, and unit barcode reprint tool |
 | `DONOR` | `donor@bbms.test` | **Donor Portal:** View digital donor card and donation history (linked to pre-seeded donor `D-000001` / Ravi Kumar) |
 | `ADMIN` | `admin@bbms.test` | **System Administrator:** Full administrative and operational oversight across all facility and frontline workspaces |
