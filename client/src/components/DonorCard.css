@@ -1,0 +1,342 @@
+/* ==========================================================================
+   BBMS Official Donor ID Card Styling (CR80 Standard Wallet ID Format)
+   ========================================================================== */
+
+.bbms-donor-card-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+  width: 100%;
+}
+
+.donor-card-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-print-card,
+.btn-download-card {
+  padding: 0.65rem 1.25rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.btn-print-card {
+  background: linear-gradient(135deg, #e63946, #b91c1c);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(230, 57, 70, 0.35);
+}
+
+.btn-print-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(230, 57, 70, 0.45);
+}
+
+.btn-download-card {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary, #ffffff);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-download-card:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Physical Card Container
+   ========================================================================== */
+.bbms-donor-card {
+  width: 440px;
+  max-width: 100%;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #111827;
+  border: 1.5px solid #d1d5db;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  box-sizing: border-box;
+}
+
+/* Header Banner */
+.bbms-card-header {
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  color: #ffffff;
+  padding: 0.65rem 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #e63946;
+}
+
+.bbms-card-brand {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-brand-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+}
+
+.card-brand-subtitle {
+  font-size: 0.62rem;
+  color: #94a3b8;
+  letter-spacing: 0.03em;
+}
+
+.card-drop-icon {
+  background: rgba(230, 57, 70, 0.15);
+  border-radius: 50%;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Card Body */
+.bbms-card-body {
+  display: flex;
+  padding: 0.85rem 1rem 0.6rem;
+  gap: 1rem;
+  background: #ffffff;
+}
+
+/* Left Column: Avatar & Blood Group */
+.bbms-card-avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 90px;
+  flex-shrink: 0;
+  gap: 0.35rem;
+}
+
+.donor-avatar-circle {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  border: 2px solid #94a3b8;
+}
+
+.blood-group-badge {
+  background: #e63946;
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 1.05rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(230, 57, 70, 0.3);
+}
+
+.blood-group-badge.badge-pending {
+  background: #f59e0b;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.4rem;
+}
+
+.blood-group-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+/* Right Column: Donor Data */
+.bbms-card-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex-grow: 1;
+}
+
+.card-info-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.card-value {
+  font-size: 0.78rem;
+  color: #0f172a;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.card-name-val {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.card-id-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #b91c1c;
+  letter-spacing: 0.05em;
+}
+
+.card-consent-val {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.card-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+/* Barcode Section */
+.bbms-card-barcode-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.4rem 0.75rem 0.35rem;
+  background: #f8fafc;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.card-barcode-svg {
+  display: block;
+  max-width: 220px;
+  height: 34px;
+}
+
+.card-barcode-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #334155;
+  margin-top: 2px;
+}
+
+/* Footer & Portal Notice */
+.bbms-card-footer {
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  padding: 0.45rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+  font-size: 0.62rem;
+  color: #475569;
+}
+
+.portal-notice strong {
+  color: #0f172a;
+}
+
+.helpline-notice {
+  font-weight: 700;
+  color: #64748b;
+}
+
+/* ==========================================================================
+   Print Optimization: Standard CR80 ID Card
+   Hides browser chrome, app navigation, and renders ONLY the card
+   ========================================================================== */
+@media print {
+  @page {
+    size: auto;
+    margin: 5mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .bbms-donor-card,
+  .bbms-donor-card * {
+    visibility: visible !important;
+  }
+
+  .bbms-donor-card {
+    position: fixed !important;
+    left: 50% !important;
+    top: 15mm !important;
+    transform: translateX(-50%) !important;
+    width: 85.6mm !important;
+    height: auto !important;
+    min-height: 54mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 1.5px solid #000000 !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Completely collapse non-card containers */
+  .app-header,
+  .nav-tabs,
+  .user-bar,
+  .donor-portal-container,
+  .collection-wizard-container,
+  .registration-form-container,
+  .portal-welcome-header,
+  .portal-metrics-grid,
+  .portal-content-grid,
+  .portal-card-section > h3,
+  .portal-card-section > p,
+  .portal-history-section,
+  .donor-card-actions,
+  .no-print {
+    display: none !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .bbms-card-header {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .blood-group-badge {
+    background: #e63946 !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

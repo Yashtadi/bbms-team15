@@ -44,6 +44,10 @@ function validateDonorRegistration(input = {}) {
     errors.idProof = 'ID proof is required';
   }
 
+  if (input.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email.toString().trim())) {
+    errors.email = 'Invalid email address';
+  }
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors,
@@ -246,10 +250,14 @@ async function registerDonor(input, repository = defaultRepository) {
     consentAt,
   });
 
-  return {
+  const result = {
     donorId: createdDonor.donorCode,
     status: 'PENDING',
   };
+  if (createdDonor.portalUser) {
+    result.portalUser = createdDonor.portalUser;
+  }
+  return result;
 }
 
 /**
@@ -376,12 +384,125 @@ async function getDonor(query, repository = defaultRepository) {
     gender: donor.gender,
     bloodGroup: donor.blood_group,
     phone: donor.phone,
+    email: donor.email,
     idProof: donor.id_proof,
     medicalHistory: donor.medical_history,
     eligibilityStatus: donor.eligibility_status,
     deferralReason: donor.deferral_reason,
     consentGiven: Boolean(donor.consent_given),
     consentAt: donor.consent_at,
+  };
+}
+
+/**
+ * BBMS-F-001 / F-003: Retrieves donor portal profile, impact statistics, next eligible date, and donation history.
+ * @param {number|null} userId
+ * @param {number|string|null} queryDonorId
+ * @param {object} repository
+ * @returns {Promise<object>}
+ */
+async function getDonorPortalData(userId, queryDonorId = null, repository = defaultRepository) {
+  let donor = null;
+  if (queryDonorId) {
+    donor = await repository.findByIdOrCode(queryDonorId);
+  } else if (userId && typeof repository.findByUserId === 'function') {
+    donor = await repository.findByUserId(userId);
+  }
+
+  if (!donor) {
+    const error = new Error('Donor profile not found for this account');
+    error.status = 404;
+    throw error;
+  }
+
+  const donations = typeof repository.findDonationsByDonorId === 'function'
+    ? await repository.findDonationsByDonorId(donor.id)
+    : [];
+
+  const completed = (donations || []).filter((d) => d.status === 'COMPLETED');
+  const totalDonations = completed.length;
+  const totalVolumeMl = completed.reduce((sum, d) => sum + (Number(d.volume_ml) || 0), 0);
+  const livesSaved = totalDonations * 3;
+
+  const lastDonation = completed[0] || null;
+  const lastDonationDate = lastDonation ? lastDonation.collected_at : null;
+
+  let isEligibleNow = false;
+  let nextEligibleDate = null;
+  let daysUntilEligible = 0;
+  let eligibilityReason = null;
+
+  if (donor.eligibility_status === 'DEFERRED') {
+    isEligibleNow = false;
+    eligibilityReason = donor.deferral_reason || 'Deferred by medical screening';
+    nextEligibleDate = donor.deferred_until ? new Date(donor.deferred_until).toISOString().split('T')[0] : null;
+  } else if (lastDonationDate) {
+    const lastDonationTime = new Date(lastDonationDate).getTime();
+    const intervalDays = 90; // Whole blood minimum 90-day rest rule
+    const nextEligibleTime = lastDonationTime + intervalDays * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    if (now >= nextEligibleTime) {
+      isEligibleNow = true;
+      daysUntilEligible = 0;
+      nextEligibleDate = new Date(nextEligibleTime).toISOString().split('T')[0];
+    } else {
+      isEligibleNow = false;
+      daysUntilEligible = Math.ceil((nextEligibleTime - now) / (24 * 60 * 60 * 1000));
+      nextEligibleDate = new Date(nextEligibleTime).toISOString().split('T')[0];
+    }
+  } else {
+    // No prior donations: eligible if not deferred
+    isEligibleNow = donor.eligibility_status !== 'DEFERRED';
+    daysUntilEligible = 0;
+    nextEligibleDate = null;
+  }
+
+  // Mask ID proof for privacy
+  const idProof = donor.id_proof || '';
+  const maskedIdProof =
+    idProof.length > 4
+      ? `${idProof.slice(0, 3)}****${idProof.slice(-2)}`
+      : '****';
+
+  return {
+    donor: {
+      id: donor.id,
+      donorCode: donor.donor_code || formatDonorCode(donor.id),
+      fullName: donor.full_name,
+      dateOfBirth: donor.date_of_birth,
+      gender: donor.gender,
+      bloodGroup: donor.blood_group || 'Pending Typing',
+      phone: donor.phone,
+      email: donor.email,
+      maskedIdProof,
+      eligibilityStatus: donor.eligibility_status,
+      deferralReason: donor.deferral_reason,
+      registeredAt: donor.created_at,
+    },
+    stats: {
+      totalDonations,
+      totalVolumeMl,
+      livesSaved,
+      lastDonationDate,
+      nextEligibleDate,
+      isEligibleNow,
+      daysUntilEligible,
+      eligibilityReason,
+    },
+    history: (donations || []).map((d) => ({
+      id: d.id,
+      collectedAt: d.collected_at,
+      status: d.status,
+      volumeMl: d.volume_ml,
+      vitals: {
+        weightKg: d.weight_kg,
+        hemoglobin: d.hemoglobin_g_dl,
+        bloodPressure: d.bp_systolic && d.bp_diastolic ? `${d.bp_systolic}/${d.bp_diastolic}` : null,
+        pulse: d.pulse_bpm,
+        temperature: d.temperature_c,
+      },
+    })),
   };
 }
 
@@ -398,4 +519,5 @@ module.exports = {
   isEligible,
   evaluateDonorEligibility,
   getDonor,
+  getDonorPortalData,
 };

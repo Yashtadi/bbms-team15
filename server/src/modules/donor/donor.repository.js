@@ -1,4 +1,27 @@
+const bcrypt = require('bcryptjs');
 const db = require('../../db');
+
+/**
+ * Derives default password in DDMMYYYY format from Date of Birth.
+ * Robust against Date objects, ISO strings, and standard YYYY-MM-DD.
+ */
+function deriveDobPassword(dob) {
+  if (!dob) return '01012000';
+  const str = String(dob).trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+  if (match) {
+    const [, yyyy, mm, dd] = match;
+    return `${dd}${mm}${yyyy}`;
+  }
+  const d = new Date(dob);
+  if (!isNaN(d.getTime())) {
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const yyyy = d.getUTCFullYear();
+    return `${dd}${mm}${yyyy}`;
+  }
+  return '01012000';
+}
 
 /**
  * Finds a donor by their unique ID proof number.
@@ -50,6 +73,33 @@ async function findByIdOrCodeOrPhone(queryVal) {
     : 'SELECT * FROM donors WHERE donor_code = ? OR phone = ? LIMIT 1';
   const [rows] = await db.query(query, isNumeric ? [Number(trimmed), trimmed, trimmed] : [trimmed, trimmed]);
   return rows[0] || null;
+}
+
+/**
+ * Finds a donor by user_id (for authenticated donor portal).
+ * @param {number} userId
+ * @returns {Promise<object|null>}
+ */
+async function findByUserId(userId) {
+  const [rows] = await db.query('SELECT * FROM donors WHERE user_id = ?', [userId]);
+  return rows[0] || null;
+}
+
+/**
+ * Finds all donations for a donor, ordered by collection date descending.
+ * @param {number} donorId
+ * @returns {Promise<Array<object>>}
+ */
+async function findDonationsByDonorId(donorId) {
+  const [rows] = await db.query(
+    `SELECT id, donor_id, collected_at, status, volume_ml,
+            weight_kg, hemoglobin_g_dl, bp_systolic, bp_diastolic, pulse_bpm, temperature_c
+     FROM donations
+     WHERE donor_id = ?
+     ORDER BY collected_at DESC`,
+    [donorId]
+  );
+  return rows;
 }
 
 /**
@@ -154,7 +204,7 @@ async function generateNextDonorCode() {
 
 /**
  * Inserts a new donor record into MySQL using a transaction to guarantee atomic, race-free donor_code generation.
- * BBMS-F-003 / #46: Sets donor_code = CONCAT('D-', LPAD(id, 6, '0')) within the same transaction.
+ * Also provisions a linked user portal account with default password DDMMYYYY derived from date of birth.
  * @param {object} donor
  * @returns {Promise<object>}
  */
@@ -211,6 +261,40 @@ async function createDonor(donor) {
       finalDonorCode = `D-${String(insertId).padStart(6, '0')}`;
     }
 
+    // Automatically provision online portal account for the donor
+    let portalUser = null;
+    try {
+      const defaultPassword = deriveDobPassword(dateOfBirth);
+      const passwordHash = await bcrypt.hash(defaultPassword, 10);
+      let userEmail = (email || '').trim().toLowerCase();
+      if (!userEmail) {
+        userEmail = `${finalDonorCode.toLowerCase()}@donor.bbms.test`;
+      }
+
+      // Check if user already exists with this email
+      const [existingUsers] = await connection.query('SELECT id FROM users WHERE email = ?', [userEmail]);
+      let userId;
+      if (existingUsers.length > 0) {
+        userId = existingUsers[0].id;
+      } else {
+        const [userResult] = await connection.query(
+          'INSERT INTO users (email, password_hash, full_name, role, is_active) VALUES (?, ?, ?, ?, ?)',
+          [userEmail, passwordHash, fullName, 'DONOR', true]
+        );
+        userId = userResult.insertId;
+      }
+
+      await connection.query('UPDATE donors SET user_id = ? WHERE id = ?', [userId, insertId]);
+
+      portalUser = {
+        email: userEmail,
+        defaultPasswordFormat: 'DDMMYYYY',
+        defaultPasswordHint: 'Your Date of Birth (DDMMYYYY)',
+      };
+    } catch (userErr) {
+      // Non-fatal if portal user creation encounters an issue
+    }
+
     // Permanently audit registration
     try {
       await connection.query(
@@ -228,6 +312,7 @@ async function createDonor(donor) {
       id: insertId,
       donorCode: finalDonorCode,
       eligibilityStatus,
+      portalUser,
     };
   } catch (err) {
     await connection.rollback();
@@ -252,10 +337,13 @@ async function deleteDonor(idOrCode) {
 }
 
 module.exports = {
+  deriveDobPassword,
   findByIdProof,
   findById,
   findByIdOrCode,
   findByIdOrCodeOrPhone,
+  findByUserId,
+  findDonationsByDonorId,
   findLastDonation,
   updateEligibility,
   updateConsent,

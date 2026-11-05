@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { login } = require('../../src/modules/auth/auth.service');
+const { login, changePassword } = require('../../src/modules/auth/auth.service');
 const repository = require('../../src/modules/auth/auth.repository');
 
 jest.mock('../../src/modules/auth/auth.repository');
@@ -39,6 +39,16 @@ describe('TC-Sec-02: auth.service login (unit)', () => {
     expect(repository.findUserByEmail).toHaveBeenCalledWith('labtech@bbms.test');
   });
 
+  it('falls back to finding user by donor code or phone if email search fails', async () => {
+    repository.findUserByEmail.mockResolvedValue(null);
+    repository.findUserByDonorCodeOrPhone = jest.fn().mockResolvedValue(fakeUser);
+
+    const result = await login({ email: 'D-000001', password: PASSWORD });
+
+    expect(repository.findUserByDonorCodeOrPhone).toHaveBeenCalledWith('D-000001');
+    expect(result.user.id).toBe(3);
+  });
+
   it('rejects a wrong password with 401', async () => {
     repository.findUserByEmail.mockResolvedValue(fakeUser);
 
@@ -64,5 +74,50 @@ describe('TC-Sec-02: auth.service login (unit)', () => {
     await expect(login({ email: 'labtech@bbms.test' })).rejects.toMatchObject({ status: 400 });
     await expect(login({ password: PASSWORD })).rejects.toMatchObject({ status: 400 });
     await expect(login()).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe('auth.service changePassword (unit)', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('successfully updates password when credentials match', async () => {
+    repository.findUserById = jest.fn().mockResolvedValue(fakeUser);
+    repository.updatePassword = jest.fn().mockResolvedValue(true);
+
+    const res = await changePassword({
+      userId: 3,
+      currentPassword: PASSWORD,
+      newPassword: 'NewPassword@456',
+      confirmPassword: 'NewPassword@456',
+    });
+
+    expect(res).toEqual({ message: 'Password updated successfully' });
+    expect(repository.updatePassword).toHaveBeenCalledWith(3, expect.any(String));
+  });
+
+  it('rejects when new passwords do not match', async () => {
+    await expect(
+      changePassword({
+        userId: 3,
+        currentPassword: PASSWORD,
+        newPassword: 'NewPassword@456',
+        confirmPassword: 'DifferentPassword@789',
+      })
+    ).rejects.toMatchObject({ status: 400, message: 'New passwords do not match' });
+  });
+
+  it('rejects when current password is incorrect', async () => {
+    repository.findUserById = jest.fn().mockResolvedValue(fakeUser);
+
+    await expect(
+      changePassword({
+        userId: 3,
+        currentPassword: 'WrongPassword',
+        newPassword: 'NewPassword@456',
+        confirmPassword: 'NewPassword@456',
+      })
+    ).rejects.toMatchObject({ status: 401, message: 'Current password is incorrect' });
   });
 });
