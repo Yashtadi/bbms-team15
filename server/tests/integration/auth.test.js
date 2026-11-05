@@ -23,7 +23,7 @@ describe('TC-Sec-02: login and role-based access (integration)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.token).toEqual(expect.any(String));
-      expect(res.body.user).toEqual({ id: 3, email: 'labtech@bbms.test', fullName: 'Lata LabTech', role: 'LAB_TECH' });
+      expect(res.body.user).toEqual({ id: 3, email: 'labtech@bbms.test', fullName: 'Labtech 1', role: 'LAB_TECH' });
     });
 
     it('returns 401 for a wrong password', async () => {
