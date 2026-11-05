@@ -7,10 +7,11 @@
 INSERT INTO users (id, email, password_hash, full_name, role, organisation) VALUES
   (1, 'admin@bbms.test',    '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Asha Admin',         'ADMIN',    NULL),
   (2, 'manager@bbms.test',  '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Manoj Manager',      'MANAGER',  NULL),
-  (3, 'labtech@bbms.test',  '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Lata LabTech',       'LAB_TECH', NULL),
-  (4, 'labtech2@bbms.test', '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Kiran LabTech',      'LAB_TECH', NULL),
+  (3, 'labtech@bbms.test',  '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Labtech 1',          'LAB_TECH', NULL),
+  (4, 'labtech2@bbms.test', '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Labtech 2',          'LAB_TECH', NULL),
   (5, 'hospital@bbms.test', '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'City Hospital Desk', 'HOSPITAL', 'City General Hospital'),
-  (6, 'donor@bbms.test',    '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Ravi Kumar',         'DONOR',    NULL);
+  (6, 'donor@bbms.test',     '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Ravi Kumar',         'DONOR',    NULL),
+  (7, 'collector@bbms.test', '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Blood Collector',   'LAB_TECH', NULL);
 
 -- Donors in different states
 INSERT INTO donors (id, donor_code, user_id, full_name, date_of_birth, gender, blood_group, phone,

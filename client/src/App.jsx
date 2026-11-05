@@ -10,12 +10,13 @@ import { getSession, clearSession } from './api';
 import './App.css';
 import './components/DonorRegistrationForm.css';
 
-// Role Permissions aligned with SRS §4.2 / SAD §3.2 & §4.3:
-// LAB_TECH: Blood collection, vitals, lab screening, quarantine & barcode labels
-// MANAGER: Inventory oversight, read-only screening inspection
-// DONOR: Personal donor profile & donation history
-// ADMIN: Full system administration
-const COLLECTION_ROLES = ['LAB_TECH', 'ADMIN'];
+// Target Groups & Role Permissions:
+// 1. Blood Collector (collector@bbms.test / LAB_TECH): Collection Desk & Blood Label Tool
+// 2. Central Facility Testers (labtech@bbms.test, labtech2@bbms.test / LAB_TECH): Lab Screening, Inventory, Blood Label Tool
+// 3. Storage Manager (manager@bbms.test / MANAGER): Storage & Inventory, Blood Label Tool
+// 4. Hospital Desk (hospital@bbms.test / HOSPITAL): Storage & Inventory
+// 5. Donor (donor@bbms.test / DONOR): My Donor Card
+// 6. Admin (admin@bbms.test / ADMIN): Full system administration
 const LAB_STAFF_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 const INVENTORY_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 const UNIT_LABEL_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
@@ -24,14 +25,20 @@ export default function App({ initialTab } = {}) {
   const [session, setSession] = useState(getSession);
 
   const role = session?.user?.role;
-  const canSeeCollection = COLLECTION_ROLES.includes(role);
-  const canSeeLab = LAB_STAFF_ROLES.includes(role);
-  const canSeeInventory = INVENTORY_ROLES.includes(role);
-  const canSeeLabels = UNIT_LABEL_ROLES.includes(role);
+  const email = session?.user?.email;
+
+  const isCollector = email === 'collector@bbms.test';
+  const isAdmin = role === 'ADMIN';
+
+  const canSeeCollection = isCollector || isAdmin;
+  const canSeeLab = !isCollector && LAB_STAFF_ROLES.includes(role);
+  const canSeeInventory = !isCollector && INVENTORY_ROLES.includes(role);
+  const canSeeLabels = isCollector || UNIT_LABEL_ROLES.includes(role);
   const canSeeDonors = role === 'DONOR';
 
-  // Default landing tab per role
+  // Default landing tab per role & persona
   const getDefaultTab = () => {
+    if (isCollector) return 'collection';
     if (role === 'DONOR') return 'donors';
     if (role === 'MANAGER') return 'inventory';
     if (role === 'LAB_TECH') return 'lab';
@@ -39,26 +46,33 @@ export default function App({ initialTab } = {}) {
   };
 
   const defaultTab = getDefaultTab();
-  const [activeTab, setActiveTab] = useState(initialTab || defaultTab);
+  const [activeTab, setActiveTab] = useState(initialTab || null);
+  const currentTab = activeTab || defaultTab;
 
   const handleLogout = () => {
     clearSession();
     setSession(null);
+    setActiveTab(null);
+  };
+
+  const handleLogin = (newSession) => {
+    setSession(newSession);
+    setActiveTab(null);
   };
 
   if (!session) {
-    return <LoginForm onLogin={setSession} />;
+    return <LoginForm onLogin={handleLogin} />;
   }
 
   // Fallback if the activeTab is restricted for this role
   const effectiveTab =
-    (activeTab === 'collection' && !canSeeCollection) ||
-    (activeTab === 'donors' && !canSeeDonors) ||
-    (activeTab === 'units' && !canSeeLabels) ||
-    (activeTab === 'lab' && !canSeeLab) ||
-    (activeTab === 'inventory' && !canSeeInventory)
+    (currentTab === 'collection' && !canSeeCollection) ||
+    (currentTab === 'donors' && !canSeeDonors) ||
+    (currentTab === 'units' && !canSeeLabels) ||
+    (currentTab === 'lab' && !canSeeLab) ||
+    (currentTab === 'inventory' && !canSeeInventory)
       ? defaultTab
-      : activeTab;
+      : currentTab;
 
   return (
     <div className="app-layout">

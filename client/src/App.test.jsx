@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event';
 import App from './App';
 import { saveSession } from './api';
 
-function logInAs(role) {
-  saveSession({ token: 'fake-token', user: { id: 3, fullName: 'Test User', role } });
+function logInAs(role, email = null, fullName = 'Test User') {
+  saveSession({ token: 'fake-token', user: { id: 3, fullName, role, email: email || `${role.toLowerCase()}@bbms.test` } });
 }
 
 describe('App', () => {
@@ -23,19 +23,22 @@ describe('App', () => {
     ).toBeInTheDocument();
   });
 
-  it('TC-Col-01: shows collection desk tab to LAB_TECH (frontline collector) and lands on Lab Screening by default', async () => {
-    const user = userEvent.setup();
-    logInAs('LAB_TECH');
+  it('TC-Col-01: shows collection desk tab to collector@bbms.test (Blood Collector) and lands on it by default', () => {
+    logInAs('LAB_TECH', 'collector@bbms.test', 'Blood Collector');
     render(<App />);
 
+    expect(screen.getByRole('tab', { name: /Collection Desk/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Blood Collection Desk' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Lab Screening/i })).not.toBeInTheDocument();
+  });
+
+  it('TC-Col-01: hides collection desk tab from labtech@bbms.test (Labtech 1), landing on Lab Screening by default', () => {
+    logInAs('LAB_TECH', 'labtech@bbms.test', 'Labtech 1');
+    render(<App />);
+
+    expect(screen.queryByRole('tab', { name: /Collection Desk/i })).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Lab Screening/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Lab Screening' })).toBeInTheDocument();
-
-    const collectionTab = screen.getByRole('tab', { name: /Collection Desk/i });
-    expect(collectionTab).toBeInTheDocument();
-
-    await user.click(collectionTab);
-    expect(screen.getByRole('heading', { level: 2, name: 'Blood Collection Desk' })).toBeInTheDocument();
   });
 
   it.each(['MANAGER', 'HOSPITAL', 'DONOR'])(
@@ -92,6 +95,18 @@ describe('App', () => {
       expect(screen.getByRole('heading', { name: 'Blood Unit Label' })).toBeInTheDocument();
     },
   );
+
+  it('TC-Don-03: shows the blood label tool tab to collector@bbms.test', async () => {
+    const user = userEvent.setup();
+    logInAs('LAB_TECH', 'collector@bbms.test', 'Blood Collector');
+    render(<App />);
+
+    const unitsTab = screen.getByRole('tab', { name: /Blood Label Tool/i });
+    expect(unitsTab).toBeInTheDocument();
+
+    await user.click(unitsTab);
+    expect(screen.getByRole('heading', { name: 'Blood Unit Label' })).toBeInTheDocument();
+  });
 
   it.each(['HOSPITAL', 'DONOR'])('TC-Don-03: hides the blood label tool tab from %s', (role) => {
     logInAs(role);

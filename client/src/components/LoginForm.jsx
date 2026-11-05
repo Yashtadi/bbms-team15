@@ -84,7 +84,7 @@ export default function LoginForm({ onLogin }) {
 
         {import.meta.env.DEV && (
           <p className="login-hint">
-            Demo: <code>labtech@bbms.test</code> · <code>Password@123</code>
+            Demo: <code>collector@bbms.test</code> · <code>labtech@bbms.test</code> · <code>Password@123</code>
           </p>
         )}
       </form>

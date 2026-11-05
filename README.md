@@ -44,13 +44,14 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 All pre-seeded demo accounts use the default password: `Password@123` (populated via `npm run db:setup`).
 
-| Role | Demo Email | Target Operating Group & Capabilities |
-|---|---|---|
-| `LAB_TECH` | `labtech@bbms.test`<br>`labtech2@bbms.test` | **Central Facility & Phlebotomy (Collector + Tester):** Operates the 3-step Blood Collection Desk (walk-in donor check-in, chair-side vitals, session recording, Code 128 barcode stickers), operates the Lab Screening workspace (FIFO testing queue, dual ABO/Rh verification, 5 mandatory TTI tests), and manages quarantine stock |
-| `HOSPITAL` | `hospital@bbms.test` | **Hospital Clinical Desk:** Submits and tracks hospital patient blood unit requests and inspects available blood inventory |
-| `MANAGER` | `manager@bbms.test` | **Central Facility (Storage Manager):** Central storage & inventory oversight, stock levels by blood group and component, expiry monitoring, and unit barcode reprint tool |
-| `DONOR` | `donor@bbms.test` | **Donor Portal:** View digital donor card and donation history (linked to pre-seeded donor `D-000001` / Ravi Kumar) |
-| `ADMIN` | `admin@bbms.test` | **System Administrator:** Full administrative and operational oversight across all facility and frontline workspaces |
+| Role | Demo Email | Display Name | Target Operating Group & Capabilities |
+|---|---|---|---|
+| `LAB_TECH` | `collector@bbms.test` | **Blood Collector** | **Frontline Blood Collection Desk:** Operates the 3-step Blood Collection Desk (walk-in donor check-in, registration, chair-side vitals, session recording, Code 128 barcode stickers) and Blood Label Tool |
+| `LAB_TECH` | `labtech@bbms.test`<br>`labtech2@bbms.test` | **Labtech 1**<br>**Labtech 2** | **Central Facility (Testing Lab):** Operates the Lab Screening workspace (FIFO testing queue, dual ABO/Rh verification, 5 mandatory TTI tests), and manages quarantine stock |
+| `HOSPITAL` | `hospital@bbms.test` | **City Hospital Desk** | **Hospital Clinical Desk:** Submits and tracks hospital patient blood unit requests |
+| `MANAGER` | `manager@bbms.test` | **Manoj Manager** | **Central Facility (Storage Manager):** Central storage & inventory oversight, stock levels by blood group and component, expiry monitoring, and unit barcode reprint tool |
+| `DONOR` | `donor@bbms.test` | **Ravi Kumar** | **Donor Portal:** View digital donor card and donation history (linked to pre-seeded donor `D-000001` / Ravi Kumar) |
+| `ADMIN` | `admin@bbms.test` | **Asha Admin** | **System Administrator:** Full administrative and operational oversight across all facility and frontline workspaces |
 
 > **Walk-in Donors vs. Portal Accounts:**  
 > Registering a donor at the collection desk creates a clinical record in the `donors` table and generates a permanent **Donor ID** (e.g. `D-000006`), but does *not* automatically create a web portal login account. Web login accounts reside in the `users` table, linked via the nullable `donors.user_id` foreign key.

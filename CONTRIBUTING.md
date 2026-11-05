@@ -229,18 +229,20 @@ server.
 
 **Demo accounts** (from `server/db/seed.sql`). The password for all of them is `Password@123`:
 
-| Email | Role | Target Group & Responsibilities |
-|---|---|---|
-| `labtech@bbms.test`, `labtech2@bbms.test` | LAB_TECH | **Central Facility & Phlebotomy (Collector + Tester):** Operates Blood Collection Desk (walk-in donor check-in, chair-side vitals, donation session, barcode sticker generation) and Lab Screening (FIFO testing queue, dual ABO/Rh verification, 5-TTI screening, quarantine stock) |
-| `hospital@bbms.test` | HOSPITAL | **Hospital Clinical Desk:** Submits and tracks hospital patient blood requests and inspects available blood inventory |
-| `manager@bbms.test` | MANAGER | **Central Facility (Storage Manager):** Storage & inventory dashboard oversight, released stock by group/component, expiry alerts, and barcode reprints |
-| `donor@bbms.test` | DONOR | **Donor Portal:** Self-service portal to view donor card and donation history |
-| `admin@bbms.test` | ADMIN | **System Administrator:** Full administrative oversight across all facility and frontline workspaces |
+| Email | Role | Display Name | Target Group & Responsibilities |
+|---|---|---|---|
+| `collector@bbms.test` | LAB_TECH | **Blood Collector** | **Frontline Blood Collection Desk:** Operates Blood Collection Desk (walk-in donor check-in, chair-side vitals, donation session, barcode sticker generation) and Blood Label Tool |
+| `labtech@bbms.test`, `labtech2@bbms.test` | LAB_TECH | **Labtech 1**, **Labtech 2** | **Central Facility (Testing Lab):** Operates Lab Screening (FIFO testing queue, dual ABO/Rh verification, 5-TTI screening, quarantine stock) |
+| `hospital@bbms.test` | HOSPITAL | **City Hospital Desk** | **Hospital Clinical Desk:** Submits and tracks hospital patient blood requests |
+| `manager@bbms.test` | MANAGER | **Manoj Manager** | **Central Facility (Storage Manager):** Storage & inventory dashboard oversight, released stock by group/component, expiry alerts, and barcode reprints |
+| `donor@bbms.test` | DONOR | **Ravi Kumar** | **Donor Portal:** Self-service portal to view donor card and donation history |
+| `admin@bbms.test` | ADMIN | **Asha Admin** | **System Administrator:** Full administrative oversight across all facility and frontline workspaces |
 
 > **Role Separation & Workspaces:**
-> 1. **Central Facility Phlebotomists & Technicians (`LAB_TECH`):** Central facility staff authorized on `/api/donations` and vitals (`PUT vitals`). In the UI, technicians land on the Lab Screening Testing Queue by default and can switch to the Collection Desk to check in donors and draw blood.
-> 2. **Storage Managers (`MANAGER`):** Manage storage & inventory oversight and reprint unit barcode labels; forbidden from drawing blood.
-> 3. **Hospital Personnel (`HOSPITAL`):** External hospital clients submitting blood requests; forbidden from collection and vitals endpoints (403).
+> 1. **Frontline Blood Collector (`collector@bbms.test` / `LAB_TECH`):** Operates the Collection Desk and Blood Label Tool. Authorized on `/api/donations` and vitals (`PUT vitals`).
+> 2. **Central Facility Lab Technicians (`labtech@bbms.test`, `labtech2@bbms.test` / `LAB_TECH`):** Central facility staff operating Lab Screening (FIFO testing queue) and Storage & Inventory. Collection Desk is hidden.
+> 3. **Storage Managers (`MANAGER`):** Manage storage & inventory oversight and reprint unit barcode labels; forbidden from drawing blood.
+> 4. **Hospital Personnel (`HOSPITAL`):** External hospital clients submitting blood requests; forbidden from collection and vitals endpoints (403).
 >
 > **Note on Walk-in Donors vs Portal Logins:**  
 > Registering a donor at the collection desk creates a clinical record in the `donors` table and generates a permanent **Donor ID** (e.g. `D-000006`), but does not create a web portal login account in the `users` table. The `donors.user_id` foreign key is nullable.
