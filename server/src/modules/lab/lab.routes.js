@@ -42,6 +42,16 @@ router.post('/donations/:id/tti-results', requireRole('LAB_TECH'), async (req, r
   }
 });
 
+
+router.get('/queue', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const data = await labService.getLabQueue();
+    return res.status(200).json(data);
+  } catch (error) {
+    return handleError(res, error, 'Failed to load lab testing queue');
+  }
+});
+
 router.get('/notifications', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
   try {
     const notifications = await labService.listNotifications(req.user.id);

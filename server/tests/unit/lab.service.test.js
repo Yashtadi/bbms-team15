@@ -6,6 +6,7 @@ describe('BBMS-F-020 to F-023 lab service validation', () => {
     recordTtiResult: jest.fn(),
     verifyBloodGroup: jest.fn(),
     listNotifications: jest.fn(),
+    getQueueAndStorage: jest.fn(),
   };
 
   beforeEach(() => jest.clearAllMocks());
@@ -77,4 +78,13 @@ describe('BBMS-F-020 to F-023 lab service validation', () => {
       )
     ).rejects.toMatchObject({ status: 409 });
   });
+  it('fetches the queue and storage from the repository', async () => {
+    const fakeData = { queue: [{ donationId: 99 }], storage: [{ donationId: 99 }] };
+    repository.getQueueAndStorage.mockResolvedValue(fakeData);
+
+    const result = await labService.getLabQueue(repository);
+    expect(result).toEqual(fakeData);
+    expect(repository.getQueueAndStorage).toHaveBeenCalled();
+  });
+
 });

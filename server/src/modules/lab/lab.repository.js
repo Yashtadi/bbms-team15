@@ -213,7 +213,119 @@ async function listNotifications(userId) {
   return rows;
 }
 
+
+async function getQueueAndStorage() {
+  const [donations] = await db.query(
+    `SELECT 
+       d.id AS donation_id,
+       d.donor_id,
+       d.collected_at,
+       d.donation_type,
+       d.volume_ml,
+       d.status AS donation_status,
+       dn.donor_code,
+       dn.full_name AS donor_name,
+       bu.id AS unit_id,
+       bu.unit_code,
+       bu.component,
+       bu.blood_group,
+       bu.status AS unit_status,
+       bu.expires_at
+     FROM donations d
+     JOIN blood_units bu ON bu.donation_id = d.id
+     JOIN donors dn ON dn.id = d.donor_id
+     ORDER BY d.collected_at ASC, d.id ASC`
+  );
+
+  if (!donations || donations.length === 0) {
+    return { queue: [], storage: [] };
+  }
+
+  const donationIds = donations.map((d) => d.donation_id);
+  const [labRows] = await db.query(
+    `SELECT id, donation_id, test_type, result, method, tested_by, verified_by, verification_status, tested_at
+     FROM lab_results
+     WHERE donation_id IN (?)
+     ORDER BY id ASC`,
+    [donationIds]
+  );
+
+  const resultsByDonation = {};
+  for (const r of labRows) {
+    if (!resultsByDonation[r.donation_id]) {
+      resultsByDonation[r.donation_id] = [];
+    }
+    resultsByDonation[r.donation_id].push(r);
+  }
+
+  const allTtiTypes = ['HIV', 'HBV', 'HCV', 'SYPHILIS', 'MALARIA'];
+
+  const items = donations.map((d) => {
+    const results = resultsByDonation[d.donation_id] || [];
+    const aboRow = results.find((r) => r.test_type === 'ABO_RH');
+    const ttiRows = results.filter((r) => allTtiTypes.includes(r.test_type));
+
+    const abo = aboRow
+      ? {
+          result: aboRow.result,
+          verificationStatus: aboRow.verification_status,
+          testedBy: aboRow.tested_by,
+          verifiedBy: aboRow.verified_by,
+        }
+      : null;
+
+    const ttiDone = ttiRows.map((r) => ({
+      testType: r.test_type,
+      result: r.result,
+      method: r.method,
+    }));
+
+    const completedTtiTypes = ttiDone.map((r) => r.testType);
+    const ttiRemaining = allTtiTypes.filter((t) => !completedTtiTypes.includes(t));
+    const hasReactive = ttiDone.some((r) => r.result === 'REACTIVE');
+    const isAboVerified = Boolean(abo && abo.verificationStatus === 'VERIFIED');
+    const isFullyTested = isAboVerified && ttiDone.length === 5 && !hasReactive;
+
+    return {
+      donationId: d.donation_id,
+      donorId: d.donor_id,
+      donorCode: d.donor_code,
+      donorName: d.donor_name,
+      collectedAt: d.collected_at,
+      donationType: d.donation_type,
+      volumeMl: d.volume_ml,
+      donationStatus: d.donation_status,
+      unitId: d.unit_id,
+      unitCode: d.unit_code,
+      component: d.component,
+      bloodGroup: d.blood_group,
+      unitStatus: d.unit_status,
+      expiresAt: d.expires_at,
+      abo,
+      tti: {
+        results: ttiDone,
+        completedCount: ttiDone.length,
+        remaining: ttiRemaining,
+        hasReactive,
+      },
+      isFullyTested,
+      needsAbo: !abo || abo.verificationStatus !== 'VERIFIED',
+      needsVerification: Boolean(abo && abo.verificationStatus === 'PENDING'),
+      needsTti: ttiDone.length < 5,
+    };
+  });
+
+  // Testing queue is strictly First In First Out (oldest collected blood tested first)
+  const queue = items
+    .filter((item) => item.unitStatus === 'QUARANTINE' || !item.isFullyTested)
+    .sort((a, b) => new Date(a.collectedAt).getTime() - new Date(b.collectedAt).getTime() || a.donationId - b.donationId);
+  const storage = items;
+
+  return { queue, storage };
+}
+
 module.exports = {
+  getQueueAndStorage,
   listNotifications,
   recordBloodGroup,
   recordTtiResult,

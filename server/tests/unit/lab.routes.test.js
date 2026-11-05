@@ -78,4 +78,23 @@ describe('BBMS-F-020 to F-023 lab routes', () => {
     expect(response.status).toBe(403);
     expect(labService.listNotifications).not.toHaveBeenCalled();
   });
+  it('returns the testing queue and storage to authorized lab staff', async () => {
+    labService.getLabQueue.mockResolvedValue({ queue: [{ donationId: 1 }], storage: [{ donationId: 1 }] });
+
+    const response = await request(app)
+      .get('/api/lab/queue').set(authHeader('LAB_TECH'));
+
+    expect(response.status).toBe(200);
+    expect(response.body.queue).toHaveLength(1);
+    expect(response.body.storage).toHaveLength(1);
+  });
+
+  it.each(['DONOR', 'HOSPITAL'])('%s cannot read the lab queue (403)', async (role) => {
+    const response = await request(app)
+      .get('/api/lab/queue').set(authHeader(role));
+
+    expect(response.status).toBe(403);
+    expect(labService.getLabQueue).not.toHaveBeenCalled();
+  });
+
 });

@@ -38,6 +38,21 @@ async function findByIdOrCode(idOrCode) {
 }
 
 /**
+ * Finds a donor by ID, donor code, or contact phone.
+ * @param {string|number} queryVal
+ * @returns {Promise<object|null>}
+ */
+async function findByIdOrCodeOrPhone(queryVal) {
+  const trimmed = String(queryVal).trim();
+  const isNumeric = /^\d+$/.test(trimmed);
+  const query = isNumeric
+    ? 'SELECT * FROM donors WHERE id = ? OR phone = ? OR donor_code = ? LIMIT 1'
+    : 'SELECT * FROM donors WHERE donor_code = ? OR phone = ? LIMIT 1';
+  const [rows] = await db.query(query, isNumeric ? [Number(trimmed), trimmed, trimmed] : [trimmed, trimmed]);
+  return rows[0] || null;
+}
+
+/**
  * Finds the latest completed donation for a given donor.
  * @param {number} donorId
  * @returns {Promise<object|null>}
@@ -240,6 +255,7 @@ module.exports = {
   findByIdProof,
   findById,
   findByIdOrCode,
+  findByIdOrCodeOrPhone,
   findLastDonation,
   updateEligibility,
   updateConsent,

@@ -24,7 +24,7 @@ describe('TC-Don-01: collection.routes access and error mapping (unit)', () => {
     expect(collectionService.startDonation).not.toHaveBeenCalled();
   });
 
-  it.each(['ADMIN', 'MANAGER', 'HOSPITAL', 'DONOR'])(
+  it.each(['MANAGER', 'DONOR'])(
     'returns 403 for the %s role (only LAB_TECH may record sessions, AC 4)',
     async (role) => {
       const res = await request(app)
@@ -35,6 +35,17 @@ describe('TC-Don-01: collection.routes access and error mapping (unit)', () => {
       expect(collectionService.startDonation).not.toHaveBeenCalled();
     }
   );
+
+
+  it.each(['HOSPITAL', 'ADMIN'])('lets %s record a session as frontline collector', async (role) => {
+    collectionService.startDonation.mockResolvedValue({ donationId: 1, status: 'IN_PROGRESS' });
+
+    const res = await request(app)
+      .post('/api/donations').set(authHeader(role))
+      .send({ donorId: 'D-000001', volumeMl: 450 });
+
+    expect(res.status).toBe(201);
+  });
 
   it('lets LAB_TECH record a session, taking the staff ID from the token (AC 1 & AC 4)', async () => {
     collectionService.startDonation.mockResolvedValue({ donationId: 1, status: 'IN_PROGRESS' });
@@ -97,7 +108,7 @@ describe('TC-Don-02: vitals routes access and error mapping (unit)', () => {
     expect(collectionService.recordVitals).not.toHaveBeenCalled();
   });
 
-  it.each(['ADMIN', 'MANAGER', 'HOSPITAL', 'DONOR'])('returns 403 for the %s role', async (role) => {
+  it.each(['MANAGER', 'DONOR'])('returns 403 for the %s role', async (role) => {
     const res = await request(app).put('/api/donations/21/vitals/pre').set(authHeader(role)).send(vitals);
 
     expect(res.status).toBe(403);
@@ -192,7 +203,7 @@ describe('TC-Don-03: unit barcode lookup route access and error mapping (unit)',
     expect(collectionService.getUnitByBarcode).not.toHaveBeenCalled();
   });
 
-  it.each(['HOSPITAL', 'DONOR'])('returns 403 for the %s role', async (role) => {
+  it.each(['DONOR'])('returns 403 for the %s role', async (role) => {
     const res = await request(app).get('/api/donations/units/U-2026-000007').set(authHeader(role));
 
     expect(res.status).toBe(403);

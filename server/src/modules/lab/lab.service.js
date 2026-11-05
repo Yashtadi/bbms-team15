@@ -99,7 +99,13 @@ async function listNotifications(userId, repository = defaultLabRepository) {
   return repository.listNotifications(userId);
 }
 
+
+async function getLabQueue(repository = defaultLabRepository) {
+  return repository.getQueueAndStorage();
+}
+
 module.exports = {
+  getLabQueue,
   bloodGroupFromInput,
   normaliseTtiInput,
   recordBloodGroup,

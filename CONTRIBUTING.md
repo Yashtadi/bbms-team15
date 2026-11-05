@@ -229,13 +229,23 @@ server.
 
 **Demo accounts** (from `server/db/seed.sql`). The password for all of them is `Password@123`:
 
-| Email | Role |
-|---|---|
-| `admin@bbms.test` | ADMIN |
-| `manager@bbms.test` | MANAGER |
-| `labtech@bbms.test`, `labtech2@bbms.test` | LAB_TECH |
-| `hospital@bbms.test` | HOSPITAL |
-| `donor@bbms.test` | DONOR |
+| Email | Role | Target Group & Responsibilities |
+|---|---|---|
+| `hospital@bbms.test` | HOSPITAL | **Frontline Clinical & Hospital (Collector + Hospital):** Operates Blood Collection Desk (walk-in donor check-in, registration, chair-side vitals, barcode sticker generation) and submits/tracks patient blood requests |
+| `labtech@bbms.test`, `labtech2@bbms.test` | LAB_TECH | **Central Facility (Tester):** Operates Lab Screening (FIFO testing queue, dual ABO/Rh verification, 5-TTI screening, quarantine stock) |
+| `manager@bbms.test` | MANAGER | **Central Facility (Storage Manager):** Storage & inventory dashboard oversight, released stock by group/component, expiry alerts, and barcode reprints |
+| `donor@bbms.test` | DONOR | **Donor Portal:** Self-service portal to view donor card and donation history |
+| `admin@bbms.test` | ADMIN | **System Administrator:** Full administrative oversight across all facility and frontline workspaces |
+
+> **Two Target Operating Groups:**
+> 1. **Frontline Clinical & Hospital (`HOSPITAL`):** Frontline staff and phlebotomists collect blood from walk-in donors. Authorized on `/api/donors` and `/api/donations`.
+> 2. **Central Blood Bank Facility (`LAB_TECH` & `MANAGER`):** Central facility staff test and manage inventory. Lab technicians and managers do *not* have the walk-in Collection Desk tab to prevent operational mix-up between chair-side donor draws and clean laboratory screening.
+>
+> **Note on Walk-in Donors vs Portal Logins:**  
+> Registering a donor at the collection desk creates a clinical record in the `donors` table and generates a permanent **Donor ID** (e.g. `D-000006`), but does not create a web portal login account in the `users` table. The `donors.user_id` foreign key is nullable.
+>
+> **Note on Patients:**  
+> Patients do not log in directly. Hospital personnel log in via `hospital@bbms.test` to submit and manage blood unit requests on a patient's behalf.
 
 **Frontend:** call the API with `apiFetch` from `client/src/api.js`, not `fetch`. It adds the token for you:
 
@@ -552,8 +562,10 @@ Also test that the **wrong role gets 403**, e.g. `.set(authHeader('HOSPITAL'))`.
 7. **Use the status codes from the SAD** (section 4).
 8. **Different from SRS/SAD/STP? Add a row to `DEVIATIONS.md`** with the date, the document and section,
    what changed and why. We must explain these at the demo.
-9. **Found a bug?** Open a GitHub Issue with the `bug` label.
-10. **Stuck for more than 20 minutes?** Ask in the group chat. Paste the exact error.
+9. **UI Design Standard: Never put emojis in buttons or tabs.** Use clean typography, accessible text labels, and standard SVGs where appropriate.
+10. **Testing Queue FIFO & Pagination:** Queue processing must always strictly follow First In First Out (`collected_at ASC, id ASC`) and display at most 6 tickets per page.
+11. **Found a bug?** Open a GitHub Issue with the `bug` label.
+12. **Stuck for more than 20 minutes?** Ask in the group chat. Paste the exact error.
 
 ---
 

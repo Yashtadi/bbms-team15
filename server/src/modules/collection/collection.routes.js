@@ -11,7 +11,7 @@ const router = express.Router();
  * Returns 422 if the donor has not given consent or is not eligible.
  * The staff ID is always the logged-in user, never taken from the request body.
  */
-router.post('/', requireRole('LAB_TECH'), async (req, res) => {
+router.post('/', requireRole('LAB_TECH', 'HOSPITAL', 'ADMIN'), async (req, res) => {
   try {
     const result = await collectionService.startDonation({ ...req.body, staffId: req.user.id });
     return res.status(201).json(result);
@@ -66,8 +66,8 @@ function recordVitalsHandler(phase) {
   };
 }
 
-router.put('/:id/vitals/pre', requireRole('LAB_TECH'), recordVitalsHandler('PRE'));
-router.put('/:id/vitals/post', requireRole('LAB_TECH'), recordVitalsHandler('POST'));
+router.put('/:id/vitals/pre', requireRole('LAB_TECH', 'HOSPITAL', 'ADMIN'), recordVitalsHandler('PRE'));
+router.put('/:id/vitals/post', requireRole('LAB_TECH', 'HOSPITAL', 'ADMIN'), recordVitalsHandler('POST'));
 
 /**
  * BBMS-F-012: Look up a blood unit by its barcode (scanned or typed unit ID)
@@ -75,7 +75,7 @@ router.put('/:id/vitals/post', requireRole('LAB_TECH'), recordVitalsHandler('POS
  * LAB_TECH prints labels; MANAGER and ADMIN may also look units up. Others get 403.
  * A malformed code gets 400, an unknown one 404.
  */
-router.get('/units/:unitId', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+router.get('/units/:unitId', requireRole('LAB_TECH', 'HOSPITAL', 'MANAGER', 'ADMIN'), async (req, res) => {
   try {
     const unit = await collectionService.getUnitByBarcode(req.params.unitId);
     return res.status(200).json(unit);
