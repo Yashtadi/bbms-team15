@@ -97,18 +97,21 @@ CREATE TABLE blood_units (
   id                       INT AUTO_INCREMENT PRIMARY KEY,
   unit_code                VARCHAR(30) NOT NULL UNIQUE,   -- barcode, e.g. U-2026-000001
   donation_id              INT NOT NULL,
+  parent_unit_id           INT NULL,                      -- F-031: the whole-blood bag this component was separated from
   component                ENUM('WHOLE_BLOOD','PRBC','FFP','PLATELETS','CRYO') NOT NULL DEFAULT 'WHOLE_BLOOD',
   blood_group              ENUM('A+','A-','B+','B-','AB+','AB-','O+','O-') NULL,  -- set after F-020
   volume_ml                SMALLINT NOT NULL,
   collected_at             DATETIME NOT NULL,
   expires_at               DATETIME NOT NULL,
-  status                   ENUM('QUARANTINE','AVAILABLE','RESERVED','ISSUED','DISCARDED','EXPIRED')
-                           NOT NULL DEFAULT 'QUARANTINE',
+  status                   ENUM('QUARANTINE','AVAILABLE','RESERVED','ISSUED','DISCARDED','EXPIRED','SEPARATED')
+                           NOT NULL DEFAULT 'QUARANTINE',  -- SEPARATED: split into components (F-031), never issued
   discard_reason           VARCHAR(255) NULL,
   reserved_for_request_id  INT NULL,
   created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (donation_id) REFERENCES donations(id),
   FOREIGN KEY (reserved_for_request_id) REFERENCES blood_requests(id),
+  FOREIGN KEY (parent_unit_id) REFERENCES blood_units(id),
+  INDEX idx_units_parent (parent_unit_id),
   INDEX idx_units_stock (status, blood_group, component, expires_at)  -- fast stock + FEFO queries (NF-001)
 );
 

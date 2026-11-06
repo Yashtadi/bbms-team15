@@ -61,4 +61,23 @@ describe('Database schema v1', () => {
     expect(rows[0].IS_NULLABLE).toBe('YES');
     expect(rows[0].COLUMN_KEY).toBe('UNI');
   });
+
+  it('TC-Inv-02: links a component to its parent unit and allows the SEPARATED status', async () => {
+    const [parent] = await db.query(
+      `SELECT IS_NULLABLE FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'blood_units' AND COLUMN_NAME = 'parent_unit_id'`
+    );
+    expect(parent).toHaveLength(1);
+    expect(parent[0].IS_NULLABLE).toBe('YES');
+
+    const [status] = await db.query(
+      `SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'blood_units' AND COLUMN_NAME = 'status'`
+    );
+    expect(status[0].COLUMN_TYPE).toContain("'SEPARATED'");
+
+    await expect(
+      db.query('UPDATE blood_units SET parent_unit_id = ? WHERE id = 1', [999999])
+    ).rejects.toMatchObject({ code: 'ER_NO_REFERENCED_ROW_2' });
+  });
 });
