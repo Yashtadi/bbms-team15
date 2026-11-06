@@ -426,6 +426,7 @@ function buildUnitRecord(row) {
     collectedAt: row.collected_at,
     expiresAt: row.expires_at,
     donationId: row.donation_id,
+    parentUnitCode: row.parent_unit_code || null, // F-031: set when the unit is a component
   };
 }
 
