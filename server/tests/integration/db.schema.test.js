@@ -50,4 +50,15 @@ describe('Database schema v1', () => {
       db.query('INSERT INTO donations (donor_id) VALUES (?)', [999999])
     ).rejects.toMatchObject({ code: 'ER_NO_REFERENCED_ROW_2' });
   });
+
+  it('TC-Don-04: has a nullable, unique donations.client_ref for offline camp sync', async () => {
+    const [rows] = await db.query(
+      `SELECT IS_NULLABLE, COLUMN_KEY FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'donations' AND COLUMN_NAME = 'client_ref'`
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].IS_NULLABLE).toBe('YES');
+    expect(rows[0].COLUMN_KEY).toBe('UNI');
+  });
 });

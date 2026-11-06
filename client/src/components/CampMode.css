@@ -1,0 +1,135 @@
+/* BBMS-F-013: outreach camp mode and the offline sync bar */
+
+.collection-workspace {
+  max-width: 760px;
+  margin: 1.5rem auto 0;
+}
+
+.workspace-mode-toggle {
+  margin-bottom: 1rem;
+}
+
+.camp-sync-bar {
+  margin-bottom: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
+  border-radius: 16px;
+  box-shadow: var(--card-inner-shadow);
+  color: var(--text-primary);
+}
+
+.camp-sync-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.camp-sync-header .btn-primary {
+  width: auto;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.camp-sync-status {
+  font-weight: 600;
+}
+
+.camp-sync-status-offline {
+  color: #b45309;
+}
+
+[data-theme="dark"] .camp-sync-status-offline {
+  color: #fbbf24;
+}
+
+.camp-sync-bar .alert-box {
+  margin: 0.75rem 0 0;
+}
+
+.camp-sync-section {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--card-inner-border);
+}
+
+.camp-sync-section h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+}
+
+.camp-record-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.camp-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--input-bg);
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.camp-record-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.camp-record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.camp-record .btn-secondary {
+  width: auto;
+  padding: 0.35rem 0.85rem;
+}
+
+.camp-ref {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.camp-record-error {
+  color: #b91c1c;
+}
+
+[data-theme="dark"] .camp-record-error {
+  color: #f87171;
+}
+
+.camp-field-errors {
+  flex-basis: 100%;
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text-secondary);
+}
+
+.camp-label-preview {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.camp-label-preview .btn-primary {
+  width: auto;
+}

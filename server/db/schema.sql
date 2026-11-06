@@ -54,7 +54,8 @@ CREATE TABLE donations (
   collected_by       INT NULL,
   collected_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   camp_location      VARCHAR(150) NULL,             -- set when collected at a blood camp
-  donation_type      ENUM('WHOLE_BLOOD','APHERESIS') NOT NULL DEFAULT 'WHOLE_BLOOD',  -- F-010
+  client_ref         CHAR(36) NULL UNIQUE,          -- F-013: browser-made UUID of an offline camp record, so a re-sent record is never saved twice
+  donation_type     ENUM('WHOLE_BLOOD','APHERESIS') NOT NULL DEFAULT 'WHOLE_BLOOD',  -- F-010
   status             ENUM('IN_PROGRESS','COMPLETED','ABORTED') NOT NULL DEFAULT 'IN_PROGRESS',
   volume_ml          SMALLINT NULL,
   -- pre-donation vitals
