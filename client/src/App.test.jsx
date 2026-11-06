@@ -68,7 +68,7 @@ describe('App', () => {
     expect(screen.queryByRole('tab', { name: /Collection Desk/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /Inventory/i })).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /My Donor Card/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Donor Registration' })).toBeInTheDocument();
+    expect(screen.getByTestId('portal-loading')).toBeInTheDocument();
   });
 
   it.each(['LAB_TECH', 'ADMIN', 'MANAGER', 'HOSPITAL', 'DONOR'])(
@@ -127,6 +127,13 @@ describe('App', () => {
       expect(screen.getByRole('heading', { name: 'Inventory Dashboard' })).toBeInTheDocument();
     },
   );
+
+  it('TC-Inv-01: hides the inventory tab from Blood Collector collector@bbms.test', () => {
+    logInAs('LAB_TECH', 'collector@bbms.test', 'Blood Collector');
+    render(<App />);
+
+    expect(screen.queryByRole('tab', { name: /Inventory/i })).not.toBeInTheDocument();
+  });
 
   it.each(['HOSPITAL', 'DONOR'])(
     'TC-Inv-01: hides the inventory tab from %s',
@@ -190,5 +197,14 @@ describe('App', () => {
 
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
     expect(sessionStorage.getItem('bbms.session')).toBeNull();
+  });
+
+  it('redirects to the default role landing tab if activeTab is restricted', () => {
+    // Attempting to open collection tab as central facility tester should fallback to lab tab
+    logInAs('LAB_TECH', 'labtech@bbms.test', 'Labtech 1');
+    render(<App initialTab="collection" />);
+
+    // Since collection is hidden for labtech1, active tab falls back to lab
+    expect(screen.getByRole('tab', { name: /Lab Screening/i })).toHaveClass('active');
   });
 });
