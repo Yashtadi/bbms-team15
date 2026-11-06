@@ -47,7 +47,14 @@ describe('TC-Don-03: blood-unit barcode label (unit)', () => {
         collectedAt: COLLECTED_AT,
         expiresAt: EXPIRES_AT,
         donationId: 4,
+        parentUnitCode: null,
       });
+    });
+
+    it('TC-Inv-02: carries the parent unit code for a separated component', () => {
+      const record = buildUnitRecord({ ...QUARANTINE_ROW, component: 'PRBC', parent_unit_code: 'U-2026-000007' });
+
+      expect(record.parentUnitCode).toBe('U-2026-000007');
     });
 
     it('shows the tested blood group once it is set (AC 2)', () => {

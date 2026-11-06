@@ -1,0 +1,104 @@
+/* BBMS-F-031: component separation panel and lineage on the Blood Label Tool */
+
+.component-separation {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--card-inner-border);
+}
+
+.component-separation h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.component-separation-form fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  background: var(--input-bg);
+}
+
+.component-separation-form legend {
+  padding: 0 0.25rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.component-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.component-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.unit-lineage {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.unit-lineage dt {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.unit-lineage dd {
+  margin: 0 0 0.35rem;
+}
+
+.unit-lineage ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+@media print {
+  /* Only labels print: hide the panel's text, form, buttons and the lineage list */
+  body:has(.unit-label) .component-separation > h3,
+  body:has(.unit-label) .component-separation > .subtitle,
+  body:has(.unit-label) .component-separation > button,
+  body:has(.unit-label) .component-separation-form,
+  body:has(.unit-label) .unit-lineage {
+    display: none !important;
+  }
+
+  body:has(.unit-label) .component-separation,
+  body:has(.unit-label) .component-labels {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* Several labels: a gap between them, and never split one across pages */
+  body:has(.unit-label) .component-label-item {
+    margin: 0 0 4mm !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* "Print component labels" prints only the components, not the parent's label */
+  .unit-lookup-container.print-components > .unit-label {
+    display: none !important;
+  }
+
+  /* "Print Label" prints only the unit that was looked up */
+  .unit-lookup-container.print-unit .component-separation {
+    display: none !important;
+  }
+}

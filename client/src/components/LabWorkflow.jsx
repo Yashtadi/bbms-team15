@@ -235,6 +235,11 @@ export default function LabWorkflow({ canEnterResults }) {
                       <span className="donor-code-sub">({item.donorCode})</span>
                     </div>
 
+                    {item.isSeparated && item.components?.length > 0 && (
+                      <div className="card-components" data-testid="card-components">
+                        Separated into {item.components.map((c) => c.component).join(', ')}
+                      </div>
+                    )}
                     <div className="card-blood-type">
                       {item.component} · {item.volumeMl} ml
                     </div>
@@ -338,7 +343,10 @@ export default function LabWorkflow({ canEnterResults }) {
                   const val = e.target.value;
                   setDonationId(val);
                   const matchIndex = fifoQueue.findIndex(
-                    (q) => String(q.donationId) === val.trim() || q.unitCode?.toUpperCase() === val.trim().toUpperCase(),
+                    (q) => String(q.donationId) === val.trim()
+                        || q.unitCode?.toUpperCase() === val.trim().toUpperCase()
+                        // BBMS-F-031: a scan of any component of a separated donation finds its ticket
+                        || (q.unitCodes || []).some((c) => c.toUpperCase() === val.trim().toUpperCase()),
                   );
                   if (matchIndex !== -1) {
                     setSelectedUnit(fifoQueue[matchIndex]);

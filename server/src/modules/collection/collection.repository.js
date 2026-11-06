@@ -109,14 +109,17 @@ async function updateVitals(donationId, phase, vitals) {
 
 /**
  * BBMS-F-012: Finds a blood unit by its unit code (the value encoded in its barcode).
+ * Includes the parent's unit code when the unit is a separated component (F-031).
  * @param {string} unitCode e.g. U-2026-000001
  * @returns {Promise<object|null>}
  */
 async function findUnitByCode(unitCode) {
   const [rows] = await db.query(
-    `SELECT id, unit_code, donation_id, component, blood_group, volume_ml,
-            collected_at, expires_at, status
-     FROM blood_units WHERE unit_code = ?`,
+    `SELECT bu.id, bu.unit_code, bu.donation_id, bu.component, bu.blood_group, bu.volume_ml,
+            bu.collected_at, bu.expires_at, bu.status, p.unit_code AS parent_unit_code
+     FROM blood_units bu
+     LEFT JOIN blood_units p ON p.id = bu.parent_unit_id
+     WHERE bu.unit_code = ?`,
     [unitCode]
   );
   return rows[0] || null;

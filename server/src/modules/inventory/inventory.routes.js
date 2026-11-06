@@ -19,6 +19,47 @@ router.get('/summary', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, 
   }
 });
 
+// Sends the 4xx a service error asks for, or 500 for anything unexpected
+function sendServiceError(res, error, fallbackMessage) {
+  if ([400, 404, 409, 422].includes(error.status)) {
+    return res.status(error.status).json({
+      message: error.message,
+      ...(error.code ? { code: error.code } : {}),
+      ...(error.errors ? { errors: error.errors } : {}),
+    });
+  }
+  return res.status(500).json({ message: fallbackMessage });
+}
+
+/**
+ * BBMS-F-031: Separate a whole-blood unit into components
+ * POST /api/inventory/units/:unitCode/separate { components: ['PRBC','FFP','PLATELETS'], volumes? }
+ *   -> 201 { parent, children }
+ * 400 bad input, 404 unknown unit, 409 already separated / not in the bank, 422 not whole blood
+ * or a component that would already be expired. Blood-bank staff only.
+ */
+router.post('/units/:unitCode/separate', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const result = await inventoryService.separateUnit(req.params.unitCode, req.body, req.user.id);
+    return res.status(201).json(result);
+  } catch (error) {
+    return sendServiceError(res, error, 'Failed to separate blood unit');
+  }
+});
+
+/**
+ * BBMS-F-031: Traceability of a unit
+ * GET /api/inventory/units/:unitCode/lineage -> 200 { unit, parent, children, siblings, donation }
+ */
+router.get('/units/:unitCode/lineage', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const lineage = await inventoryService.getLineage(req.params.unitCode);
+    return res.status(200).json(lineage);
+  } catch (error) {
+    return sendServiceError(res, error, 'Failed to load unit lineage');
+  }
+});
+
 router.get('/', requireRole('LAB_TECH', 'MANAGER', 'HOSPITAL', 'ADMIN'), async (req, res) => {
   const { bloodGroup = null, component = null } = req.query;
   const invalidBloodGroup = bloodGroup !== null &&

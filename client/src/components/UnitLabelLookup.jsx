@@ -1,21 +1,51 @@
 import { useState } from 'react';
+import { flushSync } from 'react-dom';
 import { apiFetch } from '../api';
 import UnitLabel from './UnitLabel';
+import ComponentSeparation from './ComponentSeparation';
 
 // BBMS-F-012: scan or type a unit ID to open the unit's record and print its label.
 // A USB barcode scanner acts like a keyboard: it types the code and presses Enter,
 // which submits this form. Without a scanner, staff type the code (simulated scan).
+// BBMS-F-031: the record also shows where the unit came from (parent, components, siblings),
+// and a whole-blood unit can be separated into components here.
+
+function UnitList({ units }) {
+  return (
+    <ul>
+      {units.map((u) => (
+        <li key={u.unitId}>
+          {u.unitId} · {u.component} · {u.status}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function UnitLabelLookup() {
   const [code, setCode] = useState('');
   const [fieldError, setFieldError] = useState('');
   const [generalError, setGeneralError] = useState('');
   const [unit, setUnit] = useState(null);
+  const [lineage, setLineage] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [printTarget, setPrintTarget] = useState('unit');
 
   const handleChange = (e) => {
     setCode(e.target.value);
     if (fieldError) setFieldError('');
+  };
+
+  // Lineage is extra information: if it cannot be loaded, the record and label still show
+  const loadLineage = async (unitId) => {
+    try {
+      const response = await apiFetch(`/api/inventory/units/${encodeURIComponent(unitId)}/lineage`);
+      if (response.status !== 200) return;
+      const data = await response.json();
+      if (Array.isArray(data?.children) && Array.isArray(data?.siblings)) setLineage(data);
+    } catch {
+      // ignore
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -23,6 +53,7 @@ export default function UnitLabelLookup() {
     setFieldError('');
     setGeneralError('');
     setUnit(null);
+    setLineage(null);
 
     const trimmed = code.trim();
     if (!trimmed) {
@@ -37,6 +68,7 @@ export default function UnitLabelLookup() {
 
       if (response.status === 200) {
         setUnit(data);
+        loadLineage(data.unitId);
       } else if (response.status === 400) {
         setFieldError(data.errors?.unitId || data.message || 'Invalid unit ID');
       } else if (response.status === 404) {
@@ -51,8 +83,19 @@ export default function UnitLabelLookup() {
     }
   };
 
+  // The print CSS uses the container class to choose which labels go on paper
+  const printLabels = (target) => {
+    flushSync(() => setPrintTarget(target));
+    window.print();
+  };
+
+  const handleSeparated = (result) => {
+    setUnit((current) => ({ ...current, status: 'SEPARATED' }));
+    setLineage((current) => (current ? { ...current, children: result.children } : current));
+  };
+
   return (
-    <div className="registration-form-container unit-lookup-container">
+    <div className={`registration-form-container unit-lookup-container print-${printTarget}`}>
       <h2>Blood Unit Label</h2>
       <p className="subtitle">BBMS-F-012 · Scan or enter a unit ID to open its record and print its barcode label</p>
 
@@ -99,6 +142,29 @@ export default function UnitLabelLookup() {
             <dt>Donation</dt>
             <dd>#{unit.donationId}</dd>
           </div>
+          {unit.parentUnitCode && (
+            <div>
+              <dt>Parent unit</dt>
+              <dd data-testid="record-parent">{unit.parentUnitCode}</dd>
+            </div>
+          )}
+        </dl>
+      )}
+
+      {lineage && (lineage.children.length > 0 || lineage.siblings.length > 0) && (
+        <dl className="unit-lineage" data-testid="unit-lineage">
+          {lineage.children.length > 0 && (
+            <>
+              <dt>Components made from this unit</dt>
+              <dd><UnitList units={lineage.children} /></dd>
+            </>
+          )}
+          {lineage.siblings.length > 0 && (
+            <>
+              <dt>Other components from {lineage.parent?.unitId}</dt>
+              <dd><UnitList units={lineage.siblings} /></dd>
+            </>
+          )}
         </dl>
       )}
 
@@ -106,9 +172,18 @@ export default function UnitLabelLookup() {
       {unit && <UnitLabel unit={unit} />}
 
       {unit && (
-        <button type="button" className="btn-primary" onClick={() => window.print()}>
+        <button type="button" className="btn-primary" onClick={() => printLabels('unit')}>
           Print Label
         </button>
+      )}
+
+      {unit && (
+        <ComponentSeparation
+          key={unit.unitId}
+          unit={unit}
+          onSeparated={handleSeparated}
+          onPrint={() => printLabels('components')}
+        />
       )}
     </div>
   );

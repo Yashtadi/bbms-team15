@@ -192,6 +192,13 @@
   color: var(--text-secondary);
 }
 
+/* BBMS-F-031: a separated donation is one ticket listing its components */
+.card-components {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .card-collected-time {
   font-size: 0.72rem;
   color: var(--text-muted);

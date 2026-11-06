@@ -248,3 +248,73 @@ describe('BBMS-F-020 to F-023 lab workflow UI', () => {
     expect(await screen.findByText(/All blood collections have been tested!/)).toBeInTheDocument();
   });
 });
+
+describe('TC-Inv-02: separated donations in the testing queue', () => {
+  afterEach(() => vi.clearAllMocks());
+
+  const NO_TTI = { results: [], completedCount: 0, remaining: ['HIV', 'HBV', 'HCV', 'SYPHILIS', 'MALARIA'], hasReactive: false };
+
+  // 8 tickets (one per donation); donations 2, 5 and 7 were separated into components
+  function mixedQueue() {
+    return Array.from({ length: 8 }, (_, idx) => {
+      const num = idx + 1;
+      const separated = [2, 5, 7].includes(num);
+      const code = `U-2026-00060${num}`;
+      return {
+        donationId: num,
+        unitId: 600 + num,
+        unitCode: code,
+        donorName: `Donor ${num}`,
+        donorCode: `D-00020${num}`,
+        component: 'WHOLE_BLOOD',
+        volumeMl: 450,
+        collectedAt: new Date(`2026-10-0${num}T10:00:00Z`).toISOString(),
+        unitStatus: 'QUARANTINE',
+        isSeparated: separated,
+        unitCodes: separated ? [`U-2026-00070${num}`, `U-2026-00080${num}`] : [code],
+        components: separated
+          ? [
+            { unitCode: `U-2026-00070${num}`, component: 'PRBC', status: 'QUARANTINE' },
+            { unitCode: `U-2026-00080${num}`, component: 'FFP', status: 'QUARANTINE' },
+          ]
+          : [],
+        abo: null,
+        tti: NO_TTI,
+      };
+    }).reverse();
+  }
+
+  function mockQueue(queue) {
+    apiFetch.mockImplementation(async (url) => {
+      if (url.includes('/notifications')) return jsonResponse(200, { notifications: [] });
+      if (url.includes('/queue')) return jsonResponse(200, { queue });
+      return jsonResponse(200, {});
+    });
+  }
+
+  it('keeps 6 tickets per page in FIFO order with a mix of separated and unseparated donations', async () => {
+    mockQueue(mixedQueue());
+    render(<LabWorkflow canEnterResults />);
+
+    expect(await screen.findByText(/8 Units Awaiting Screening/i)).toBeInTheDocument();
+    const page1 = screen.getAllByText(/^Donor \d$/).map((el) => el.textContent);
+    expect(page1).toEqual(['Donor 1', 'Donor 2', 'Donor 3', 'Donor 4', 'Donor 5', 'Donor 6']);
+    // One card per separated donation, naming its components
+    expect(screen.getAllByTestId('card-components')).toHaveLength(2);
+    expect(screen.getAllByTestId('card-components')[0]).toHaveTextContent('Separated into PRBC, FFP');
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    expect(screen.getAllByText(/^Donor \d$/).map((el) => el.textContent)).toEqual(['Donor 7', 'Donor 8']);
+    expect(screen.getAllByTestId('card-components')).toHaveLength(1);
+  });
+
+  it('finds the donation ticket when a component code is scanned', async () => {
+    mockQueue(mixedQueue());
+    render(<LabWorkflow canEnterResults />);
+    await screen.findByText(/8 Units Awaiting Screening/i);
+
+    fireEvent.change(screen.getByLabelText('Donation ID *'), { target: { value: 'u-2026-000805' } });
+
+    expect(screen.getByText(/Active Unit: U-2026-000605 \(Donation #5\)/)).toBeInTheDocument();
+  });
+});
