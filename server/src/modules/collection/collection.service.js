@@ -1,5 +1,6 @@
 const defaultDonorRepository = require('../donor/donor.repository');
 const defaultCollectionRepository = require('./collection.repository');
+const { checkEligibility } = require('../donor/donor.service');
 
 /**
  * BBMS-F-010: Donation types a session can record.
@@ -459,6 +460,272 @@ async function getUnitByBarcode(rawCode, collectionRepo = defaultCollectionRepos
   return buildUnitRecord(unit);
 }
 
+/**
+ * BBMS-F-013: Limits for syncing offline camp records (see DEVIATIONS.md).
+ * The browser sends its queue in chunks of at most MAX_SYNC_BATCH records.
+ * CLOCK_SKEW_MS lets a camp laptop's clock run a little ahead of the server's.
+ */
+const MAX_SYNC_BATCH = 50;
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
+const MAX_CAMP_LOCATION_LENGTH = 150;
+
+const CLIENT_REF_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const DONOR_CODE_PATTERN = /^D-\d{6,}$/;
+
+/**
+ * BBMS-F-013: A camp record's id, a UUID made by the browser. Returns it in lower case,
+ * or null if it is not a UUID.
+ * @param {*} value
+ * @returns {string|null}
+ */
+function normaliseClientRef(value) {
+  if (typeof value !== 'string') return null;
+  const ref = value.trim().toLowerCase();
+  return CLIENT_REF_PATTERN.test(ref) ? ref : null;
+}
+
+/**
+ * BBMS-F-013: Validates one offline camp record (400 on failure).
+ * Expected shape: { clientRef, donorId, campLocation, collectedAt, donationType, volumeMl,
+ * vitals: { bpSystolic, bpDiastolic, pulseBpm, hemoglobinGDl } }.
+ * collectedAt is when the blood was taken at the camp. It is kept as-is (not replaced by the
+ * sync time) and may not be in the future, apart from a small clock-skew allowance.
+ * @param {object} record
+ * @param {Date} now
+ * @returns {{ isValid: boolean, errors: object, value: object }}
+ */
+function validateCampRecord(record = {}, now = new Date()) {
+  const errors = {};
+
+  const donorCode = typeof record.donorId === 'string' ? record.donorId.trim().toUpperCase() : '';
+  if (!DONOR_CODE_PATTERN.test(donorCode)) {
+    errors.donorId = 'Donor ID must look like D-000001';
+  }
+
+  const campLocation = typeof record.campLocation === 'string' ? record.campLocation.trim() : '';
+  if (!campLocation) {
+    errors.campLocation = 'Camp location is required';
+  } else if (campLocation.length > MAX_CAMP_LOCATION_LENGTH) {
+    errors.campLocation = `Camp location must be at most ${MAX_CAMP_LOCATION_LENGTH} characters`;
+  }
+
+  let collectedAt = null;
+  if (typeof record.collectedAt !== 'string' || record.collectedAt.trim() === '') {
+    errors.collectedAt = 'Collection date and time is required';
+  } else {
+    collectedAt = new Date(record.collectedAt);
+    if (Number.isNaN(collectedAt.getTime())) {
+      errors.collectedAt = 'Collection date and time is not a valid date';
+      collectedAt = null;
+    } else if (collectedAt.getTime() > now.getTime() + CLOCK_SKEW_MS) {
+      errors.collectedAt = 'Collection date and time cannot be in the future';
+    }
+  }
+
+  const session = validateSessionInput(record);
+  const vitals = validateVitals(record.vitals || {});
+  Object.assign(errors, session.errors, vitals.errors);
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+    value: {
+      donorCode,
+      campLocation,
+      collectedAt,
+      donationType: session.donationType,
+      volumeMl: session.volumeMl,
+      vitals: vitals.vitals,
+    },
+  };
+}
+
+function rejectedResult(clientRef, status, message, extra = {}) {
+  return { clientRef, status, outcome: 'REJECTED', message, ...extra };
+}
+
+function alreadySyncedResult(clientRef, existing) {
+  return {
+    clientRef,
+    status: 200,
+    outcome: 'ALREADY_SYNCED',
+    donationId: existing.donation_id,
+    unit: buildUnitRecord(existing),
+  };
+}
+
+/**
+ * BBMS-F-013: Syncs one camp record. Never throws for a bad record: it returns a result
+ * with the HTTP-style status the record would have got on its own.
+ *
+ * 1. A clientRef that was synced before returns the existing donation (200), so re-sending
+ *    a record never creates a second donation. This check runs before validation, because
+ *    the first copy of the record can itself make the donor fail the 90-day rule.
+ * 2. Then the same rules as the desk: valid input (400), known donor (404), consent and
+ *    eligibility (422). Eligibility uses the camp haemoglobin and the 90-day gap measured
+ *    from the camp collection time. A rejection does not change the donor's record.
+ * 3. The unit's expiry is counted from the camp collection time; a unit that would
+ *    already be expired is rejected (422).
+ */
+async function syncCampRecord(record, staffId, { donorRepo, collectionRepo, now }) {
+  const rawRef = record && typeof record.clientRef === 'string' ? record.clientRef.slice(0, 64) : null;
+  const clientRef = normaliseClientRef(record && record.clientRef);
+  if (!clientRef) {
+    return rejectedResult(rawRef, 400, 'Validation failed', {
+      errors: { clientRef: 'clientRef must be a UUID' },
+    });
+  }
+
+  const existing = await collectionRepo.findSessionByClientRef(clientRef);
+  if (existing) return alreadySyncedResult(clientRef, existing);
+
+  const validation = validateCampRecord(record, now);
+  if (!validation.isValid) {
+    return rejectedResult(clientRef, 400, 'Validation failed', { errors: validation.errors });
+  }
+  const { donorCode, campLocation, collectedAt, donationType, volumeMl, vitals } = validation.value;
+
+  const donor = await donorRepo.findByIdOrCode(donorCode);
+  if (!donor) {
+    return rejectedResult(clientRef, 404, `Donor ${donorCode} not found`, { code: 'DONOR_NOT_FOUND' });
+  }
+
+  if (!donor.consent_given) {
+    return rejectedResult(clientRef, 422, 'Consent must be captured before a donation can proceed', {
+      code: 'CONSENT_REQUIRED',
+    });
+  }
+
+  if (donor.eligibility_status === 'DEFERRED') {
+    const reason = donor.deferral_reason ? `: ${donor.deferral_reason}` : '';
+    return rejectedResult(clientRef, 422, `Donor is not eligible to donate (status DEFERRED${reason})`, {
+      code: 'DONOR_NOT_ELIGIBLE',
+    });
+  }
+
+  const lastDonation = await collectionRepo.findLastDonationBefore(donor.id, collectedAt);
+  const daysSinceLastDonation = lastDonation
+    ? Math.floor((collectedAt.getTime() - new Date(lastDonation.collected_at).getTime()) / DAY_MS)
+    : null;
+  const eligibility = checkEligibility({
+    dateOfBirth: donor.date_of_birth,
+    hemoglobin: vitals.hemoglobinGDl,
+    daysSinceLastDonation,
+  });
+  if (!eligibility.eligible) {
+    return rejectedResult(clientRef, 422, `Donor is not eligible to donate: ${eligibility.reason}`, {
+      code: 'DONOR_NOT_ELIGIBLE',
+      reasons: eligibility.reasons,
+    });
+  }
+
+  const unit = buildUnitForSession(donationType, volumeMl, collectedAt);
+  if (unit.expiresAt.getTime() <= now.getTime()) {
+    return rejectedResult(clientRef, 422, 'This unit would already be past its expiry date', {
+      code: 'UNIT_EXPIRED',
+    });
+  }
+
+  let session;
+  try {
+    session = await collectionRepo.createSyncedSession({
+      clientRef,
+      donorId: donor.id,
+      collectedBy: staffId,
+      collectedAt,
+      campLocation,
+      donationType,
+      volumeMl,
+      vitals,
+      unit,
+      buildUnitCode: (unitId) => formatUnitCode(collectedAt.getFullYear(), unitId),
+    });
+  } catch (error) {
+    // Another sync saved the same clientRef a moment earlier: return that one
+    if (error.code === 'ER_DUP_ENTRY') {
+      const winner = await collectionRepo.findSessionByClientRef(clientRef);
+      if (winner) return alreadySyncedResult(clientRef, winner);
+    }
+    throw error;
+  }
+
+  return {
+    clientRef,
+    status: 201,
+    outcome: 'CREATED',
+    donationId: session.donationId,
+    donorId: donor.donor_code,
+    unit: buildUnitRecord({
+      unit_code: session.unit.unitCode,
+      blood_group: null,
+      component: unit.component,
+      volume_ml: unit.volumeMl,
+      status: 'QUARANTINE',
+      collected_at: collectedAt,
+      expires_at: unit.expiresAt,
+      donation_id: session.donationId,
+    }),
+    warnings: checkVitalsSafety(vitals, 'PRE'),
+  };
+}
+
+/**
+ * BBMS-F-013: Syncs a batch of offline camp records, one at a time, each in its own
+ * transaction. One bad record never stops the rest.
+ *
+ * @param {{ records: object[] }} body
+ * @param {number} staffId the logged-in collector (recorded as collected_by)
+ * @returns {Promise<{ results: object[], summary: { created: number, alreadySynced: number, rejected: number, failed: number } }>}
+ */
+async function syncCampRecords(
+  body,
+  staffId,
+  {
+    donorRepo = defaultDonorRepository,
+    collectionRepo = defaultCollectionRepository,
+    now = new Date(),
+  } = {}
+) {
+  const records = body && body.records;
+  if (!Array.isArray(records) || records.length === 0 || records.length > MAX_SYNC_BATCH) {
+    const error = new Error('Validation failed');
+    error.status = 400;
+    error.errors = { records: `Send between 1 and ${MAX_SYNC_BATCH} records` };
+    throw error;
+  }
+
+  if (!staffId) {
+    const error = new Error('staffId is required to sync camp records');
+    error.status = 400;
+    throw error;
+  }
+
+  const results = [];
+  for (const record of records) {
+    try {
+      results.push(await syncCampRecord(record, staffId, { donorRepo, collectionRepo, now }));
+    } catch (error) {
+      // Unexpected (e.g. database) error: the record was rolled back and can be sent again
+      results.push({
+        clientRef: normaliseClientRef(record && record.clientRef),
+        status: 500,
+        outcome: 'FAILED',
+        message: 'Failed to save this record. It can be sent again.',
+      });
+    }
+  }
+
+  const summary = { created: 0, alreadySynced: 0, rejected: 0, failed: 0 };
+  results.forEach((result) => {
+    if (result.outcome === 'CREATED') summary.created += 1;
+    else if (result.outcome === 'ALREADY_SYNCED') summary.alreadySynced += 1;
+    else if (result.outcome === 'REJECTED') summary.rejected += 1;
+    else summary.failed += 1;
+  });
+
+  return { results, summary };
+}
+
 module.exports = {
   DONATION_TYPES,
   UNIT_SPEC_BY_DONATION_TYPE,
@@ -475,4 +742,9 @@ module.exports = {
   normaliseUnitCode,
   buildUnitRecord,
   getUnitByBarcode,
+  MAX_SYNC_BATCH,
+  CLOCK_SKEW_MS,
+  normaliseClientRef,
+  validateCampRecord,
+  syncCampRecords,
 };
