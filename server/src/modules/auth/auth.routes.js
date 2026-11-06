@@ -1,4 +1,5 @@
 const express = require('express');
+const { requireAuth } = require('../../middleware/auth');
 const authService = require('./auth.service');
 
 const router = express.Router();
@@ -23,6 +24,23 @@ router.post('/login', async (req, res) => {
       message: 'Server error during login. Please verify database connection and configuration.',
       error: process.env.NODE_ENV === 'production' ? undefined : error.message,
     });
+  }
+});
+
+/**
+ * POST /api/auth/change-password
+ * Body: { currentPassword, newPassword, confirmPassword }
+ * Protected: requires valid JWT bearer token
+ */
+router.post('/change-password', requireAuth, async (req, res) => {
+  try {
+    const result = await authService.changePassword({
+      userId: req.user.id,
+      ...req.body,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message });
   }
 });
 

@@ -102,7 +102,8 @@
 }
 
 /* Mode Switcher Segmented Toggle */
-.checkin-mode-toggle {
+.checkin-mode-toggle,
+.tab-toggle-group {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1.75rem;
@@ -112,14 +113,15 @@
   border: 1px solid var(--input-border);
 }
 
-.mode-btn {
+.mode-btn,
+.toggle-btn {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   padding: 0.65rem 1rem;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
   color: var(--text-secondary);
@@ -129,15 +131,18 @@
   transition: all 0.2s ease;
 }
 
-.mode-btn:hover:not(.active) {
+.mode-btn:hover:not(.active),
+.toggle-btn:hover:not(.active) {
   color: var(--text-primary);
   background: rgba(255, 255, 255, 0.08);
 }
 
-.mode-btn.active {
+.mode-btn.active,
+.toggle-btn.active {
   background: var(--card-inner-bg);
   color: var(--text-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border-color: var(--card-inner-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .btn-icon {
@@ -365,10 +370,12 @@
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .btn-secondary {
-  padding: 0.75rem 1.25rem;
+  padding: 0.75rem 1.4rem;
   border-radius: 12px;
   font-weight: 600;
   font-size: 0.92rem;
@@ -377,6 +384,13 @@
   border: 1px solid var(--input-border);
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  height: auto;
+  box-sizing: border-box;
 }
 
 .btn-secondary:hover {
@@ -481,6 +495,73 @@
 
 .mt-4 {
   margin-top: 1.25rem;
+}
+
+/* Modal for Official Donor Card */
+.donor-card-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.25rem;
+}
+
+.donor-card-modal-content {
+  background: var(--card-bg, #16223a);
+  border-radius: 24px;
+  padding: 1.75rem;
+  max-width: 520px;
+  width: 100%;
+  border: 1px solid var(--card-border, rgba(56, 189, 248, 0.25));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-sizing: border-box;
+}
+
+.donor-card-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--card-inner-border, rgba(255, 255, 255, 0.1));
+  padding-bottom: 0.85rem;
+}
+
+.donor-card-modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary, #ffffff);
+  white-space: nowrap;
+}
+
+.modal-close-btn {
+  padding: 0.45rem 1.15rem;
+  border-radius: 10px;
+  background: var(--input-bg, rgba(15, 23, 42, 0.8));
+  color: var(--text-secondary, #94a3b8);
+  border: 1px solid var(--input-border, rgba(255, 255, 255, 0.15));
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: auto !important;
+  flex: none;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary, #ffffff);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Print Styles for Chair-side Barcode Label Printing */

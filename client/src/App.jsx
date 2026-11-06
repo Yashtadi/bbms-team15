@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import CollectionDeskWizard from './components/CollectionDeskWizard';
 import DonorRegistrationForm from './components/DonorRegistrationForm';
+import DonorPortalDashboard from './components/DonorPortalDashboard';
 import UnitLabelLookup from './components/UnitLabelLookup';
 import LabWorkflow from './components/LabWorkflow';
 import InventoryDashboard from './components/InventoryDashboard';
@@ -15,7 +16,7 @@ import './components/DonorRegistrationForm.css';
 // 2. Central Facility Testers (labtech@bbms.test, labtech2@bbms.test / LAB_TECH): Lab Screening, Inventory, Blood Label Tool
 // 3. Storage Manager (manager@bbms.test / MANAGER): Storage & Inventory, Blood Label Tool
 // 4. Hospital Desk (hospital@bbms.test / HOSPITAL): Storage & Inventory
-// 5. Donor (donor@bbms.test / DONOR): My Donor Card
+// 5. Donor (donor@bbms.test / DONOR): My Donor Card (Donor Portal)
 // 6. Admin (admin@bbms.test / ADMIN): Full system administration
 const LAB_STAFF_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 const INVENTORY_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
@@ -172,7 +173,9 @@ export default function App({ initialTab } = {}) {
       {/* Main Workspace Display */}
       <main className="app-content">
         {effectiveTab === 'collection' && canSeeCollection && <CollectionDeskWizard />}
-        {effectiveTab === 'donors' && canSeeDonors && <DonorRegistrationForm />}
+        {effectiveTab === 'donors' && canSeeDonors && (
+          <DonorPortalDashboard onLogout={handleLogout} />
+        )}
         {effectiveTab === 'lab' && canSeeLab && (
           <LabWorkflow
             canEnterResults={role === 'LAB_TECH'}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { apiFetch } from '../api';
 import UnitLabel from './UnitLabel';
+import DonorCard from './DonorCard';
 import './CollectionDeskWizard.css';
 import './DonorRegistrationForm.css';
 
@@ -17,7 +18,9 @@ const DEFAULT_NEW_DONOR = {
   fullName: '',
   dateOfBirth: '',
   gender: 'MALE',
+  bloodGroup: '',
   contact: '',
+  email: '',
   idProof: '',
   medicalHistory: '',
   consentGiven: true,
@@ -35,6 +38,7 @@ export default function CollectionDeskWizard() {
   const [donorFormErrors, setDonorFormErrors] = useState({});
   const [isSearching, setIsSearching] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [showDonorCardModal, setShowDonorCardModal] = useState(false);
 
   // Step 2: Vitals & Collection State
   const [vitals, setVitals] = useState(DEFAULT_VITALS);
@@ -100,7 +104,9 @@ export default function CollectionDeskWizard() {
           name: newDonor.fullName.trim(),
           dateOfBirth: newDonor.dateOfBirth,
           gender: newDonor.gender,
+          bloodGroup: newDonor.bloodGroup || undefined,
           contact: newDonor.contact.trim(),
+          email: newDonor.email.trim() || undefined,
           idProof: newDonor.idProof.trim(),
           medicalHistory: newDonor.medicalHistory.trim() || undefined,
           consentGiven: Boolean(newDonor.consentGiven),
@@ -116,8 +122,9 @@ export default function CollectionDeskWizard() {
           gender: newDonor.gender,
           dateOfBirth: newDonor.dateOfBirth,
           phone: newDonor.contact.trim(),
+          email: newDonor.email.trim() || undefined,
           idProof: newDonor.idProof.trim(),
-          bloodGroup: 'Pending Test',
+          bloodGroup: newDonor.bloodGroup || null,
           eligibilityStatus: data.status || 'PENDING',
           consentGiven: Boolean(newDonor.consentGiven),
         };
@@ -271,6 +278,7 @@ export default function CollectionDeskWizard() {
     setCreatedSession(null);
     setCreatedUnit(null);
     setVitalsWarnings([]);
+    setShowDonorCardModal(false);
   };
 
   return (
@@ -296,41 +304,45 @@ export default function CollectionDeskWizard() {
       {/* ================= STEP 1: DONOR CHECK-IN ================= */}
       {step === 1 && (
         <div className="wizard-panel">
-          <div className="panel-header">
+          <div className="wizard-panel-header">
             <h2>Blood Collection Desk</h2>
             <p className="subtitle">Check in a walk-in donor or search existing records before collection</p>
           </div>
 
-          {/* Mode Switcher Toggle */}
-          <div className="checkin-mode-toggle">
+          {/* Toggle between Register New vs Lookup Existing */}
+          <div className="tab-toggle-group">
             <button
               type="button"
-              className={`mode-btn ${checkinMode === 'new' ? 'active' : ''}`}
+              className={`toggle-btn ${checkinMode === 'new' ? 'active' : ''}`}
               onClick={() => {
                 setCheckinMode('new');
                 setActiveDonor(null);
                 setSearchError('');
               }}
             >
-              <span>Register New Donor</span>
+              Register New Donor
             </button>
             <button
               type="button"
-              className={`mode-btn ${checkinMode === 'search' ? 'active' : ''}`}
+              className={`toggle-btn ${checkinMode === 'search' ? 'active' : ''}`}
               onClick={() => {
                 setCheckinMode('search');
                 setSearchError('');
               }}
             >
-              <span>Search Existing Donor</span>
+              Search Existing Donor
             </button>
           </div>
 
-          {searchError && <div className="alert-box alert-error">{searchError}</div>}
+          {searchError && (
+            <div className="alert-box alert-error mt-3" role="alert">
+              {searchError}
+            </div>
+          )}
 
           {/* MODE A: REGISTER NEW DONOR */}
           {checkinMode === 'new' && (
-            <form onSubmit={handleRegisterNewDonor} noValidate>
+            <form onSubmit={handleRegisterNewDonor} noValidate className="donor-registration-form">
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="fullName">Full Legal Name *</label>
@@ -403,6 +415,38 @@ export default function CollectionDeskWizard() {
                 {donorFormErrors.idProof && <span className="field-error">{donorFormErrors.idProof}</span>}
               </div>
 
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="bloodGroup">Blood Group (Optional / If Known)</label>
+                  <select
+                    id="bloodGroup"
+                    value={newDonor.bloodGroup}
+                    onChange={(e) => setNewDonor({ ...newDonor, bloodGroup: e.target.value })}
+                  >
+                    <option value="">Unknown / Pending Lab Test</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="email">Email Address (Optional)</label>
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder="e.g. donor@example.com (or login with Donor ID)"
+                    value={newDonor.email}
+                    onChange={(e) => setNewDonor({ ...newDonor, email: e.target.value })}
+                  />
+                </div>
+              </div>
+
               <div className="form-group">
                 <label htmlFor="medicalHistory">Medical History / Past Conditions</label>
                 <textarea
@@ -423,6 +467,18 @@ export default function CollectionDeskWizard() {
                   />
                   <span>I confirm the donor has been informed of the blood donation process and has granted voluntary consent.</span>
                 </label>
+              </div>
+
+              <div className="portal-tip-box" style={{
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                borderRadius: '8px',
+                padding: '0.65rem 0.9rem',
+                fontSize: '0.82rem',
+                color: 'var(--text-primary, #ffffff)',
+                margin: '0.75rem 0',
+              }}>
+                An online donor portal account is automatically generated for this donor. Default password syntax: <strong>DDMMYYYY</strong> (Donor's Date of Birth).
               </div>
 
               <button type="submit" className="btn-primary" disabled={isRegistering}>
@@ -473,13 +529,20 @@ export default function CollectionDeskWizard() {
                       <strong>Donor is currently DEFERRED:</strong> {activeDonor.deferralReason || 'Not eligible to donate blood at this time.'}
                     </div>
                   ) : (
-                    <div className="donor-action-row">
+                    <div className="donor-action-row" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                       <button
                         type="button"
                         className="btn-primary"
                         onClick={() => setStep(2)}
                       >
                         Start Blood Collection Session for {activeDonor.fullName} →
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => setShowDonorCardModal(true)}
+                      >
+                        Print Donor Card
                       </button>
                     </div>
                   )}
@@ -498,48 +561,69 @@ export default function CollectionDeskWizard() {
               <span className="context-label">Active Donor:</span>
               <span className="context-name">{activeDonor.fullName}</span>
               <span className="context-id">({activeDonor.donorCode || activeDonor.donorId})</span>
-              <span className="context-group">Group: {activeDonor.bloodGroup && activeDonor.bloodGroup !== 'PENDING' ? activeDonor.bloodGroup : 'Pending Test'}</span>
             </div>
-            <button type="button" className="btn-link" onClick={() => setStep(1)}>
-              Change Donor
-            </button>
+            <div className="context-right" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              {activeDonor.bloodGroup && (
+                <span className="context-blood-group">{activeDonor.bloodGroup}</span>
+              )}
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', width: 'auto' }}
+                onClick={() => setShowDonorCardModal(true)}
+              >
+                View / Print Card
+              </button>
+            </div>
           </div>
 
-          <div className="panel-header mt-4">
+          <div className="wizard-panel-header">
             <h2>Donation Session & Pre-Vitals</h2>
-            <p className="subtitle">Record chair-side vitals and draw parameters to allocate blood unit</p>
+            <p className="subtitle">BBMS-F-010 · Record collection volume and clinical vitals</p>
           </div>
 
-          {sessionError && <div className="alert-box alert-error">{sessionError}</div>}
+          <div className="alert-box alert-success mt-2" data-testid="portal-account-notice" style={{ fontSize: '0.85rem' }}>
+            <strong>Online Portal Account Generated:</strong> Username: <strong>{activeDonor.donorCode || activeDonor.donorId}</strong> · Default Password Syntax: <strong>DDMMYYYY</strong> (Date of Birth). Instruct donor to log into <strong>bbms.pes.edu</strong> and change their password.
+          </div>
 
-          <form onSubmit={handleStartSessionAndVitals} noValidate>
+          {sessionError && (
+            <div className="alert-box alert-error mt-3" role="alert">
+              {sessionError}
+            </div>
+          )}
+
+          <form onSubmit={handleStartSessionAndVitals} noValidate className="vitals-form">
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="donationType">Collection Type</label>
+                <label htmlFor="donationType">Donation Component Type *</label>
                 <select
                   id="donationType"
                   value={vitals.donationType}
                   onChange={(e) => setVitals({ ...vitals, donationType: e.target.value })}
                 >
-                  <option value="WHOLE_BLOOD">Whole Blood (Standard 450 mL)</option>
-                  <option value="APHERESIS">Apheresis (Platelets)</option>
+                  <option value="WHOLE_BLOOD">Whole Blood</option>
+                  <option value="APHERESIS">Apheresis (Platelets/Plasma)</option>
                 </select>
               </div>
 
               <div className="form-group">
-                <label htmlFor="volumeMl">Volume to Collect (mL)</label>
-                <select
+                <label htmlFor="volumeMl">Collection Volume (mL) *</label>
+                <input
                   id="volumeMl"
+                  type="number"
+                  placeholder="350 or 450"
                   value={vitals.volumeMl}
                   onChange={(e) => setVitals({ ...vitals, volumeMl: e.target.value })}
-                >
-                  <option value="450">450 mL</option>
-                  <option value="350">350 mL</option>
-                </select>
+                  required
+                />
               </div>
             </div>
 
-            <div className="vitals-grid">
+            <div className="vitals-section-title">
+              <h3>Clinical Vitals Measurement (BBMS-F-011)</h3>
+            </div>
+
+            <div className="form-row vitals-4col">
               <div className="form-group">
                 <label htmlFor="bpSystolic">Systolic BP (mmHg) *</label>
                 <input
@@ -569,7 +653,7 @@ export default function CollectionDeskWizard() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="pulseBpm">Pulse Rate (bpm) *</label>
+                <label htmlFor="pulseBpm">Pulse (bpm) *</label>
                 <input
                   id="pulseBpm"
                   type="number"
@@ -603,7 +687,12 @@ export default function CollectionDeskWizard() {
             </div>
 
             <div className="button-group mt-4">
-              <button type="button" className="btn-secondary" onClick={() => setStep(1)}>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                onClick={() => setStep(1)}
+              >
                 ← Back to Donor
               </button>
               <button type="submit" className="btn-primary" disabled={isSavingSession}>
@@ -661,9 +750,31 @@ export default function CollectionDeskWizard() {
             <button type="button" className="btn-primary" onClick={() => window.print()}>
               Print Unit Barcode Sticker
             </button>
+            <button type="button" className="btn-secondary" onClick={() => setShowDonorCardModal(true)}>
+              Print Donor Card
+            </button>
             <button type="button" className="btn-secondary" onClick={handleReset}>
               Check-in Next Donor
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Official Donor Card Preview / Print Modal */}
+      {showDonorCardModal && activeDonor && (
+        <div className="donor-card-modal-overlay">
+          <div className="donor-card-modal-content">
+            <div className="donor-card-modal-header">
+              <h3>Official Donor Card</h3>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setShowDonorCardModal(false)}
+              >
+                Close
+              </button>
+            </div>
+            <DonorCard donor={activeDonor} showActions={true} />
           </div>
         </div>
       )}

@@ -165,6 +165,25 @@ router.post('/eligibility', requireRole('LAB_TECH', 'ADMIN'), async (req, res) =
 });
 
 /**
+ * BBMS-F-001 / F-003: Donor Self-Service Portal Profile, Stats & History
+ * GET /api/donors/portal/me
+ */
+router.get('/portal/me', requireRole('DONOR', 'ADMIN'), async (req, res) => {
+  try {
+    const portalData = await donorService.getDonorPortalData(req.user.id, req.query.donorId);
+    return res.status(200).json(portalData);
+  } catch (error) {
+    if (error.status === 404) {
+      return res.status(404).json({ message: error.message || 'Donor profile not found' });
+    }
+    return res.status(500).json({
+      message: 'Failed to retrieve donor portal profile',
+      error: error.message,
+    });
+  }
+});
+
+/**
  * BBMS-F-001/F-003: Lookup an existing donor by donorCode, phone, or id
  * GET /api/donors/:query -> 200 { donorId, fullName, eligibilityStatus, ... } | 404
  */

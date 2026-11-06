@@ -30,7 +30,7 @@ export default function LoginForm({ onLogin }) {
         <ThemeToggle />
       </div>
 
-      <form className="login-card" onSubmit={handleSubmit}>
+      <form className="login-card" onSubmit={handleSubmit} noValidate>
         <div className="login-icon">
           <DropIcon />
         </div>
@@ -45,8 +45,8 @@ export default function LoginForm({ onLogin }) {
           <span className="field-icon"><MailIcon /></span>
           <input
             id="login-email"
-            type="email"
-            placeholder="Email"
+            type="text"
+            placeholder="Email / Donor ID"
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
