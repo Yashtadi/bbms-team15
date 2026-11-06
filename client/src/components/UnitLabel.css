@@ -69,6 +69,15 @@
   margin: 1mm 0 2mm;
 }
 
+/* BBMS-F-031: parent bag of a component */
+.unit-label-parent {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  margin: -1mm 0 2mm;
+}
+
 .unit-label-fields {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

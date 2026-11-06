@@ -44,6 +44,10 @@ export default function UnitLabel({ unit }) {
         data-testid="unit-barcode"
       />
       <div className="unit-label-id" data-testid="label-unit-id">{unit.unitId}</div>
+      {/* BBMS-F-031: a component's label names the whole-blood bag it was separated from */}
+      {unit.parentUnitCode && (
+        <div className="unit-label-parent" data-testid="label-parent">From {unit.parentUnitCode}</div>
+      )}
 
       <dl className="unit-label-fields">
         <div>
