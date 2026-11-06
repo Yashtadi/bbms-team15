@@ -23,11 +23,18 @@ async function lockDonation(connection, donationId) {
   if (!donationRows[0]) return null;
 
   const [units] = await connection.query(
-    'SELECT id AS unit_id, unit_code, status FROM blood_units WHERE donation_id = ? FOR UPDATE',
+    `SELECT id AS unit_id, unit_code, status, parent_unit_id
+     FROM blood_units WHERE donation_id = ? ORDER BY id ASC FOR UPDATE`,
     [donationId]
   );
   if (units.length === 0) return null;
   return { ...donationRows[0], units };
+}
+
+// BBMS-F-031: the bag the donation was collected in (not a separated component).
+// Staff alerts name this bag, so a separated donation still raises one alert, not one per component.
+function originalBag(units) {
+  return units.find((unit) => unit.parent_unit_id === null) || units[0];
 }
 
 async function updateAvailability(connection, donationId) {
@@ -139,7 +146,7 @@ async function recordTtiResult(donationId, { testType, result, method, testedBy 
       await connection.query(
         `UPDATE blood_units
          SET status = 'DISCARDED', discard_reason = ?
-         WHERE donation_id = ? AND status <> 'DISCARDED'`,
+         WHERE donation_id = ? AND status NOT IN ('DISCARDED', 'SEPARATED')`,
         [`Reactive TTI: ${testType}`, donationId]
       );
       await connection.query(
@@ -156,22 +163,25 @@ async function recordTtiResult(donationId, { testType, result, method, testedBy 
         `SELECT id FROM users
          WHERE is_active = TRUE AND role IN ('LAB_TECH', 'MANAGER', 'ADMIN')`
       );
+      // One confidential alert per staff member for the donation (F-023), even when the
+      // donation was separated into several components (F-031)
+      const bag = originalBag(donation.units);
+      for (const user of staff) {
+        await connection.query(
+          `INSERT INTO notifications
+           (recipient_user_id, event_type, message, entity_type, entity_id)
+           VALUES (?, 'REACTIVE_TTI', ?, 'blood_unit', ?)`,
+          [
+            user.id,
+            `Confidential follow-up is required for blood unit ${bag.unit_code}.`,
+            bag.unit_code,
+          ]
+        );
+      }
       for (const unit of donation.units) {
-        for (const user of staff) {
-          await connection.query(
-            `INSERT INTO notifications
-             (recipient_user_id, event_type, message, entity_type, entity_id)
-             VALUES (?, 'REACTIVE_TTI', ?, 'blood_unit', ?)`,
-            [
-              user.id,
-              `Confidential follow-up is required for blood unit ${unit.unit_code}.`,
-              unit.unit_code,
-            ]
-          );
-        }
         await writeAudit(connection, testedBy, 'REACTIVE_TTI_RECORDED', unit.unit_code, {
           testType,
-          notificationsCreated: staff.length,
+          notificationsCreated: unit === bag ? staff.length : 0,
         });
       }
 
@@ -227,6 +237,7 @@ async function getQueueAndStorage() {
        dn.full_name AS donor_name,
        bu.id AS unit_id,
        bu.unit_code,
+       bu.parent_unit_id,
        bu.component,
        bu.blood_group,
        bu.status AS unit_status,
@@ -297,6 +308,7 @@ async function getQueueAndStorage() {
       donationStatus: d.donation_status,
       unitId: d.unit_id,
       unitCode: d.unit_code,
+      parentUnitId: d.parent_unit_id,
       component: d.component,
       bloodGroup: d.blood_group,
       unitStatus: d.unit_status,
@@ -316,7 +328,30 @@ async function getQueueAndStorage() {
   });
 
   // Testing queue is strictly First In First Out (oldest collected blood tested first)
-  const queue = items
+  // One ticket per donation: lab results belong to the donation, so a donation separated into
+  // components (F-031) is tested once. The ticket shows the original bag and lists the codes of
+  // the units still in use, so a scan of any of them finds the ticket.
+  const unitsByDonation = new Map();
+  for (const item of items) {
+    if (!unitsByDonation.has(item.donationId)) unitsByDonation.set(item.donationId, []);
+    unitsByDonation.get(item.donationId).push(item);
+  }
+  const tickets = [...unitsByDonation.values()].map((units) => {
+    const original = units.find((unit) => unit.parentUnitId === null) || units[0];
+    const active = units.filter((unit) => unit.unitStatus !== 'SEPARATED');
+    const anyQuarantine = active.some((unit) => unit.unitStatus === 'QUARANTINE');
+    return {
+      ...original,
+      unitStatus: anyQuarantine ? 'QUARANTINE' : (active[0] || original).unitStatus,
+      isSeparated: original.unitStatus === 'SEPARATED',
+      unitCodes: active.map((unit) => unit.unitCode),
+      components: units
+        .filter((unit) => unit.parentUnitId !== null)
+        .map((unit) => ({ unitCode: unit.unitCode, component: unit.component, status: unit.unitStatus })),
+    };
+  });
+
+  const queue = tickets
     .filter((item) => item.unitStatus === 'QUARANTINE' || !item.isFullyTested)
     .sort((a, b) => new Date(a.collectedAt).getTime() - new Date(b.collectedAt).getTime() || a.donationId - b.donationId);
   const storage = items;
