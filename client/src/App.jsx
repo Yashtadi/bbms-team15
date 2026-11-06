@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import CollectionDeskWizard from './components/CollectionDeskWizard';
+import CollectionWorkspace from './components/CollectionWorkspace';
 import DonorRegistrationForm from './components/DonorRegistrationForm';
 import UnitLabelLookup from './components/UnitLabelLookup';
 import LabWorkflow from './components/LabWorkflow';
@@ -171,7 +171,7 @@ export default function App({ initialTab } = {}) {
 
       {/* Main Workspace Display */}
       <main className="app-content">
-        {effectiveTab === 'collection' && canSeeCollection && <CollectionDeskWizard />}
+        {effectiveTab === 'collection' && canSeeCollection && <CollectionWorkspace />}
         {effectiveTab === 'donors' && canSeeDonors && <DonorRegistrationForm />}
         {effectiveTab === 'lab' && canSeeLab && (
           <LabWorkflow
