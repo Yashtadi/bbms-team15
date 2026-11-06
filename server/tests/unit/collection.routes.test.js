@@ -243,3 +243,61 @@ describe('TC-Don-03: unit barcode lookup route access and error mapping (unit)',
     expect(res.body.message).toBe('Failed to look up blood unit');
   });
 });
+
+describe('TC-Don-04: POST /api/donations/sync access and error mapping (unit)', () => {
+  let app;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/donations', router);
+    jest.clearAllMocks();
+  });
+
+  it('returns 401 without a token', async () => {
+    const res = await request(app).post('/api/donations/sync').send({ records: [] });
+
+    expect(res.status).toBe(401);
+    expect(collectionService.syncCampRecords).not.toHaveBeenCalled();
+  });
+
+  it.each(['ADMIN', 'MANAGER', 'HOSPITAL', 'DONOR'])('returns 403 for the %s role', async (role) => {
+    const res = await request(app).post('/api/donations/sync').set(authHeader(role)).send({ records: [] });
+
+    expect(res.status).toBe(403);
+    expect(collectionService.syncCampRecords).not.toHaveBeenCalled();
+  });
+
+  it('lets LAB_TECH sync, taking the collector from the token', async () => {
+    const body = { results: [], summary: { created: 0, alreadySynced: 0, rejected: 0, failed: 0 } };
+    collectionService.syncCampRecords.mockResolvedValue(body);
+
+    const res = await request(app)
+      .post('/api/donations/sync').set(authHeader('LAB_TECH'))
+      .send({ records: [{ clientRef: 'x' }] });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(body);
+    expect(collectionService.syncCampRecords).toHaveBeenCalledWith({ records: [{ clientRef: 'x' }] }, 3);
+  });
+
+  it('maps a bad batch to 400 with errors', async () => {
+    collectionService.syncCampRecords.mockRejectedValue(
+      Object.assign(new Error('Validation failed'), { status: 400, errors: { records: 'Send between 1 and 50 records' } })
+    );
+
+    const res = await request(app).post('/api/donations/sync').set(authHeader('LAB_TECH')).send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors.records).toMatch(/50/);
+  });
+
+  it('returns 500 on an unexpected error', async () => {
+    collectionService.syncCampRecords.mockRejectedValue(new Error('DB down'));
+
+    const res = await request(app).post('/api/donations/sync').set(authHeader('LAB_TECH')).send({ records: [{}] });
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Failed to sync camp records');
+  });
+});
