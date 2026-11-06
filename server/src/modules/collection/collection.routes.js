@@ -5,6 +5,26 @@ const collectionService = require('./collection.service');
 const router = express.Router();
 
 /**
+ * BBMS-F-013: Sync donations recorded offline at an outreach camp
+ * POST /api/donations/sync { records: [...] } -> 200 { results: [...], summary }
+ * Each result carries its own status: 201 created, 200 already synced (same clientRef),
+ * 400 / 404 / 422 rejected. A missing or oversized batch gets 400 for the whole request.
+ * Only LAB_TECH may record donations (same as F-010). The collector is the logged-in user.
+ */
+router.post('/sync', requireRole('LAB_TECH'), async (req, res) => {
+  try {
+    const result = await collectionService.syncCampRecords(req.body, req.user.id);
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error.status === 400) {
+      return res.status(400).json({ message: error.message, errors: error.errors || {} });
+    }
+
+    return res.status(500).json({ message: 'Failed to sync camp records' });
+  }
+});
+
+/**
  * BBMS-F-004 / BBMS-F-010: Start a donation session
  * SAD §4.3: POST /api/donations -> 201 { donationId, donorId, status, ..., unit }
  * Only LAB_TECH may record sessions (F-010), so other roles get 403.
