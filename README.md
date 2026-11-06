@@ -126,6 +126,8 @@ The lab API requires a `LAB_TECH`, `MANAGER`, or `ADMIN` token:
 | `GET` | `/api/lab/notifications` | `LAB_TECH`, `MANAGER`, `ADMIN` | Read confidential notifications addressed to the logged-in staff member |
 | `GET` | `/api/inventory` | `LAB_TECH`, `MANAGER`, `ADMIN` | List unexpired, fully screened `AVAILABLE` units |
 | `GET` | `/api/inventory/summary` | `LAB_TECH`, `MANAGER`, `ADMIN` | Stock summary metrics and blood group × component grid |
+| `POST` | `/api/inventory/units/:unitCode/separate` | `LAB_TECH`, `MANAGER`, `ADMIN` | Separate a whole-blood unit into `components` (`PRBC`, `FFP`, `PLATELETS`, `CRYO`); returns the parent and the new component units (F-031) |
+| `GET` | `/api/inventory/units/:unitCode/lineage` | `LAB_TECH`, `MANAGER`, `ADMIN` | A unit's parent, components, sibling components and donation (F-031) |
 
 TTI `testType` values are `HIV`, `HBV`, `HCV`, `SYPHILIS`, and `MALARIA`; `result` is
 `REACTIVE` or `NON_REACTIVE`. Units stay quarantined until the ABO/Rh result is verified
