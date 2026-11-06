@@ -130,3 +130,80 @@ describe('TC-Don-03: UnitLabelLookup (client)', () => {
     expect(await screen.findByTestId('general-error')).toHaveTextContent('Network error');
   });
 });
+
+describe('TC-Inv-02: component lineage and separation in the label tool (client)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const PRBC = {
+    ...UNIT,
+    unitId: 'U-2026-000101',
+    barcode: { format: 'CODE128', value: 'U-2026-000101' },
+    component: 'PRBC',
+    parentUnitCode: 'U-2026-000007',
+  };
+  const FFP = { ...PRBC, unitId: 'U-2026-000102', barcode: { format: 'CODE128', value: 'U-2026-000102' }, component: 'FFP' };
+
+  // Answers by URL: unit lookup, lineage, separation
+  function mockApi(routes) {
+    globalThis.fetch = vi.fn(async (url, options = {}) => {
+      const key = `${options.method || 'GET'} ${url}`;
+      const [status, body] = routes[key] || [404, { message: 'Not found' }];
+      return { status, json: async () => body };
+    });
+    return globalThis.fetch;
+  }
+
+  it('shows the parent on a component record and label, and its sibling components', async () => {
+    const user = userEvent.setup();
+    mockApi({
+      'GET /api/donations/units/U-2026-000101': [200, PRBC],
+      'GET /api/inventory/units/U-2026-000101/lineage': [200, {
+        unit: PRBC,
+        parent: { ...UNIT, status: 'SEPARATED' },
+        children: [],
+        siblings: [FFP],
+        donation: { donationId: 4 },
+      }],
+    });
+    render(<UnitLabelLookup />);
+
+    await scan(user, 'U-2026-000101');
+
+    expect(await screen.findByTestId('record-parent')).toHaveTextContent('U-2026-000007');
+    expect(screen.getByTestId('label-parent')).toHaveTextContent('From U-2026-000007');
+    expect(await screen.findByTestId('unit-lineage')).toHaveTextContent('Other components from U-2026-000007');
+    expect(screen.getByTestId('unit-lineage')).toHaveTextContent('U-2026-000102 · FFP');
+    // A component cannot be separated again
+    expect(screen.queryByRole('button', { name: 'Separate components' })).not.toBeInTheDocument();
+  });
+
+  it('separates the looked-up unit, marks it SEPARATED and prints only the component labels', async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockApi({
+      'GET /api/donations/units/U-2026-000007': [200, UNIT],
+      'GET /api/inventory/units/U-2026-000007/lineage': [200, { unit: UNIT, parent: null, children: [], siblings: [], donation: {} }],
+      'POST /api/inventory/units/U-2026-000007/separate': [201, { parent: { ...UNIT, status: 'SEPARATED' }, children: [PRBC, FFP] }],
+    });
+    window.print = vi.fn();
+    const { container } = render(<UnitLabelLookup />);
+
+    await scan(user, 'U-2026-000007');
+    await user.click(await screen.findByRole('button', { name: 'Separate components' }));
+
+    expect(await screen.findByTestId('component-labels')).toBeInTheDocument();
+    expect(screen.getByTestId('record-status')).toHaveTextContent('SEPARATED');
+    expect(screen.getByTestId('unit-lineage')).toHaveTextContent('Components made from this unit');
+    expect(fetchMock).toHaveBeenCalledWith('/api/inventory/units/U-2026-000007/separate', expect.objectContaining({ method: 'POST' }));
+
+    const lookup = container.querySelector('.unit-lookup-container');
+    await user.click(screen.getByRole('button', { name: 'Print component labels' }));
+    expect(window.print).toHaveBeenCalledTimes(1);
+    expect(lookup).toHaveClass('print-components');
+
+    await user.click(screen.getByRole('button', { name: 'Print Label' }));
+    expect(window.print).toHaveBeenCalledTimes(2);
+    expect(lookup).toHaveClass('print-unit');
+  });
+});

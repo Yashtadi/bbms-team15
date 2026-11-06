@@ -64,4 +64,14 @@ describe('TC-Don-03: UnitLabel (client)', () => {
     expect(JsBarcode).toHaveBeenLastCalledWith(expect.anything(), 'U-2026-000008', expect.anything());
     expect(screen.getByRole('img', { name: 'Barcode for U-2026-000008' })).toBeInTheDocument();
   });
+
+  it('TC-Inv-02: names the parent unit on a component label, and nothing on a whole-blood label', () => {
+    const { rerender } = render(<UnitLabel unit={PENDING_UNIT} />);
+    expect(screen.queryByTestId('label-parent')).not.toBeInTheDocument();
+
+    rerender(<UnitLabel unit={{ ...PENDING_UNIT, component: 'PRBC', parentUnitCode: 'U-2026-000007' }} />);
+
+    expect(screen.getByTestId('label-parent')).toHaveTextContent('From U-2026-000007');
+    expect(screen.getByTestId('label-component')).toHaveTextContent('PRBC');
+  });
 });
