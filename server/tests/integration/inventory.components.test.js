@@ -68,8 +68,9 @@ describe('TC-Inv-02: track blood components (integration)', () => {
       .send({ components });
   }
 
-  // F-020 two-person ABO/Rh check, then all five TTI tests (F-021)
-  async function screenDonation(donationId, { aboGroup = 'O', rh = '-', reactive = null } = {}) {
+  // F-020 two-person ABO/Rh check, then all five TTI tests (F-021).
+  // Uses groups the seed and other test files don't count on (A-, B-), because the DB is shared.
+  async function screenDonation(donationId, { aboGroup = 'A', rh = '-', reactive = null } = {}) {
     const entered = await request(app)
       .post(`/api/lab/donations/${donationId}/blood-group`).set(authHeader('LAB_TECH'))
       .send({ aboGroup, rh });
@@ -253,14 +254,14 @@ describe('TC-Inv-02: track blood components (integration)', () => {
     const { body } = await separate(unitCode, ['PRBC', 'FFP', 'PLATELETS']);
     const childCodes = body.children.map((c) => c.unitId);
 
-    await screenDonation(donationId, { aboGroup: 'O', rh: '-' });
+    await screenDonation(donationId, { aboGroup: 'A', rh: '-' });
 
     const [parent, ...children] = await unitsOfDonation(donationId);
     expect(parent.status).toBe('SEPARATED');
     expect(children).toHaveLength(3);
     children.forEach((child) => {
       expect(child.status).toBe('AVAILABLE');
-      expect(child.blood_group).toBe('O-');
+      expect(child.blood_group).toBe('A-');
     });
 
     const inventory = await request(app).get('/api/inventory').set(authHeader('MANAGER'));
@@ -333,17 +334,17 @@ describe('TC-Inv-02: track blood components (integration)', () => {
 
   it('F-030 summary counts the components and never the separated parent', async () => {
     const { donationId, unitCode } = await createDonation();
-    await screenDonation(donationId, { aboGroup: 'AB', rh: '-' });
+    await screenDonation(donationId, { aboGroup: 'B', rh: '-' });
 
-    const wbBefore = await summaryCount('AB-', 'WHOLE_BLOOD');
-    const prbcBefore = await summaryCount('AB-', 'PRBC');
-    const ffpBefore = await summaryCount('AB-', 'FFP');
+    const wbBefore = await summaryCount('B-', 'WHOLE_BLOOD');
+    const prbcBefore = await summaryCount('B-', 'PRBC');
+    const ffpBefore = await summaryCount('B-', 'FFP');
 
     expect((await separate(unitCode, ['PRBC', 'FFP'])).status).toBe(201);
 
-    const wbAfter = await summaryCount('AB-', 'WHOLE_BLOOD');
-    const prbcAfter = await summaryCount('AB-', 'PRBC');
-    const ffpAfter = await summaryCount('AB-', 'FFP');
+    const wbAfter = await summaryCount('B-', 'WHOLE_BLOOD');
+    const prbcAfter = await summaryCount('B-', 'PRBC');
+    const ffpAfter = await summaryCount('B-', 'FFP');
     expect(wbAfter.units).toBe(wbBefore.units - 1);
     expect(prbcAfter.units).toBe(prbcBefore.units + 1);
     expect(ffpAfter.units).toBe(ffpBefore.units + 1);
