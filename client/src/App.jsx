@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import CollectionWorkspace from './components/CollectionWorkspace';
 import DonorPortalDashboard from './components/DonorPortalDashboard';
+import HospitalRequestDesk from './components/HospitalRequestDesk';
 import UnitLabelLookup from './components/UnitLabelLookup';
 import LabWorkflow from './components/LabWorkflow';
 import InventoryDashboard from './components/InventoryDashboard';
@@ -20,6 +21,7 @@ import './components/DonorRegistrationForm.css';
 const LAB_STAFF_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 const INVENTORY_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 const UNIT_LABEL_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
+const REQUEST_ROLES = ['HOSPITAL', 'MANAGER', 'ADMIN'];
 
 export default function App({ initialTab } = {}) {
   const [session, setSession] = useState(getSession);
@@ -35,11 +37,13 @@ export default function App({ initialTab } = {}) {
   const canSeeInventory = !isCollector && INVENTORY_ROLES.includes(role);
   const canSeeLabels = isCollector || UNIT_LABEL_ROLES.includes(role);
   const canSeeDonors = role === 'DONOR';
+  const canSeeRequests = REQUEST_ROLES.includes(role);
 
   // Default landing tab per role & persona
   const getDefaultTab = () => {
     if (isCollector) return 'collection';
     if (role === 'DONOR') return 'donors';
+    if (role === 'HOSPITAL') return 'requests';
     if (role === 'MANAGER') return 'inventory';
     if (role === 'LAB_TECH') return 'lab';
     return 'lab';
@@ -68,6 +72,7 @@ export default function App({ initialTab } = {}) {
   const effectiveTab =
     (currentTab === 'collection' && !canSeeCollection) ||
     (currentTab === 'donors' && !canSeeDonors) ||
+    (currentTab === 'requests' && !canSeeRequests) ||
     (currentTab === 'units' && !canSeeLabels) ||
     (currentTab === 'lab' && !canSeeLab) ||
     (currentTab === 'inventory' && !canSeeInventory)
@@ -112,6 +117,18 @@ export default function App({ initialTab } = {}) {
                 onClick={() => setActiveTab('donors')}
               >
                 <span>My Donor Card</span>
+              </button>
+            )}
+
+            {canSeeRequests && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={effectiveTab === 'requests'}
+                className={`tab-btn ${effectiveTab === 'requests' ? 'active' : ''}`}
+                onClick={() => setActiveTab('requests')}
+              >
+                <span>Blood Requests</span>
               </button>
             )}
 
@@ -175,6 +192,7 @@ export default function App({ initialTab } = {}) {
         {effectiveTab === 'donors' && canSeeDonors && (
           <DonorPortalDashboard onLogout={handleLogout} />
         )}
+        {effectiveTab === 'requests' && canSeeRequests && <HospitalRequestDesk />}
         {effectiveTab === 'lab' && canSeeLab && (
           <LabWorkflow
             canEnterResults={role === 'LAB_TECH'}

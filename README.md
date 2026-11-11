@@ -136,6 +136,18 @@ donation and creates confidential staff notifications.
 
 ---
 
+## Blood requests API
+
+Hospital staff and administrators submit and manage patient blood requests:
+
+| Method | Path | Allowed Roles | Purpose |
+|---|---|---|---|
+| `POST` | `/api/blood-requests` | `HOSPITAL`, `ADMIN` | Submit a new blood request with patient details, blood group, component, quantity, and priority (F-040) |
+| `GET` | `/api/blood-requests` | `HOSPITAL`, `MANAGER`, `ADMIN`, `LAB_TECH` | List blood requests (scoped to logged-in hospital for `HOSPITAL` role) |
+| `GET` | `/api/blood-requests/:idOrCode` | `HOSPITAL`, `MANAGER`, `ADMIN`, `LAB_TECH` | Get detailed status of a blood request by ID or code (`R-XXXXXX`) |
+
+---
+
 ## Core UI Workflows
 
 ### 1. Frontline Blood Collection Desk (`HOSPITAL`, `ADMIN`)

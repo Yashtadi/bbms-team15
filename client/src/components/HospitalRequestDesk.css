@@ -1,0 +1,519 @@
+/* BBMS-F-040: Hospital Blood Request Desk Styling */
+
+.hospital-desk-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 0 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* 1. Header Hero Card */
+.hospital-hero-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 1.75rem 2rem;
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+}
+
+.hospital-hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa, #93c5fd);
+}
+
+.hospital-badge-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  margin-bottom: 0.5rem;
+}
+
+.hospital-hero-info h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.4rem;
+}
+
+.hospital-desk-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.hospital-stats-pills {
+  display: flex;
+  gap: 1rem;
+}
+
+.stat-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
+  border-radius: 12px;
+  padding: 0.75rem 1.25rem;
+  min-width: 90px;
+}
+
+.stat-pill-pending {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.stat-pill-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.stat-pill-val {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.stat-pill-pending .stat-pill-val {
+  color: #f59e0b;
+}
+
+/* 2. Subnav Switcher */
+.desk-subnav {
+  display: flex;
+  gap: 0.5rem;
+  background: var(--card-inner-bg);
+  padding: 0.35rem;
+  border-radius: 12px;
+  border: 1px solid var(--card-inner-border);
+  align-self: flex-start;
+}
+
+.subnav-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.5rem 1.2rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.subnav-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.subnav-btn.active {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+/* 3. Panel Container */
+.desk-content-panel {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: var(--card-shadow);
+}
+
+/* Form Sections */
+.form-section-title {
+  border-bottom: 1px solid var(--card-inner-border);
+  padding-bottom: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.form-section-title h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.2rem;
+}
+
+.form-section-title p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.form-row {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.flex-2 {
+  flex: 2;
+}
+
+.req-star {
+  color: #ef4444;
+}
+
+.field-error-msg {
+  display: block;
+  font-size: 0.78rem;
+  color: #f87171;
+  margin-top: 0.35rem;
+}
+
+/* Priority Card Grid */
+.priority-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.priority-card {
+  background: var(--card-inner-bg);
+  border: 1.5px solid var(--card-inner-border);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.priority-card:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.priority-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.priority-radio-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--text-muted);
+  display: inline-block;
+  transition: all 0.2s;
+}
+
+.priority-card-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.priority-card-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.35;
+}
+
+/* Priority Selection Colors */
+.priority-card.selected {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: #3b82f6;
+}
+
+.priority-card.selected .priority-radio-dot {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.priority-card-urgent.selected {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: #f59e0b;
+}
+
+.priority-card-urgent.selected .priority-radio-dot {
+  border-color: #f59e0b;
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25);
+}
+
+.priority-card-emergency.selected {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+}
+
+.priority-card-emergency.selected .priority-radio-dot {
+  border-color: #ef4444;
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+}
+
+/* Form Actions */
+.form-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--card-inner-border);
+}
+
+.btn-submit-request {
+  padding: 0.75rem 2rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+/* Success Banner */
+.request-success-banner {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1.5px solid rgba(16, 185, 129, 0.35);
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.success-header-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.success-check-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.success-header-row h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #10b981;
+}
+
+.success-header-row p {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.request-id-highlight {
+  font-family: ui-monospace, monospace;
+  font-size: 1.1rem;
+  color: #3b82f6;
+}
+
+.success-details-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.detail-lbl {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.success-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.85rem;
+}
+
+.btn-link:hover {
+  color: var(--text-primary);
+}
+
+/* 4. Requests Table */
+.list-controls-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.filter-group label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.filter-select {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  width: auto;
+}
+
+.requests-table-container {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--card-inner-border);
+}
+
+.requests-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.requests-table th {
+  background: var(--card-inner-bg);
+  padding: 0.85rem 1rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--card-inner-border);
+}
+
+.requests-table td {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--card-inner-border);
+  color: var(--text-primary);
+}
+
+.requests-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.code-cell {
+  font-family: ui-monospace, monospace;
+  color: #60a5fa;
+}
+
+.badge-group {
+  display: inline-block;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.priority-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.priority-routine {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.priority-urgent {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.priority-emergency {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.status-reserved {
+  background: rgba(147, 51, 234, 0.15);
+  color: #c084fc;
+}
+
+.status-issued {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.status-rejected {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.status-cancelled {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+}
+
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+}
