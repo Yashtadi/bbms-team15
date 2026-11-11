@@ -272,16 +272,21 @@
     margin: 5mm;
   }
 
-  body * {
+  body:has(.bbms-donor-card) {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  body:has(.bbms-donor-card) * {
     visibility: hidden !important;
   }
 
-  .bbms-donor-card,
-  .bbms-donor-card * {
+  body:has(.bbms-donor-card) .bbms-donor-card,
+  body:has(.bbms-donor-card) .bbms-donor-card * {
     visibility: visible !important;
   }
 
-  .bbms-donor-card {
+  body:has(.bbms-donor-card) .bbms-donor-card {
     position: fixed !important;
     left: 50% !important;
     top: 15mm !important;
@@ -300,34 +305,34 @@
     page-break-inside: avoid !important;
   }
 
-  /* Completely collapse non-card containers */
-  .app-header,
-  .nav-tabs,
-  .user-bar,
-  .donor-portal-container,
-  .collection-wizard-container,
-  .registration-form-container,
-  .portal-welcome-header,
-  .portal-metrics-grid,
-  .portal-content-grid,
-  .portal-card-section > h3,
-  .portal-card-section > p,
-  .portal-history-section,
-  .donor-card-actions,
-  .no-print {
+  /* Completely collapse non-card containers when printing donor card */
+  body:has(.bbms-donor-card) .app-header,
+  body:has(.bbms-donor-card) .nav-tabs,
+  body:has(.bbms-donor-card) .user-bar,
+  body:has(.bbms-donor-card) .donor-portal-container,
+  body:has(.bbms-donor-card) .collection-wizard-container,
+  body:has(.bbms-donor-card) .registration-form-container,
+  body:has(.bbms-donor-card) .portal-welcome-header,
+  body:has(.bbms-donor-card) .portal-metrics-grid,
+  body:has(.bbms-donor-card) .portal-content-grid,
+  body:has(.bbms-donor-card) .portal-card-section > h3,
+  body:has(.bbms-donor-card) .portal-card-section > p,
+  body:has(.bbms-donor-card) .portal-history-section,
+  body:has(.bbms-donor-card) .donor-card-actions,
+  body:has(.bbms-donor-card) .no-print {
     display: none !important;
     height: 0 !important;
     overflow: hidden !important;
   }
 
-  .bbms-card-header {
+  body:has(.bbms-donor-card) .bbms-card-header {
     background: #0f172a !important;
     color: #ffffff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  .blood-group-badge {
+  body:has(.bbms-donor-card) .blood-group-badge {
     background: #e63946 !important;
     color: #ffffff !important;
     -webkit-print-color-adjust: exact !important;
