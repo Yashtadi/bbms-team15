@@ -97,8 +97,8 @@ router.post('/:idOrCode/crossmatch', requireRole('LAB_TECH', 'MANAGER', 'ADMIN')
 
     return res.status(201).json({ crossmatch });
   } catch (error) {
-    if (error.status === 400 || error.status === 404 || error.status === 422) {
-      return res.status(error.status).json({ message: error.message });
+    if ([400, 404, 409, 422].includes(error.status)) {
+      return res.status(error.status).json({ message: error.message, ...(error.code ? { code: error.code } : {}) });
     }
 
     return res.status(500).json({
@@ -181,6 +181,67 @@ router.get('/:idOrCode/crossmatch/:unitCode/check', requireRole('HOSPITAL', 'LAB
       message: 'Failed to check issuance readiness',
       error: error.message,
     });
+  }
+});
+
+// BBMS-F-042: maps a service error to the SAD status codes; anything unexpected is a 500
+function sendReservationError(res, error, fallbackMessage) {
+  if ([400, 403, 404, 409, 422].includes(error.status)) {
+    const body = { message: error.message };
+    if (error.code) body.code = error.code;
+    if (error.errors) body.errors = error.errors;
+    return res.status(error.status).json(body);
+  }
+  return res.status(500).json({ message: fallbackMessage, error: error.message });
+}
+
+/**
+ * BBMS-F-042: Reserve a cross-matched unit for a request for a limited time.
+ * POST /api/blood-requests/:idOrCode/reservations { unitCode, holdMinutes? } -> 201 { reservation }
+ * Roles: LAB_TECH, MANAGER, ADMIN (HOSPITAL and DONOR get 403).
+ */
+router.post('/:idOrCode/reservations', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const reservation = await requestService.reserveUnitForRequest({
+      idOrCode: req.params.idOrCode,
+      body: req.body || {},
+      user: req.user,
+    });
+    return res.status(201).json({ reservation });
+  } catch (error) {
+    return sendReservationError(res, error, 'Failed to reserve blood unit');
+  }
+});
+
+/**
+ * BBMS-F-042: Units currently held for a request.
+ * GET /api/blood-requests/:idOrCode/reservations -> 200 { request, reservations: [...] }
+ * Roles: HOSPITAL (own requests only), LAB_TECH, MANAGER, ADMIN.
+ */
+router.get('/:idOrCode/reservations', requireRole('HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const result = await requestService.getReservationsForRequest(req.params.idOrCode, req.user);
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendReservationError(res, error, 'Failed to retrieve reservations');
+  }
+});
+
+/**
+ * BBMS-F-042: Release a hold early; the unit goes back to AVAILABLE stock.
+ * DELETE /api/blood-requests/:idOrCode/reservations/:unitCode -> 200 { released }
+ * Roles: LAB_TECH, MANAGER, ADMIN (HOSPITAL and DONOR get 403).
+ */
+router.delete('/:idOrCode/reservations/:unitCode', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const released = await requestService.releaseUnitReservation({
+      idOrCode: req.params.idOrCode,
+      unitCode: req.params.unitCode,
+      user: req.user,
+    });
+    return res.status(200).json({ released });
+  } catch (error) {
+    return sendReservationError(res, error, 'Failed to release reservation');
   }
 });
 

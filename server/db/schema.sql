@@ -44,7 +44,8 @@ CREATE TABLE donors (
   follow_up_required  BOOLEAN NOT NULL DEFAULT FALSE,
   follow_up_reason    VARCHAR(255) NULL,
   created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  INDEX idx_donors_phone (phone)   -- NF-001: donor search by phone (GET /api/donors/:query)
 );
 
 -- 3. donations: one visit where blood is taken. F-010 session, F-011 vitals, F-013 camps
@@ -72,7 +73,8 @@ CREATE TABLE donations (
   post_hemoglobin_g_dl DECIMAL(4,1) NULL,           -- F-011
   adverse_reaction   VARCHAR(255) NULL,
   FOREIGN KEY (donor_id) REFERENCES donors(id),
-  FOREIGN KEY (collected_by) REFERENCES users(id)
+  FOREIGN KEY (collected_by) REFERENCES users(id),
+  INDEX idx_donations_fifo (collected_at, id)   -- NF-001: FIFO lab queue order (collected_at ASC, id ASC)
 );
 
 -- 6. blood_requests: created before blood_units, because units can be reserved for a request.
@@ -89,7 +91,9 @@ CREATE TABLE blood_requests (
   status               ENUM('PENDING','RESERVED','ISSUED','REJECTED','CANCELLED') NOT NULL DEFAULT 'PENDING',
   required_by          DATETIME NULL,
   created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (hospital_user_id) REFERENCES users(id)
+  FOREIGN KEY (hospital_user_id) REFERENCES users(id),
+  INDEX idx_requests_queue (status, priority, created_at),        -- NF-001: request list filtered by status/priority
+  INDEX idx_requests_hospital (hospital_user_id, created_at)      -- NF-001: a hospital's own requests
 );
 
 -- 4. blood_units: one bag. F-012 barcode, F-030 to F-034 inventory, F-042 reservation
@@ -107,12 +111,16 @@ CREATE TABLE blood_units (
                            NOT NULL DEFAULT 'QUARANTINE',  -- SEPARATED: split into components (F-031), never issued
   discard_reason           VARCHAR(255) NULL,
   reserved_for_request_id  INT NULL,
+  reserved_until           DATETIME NULL,                 -- F-042: hold expires at this time, then the unit is back in stock
+  reserved_by              INT NULL,                      -- F-042: staff member who placed the hold
   created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (donation_id) REFERENCES donations(id),
   FOREIGN KEY (reserved_for_request_id) REFERENCES blood_requests(id),
+  FOREIGN KEY (reserved_by) REFERENCES users(id),
   FOREIGN KEY (parent_unit_id) REFERENCES blood_units(id),
   INDEX idx_units_parent (parent_unit_id),
-  INDEX idx_units_stock (status, blood_group, component, expires_at)  -- fast stock + FEFO queries (NF-001)
+  INDEX idx_units_stock (status, blood_group, component, expires_at),  -- fast stock + FEFO queries (NF-001)
+  INDEX idx_units_reservation (status, reserved_until)                 -- NF-001: F-042 lapsed-hold sweep
 );
 
 -- 5. lab_results: tests run on a donation's sample. F-020 ABO/Rh, F-021 TTI tests
@@ -152,7 +160,8 @@ CREATE TABLE crossmatches (
   performed_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (request_id) REFERENCES blood_requests(id),
   FOREIGN KEY (unit_id) REFERENCES blood_units(id),
-  FOREIGN KEY (performed_by) REFERENCES users(id)
+  FOREIGN KEY (performed_by) REFERENCES users(id),
+  INDEX idx_crossmatch_pair (request_id, unit_id, performed_at)   -- NF-001: latest cross-match per request and unit
 );
 
 -- 8. issuances: chain of custody. F-043. One row per bag handed over.

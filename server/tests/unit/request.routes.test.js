@@ -310,3 +310,128 @@ describe('TC-Req-01: request.routes access and error mapping (unit)', () => {
     });
   });
 });
+
+describe('TC-Req-03: BBMS-F-042 reservation routes access and error mapping (unit)', () => {
+  let app;
+  const base = '/api/blood-requests/R-000001/reservations';
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/blood-requests', router);
+    jest.clearAllMocks();
+  });
+
+  const serviceError = (status, message, extra = {}) => Object.assign(new Error(message), { status }, extra);
+
+  describe('POST /:idOrCode/reservations', () => {
+    it('returns 401 without a token', async () => {
+      const res = await request(app).post(base).send({ unitCode: 'U-2026-000001' });
+      expect(res.status).toBe(401);
+    });
+
+    it.each(['HOSPITAL', 'DONOR'])('returns 403 for %s', async (role) => {
+      const res = await request(app).post(base).set(authHeader(role)).send({ unitCode: 'U-2026-000001' });
+      expect(res.status).toBe(403);
+      expect(requestService.reserveUnitForRequest).not.toHaveBeenCalled();
+    });
+
+    it.each(['LAB_TECH', 'MANAGER', 'ADMIN'])('lets %s reserve a unit (201)', async (role) => {
+      requestService.reserveUnitForRequest.mockResolvedValue({ unitCode: 'U-2026-000001', requestStatus: 'RESERVED' });
+
+      const res = await request(app).post(base).set(authHeader(role)).send({ unitCode: 'U-2026-000001', holdMinutes: 30 });
+
+      expect(res.status).toBe(201);
+      expect(res.body.reservation.requestStatus).toBe('RESERVED');
+      expect(requestService.reserveUnitForRequest).toHaveBeenCalledWith({
+        idOrCode: 'R-000001',
+        body: { unitCode: 'U-2026-000001', holdMinutes: 30 },
+        user: expect.objectContaining({ role }),
+      });
+    });
+
+    it.each([
+      [400, undefined, { holdMinutes: 'bad' }],
+      [404, undefined, undefined],
+      [409, 'RESERVED_FOR_OTHER_REQUEST', undefined],
+      [422, 'NO_CROSSMATCH', undefined],
+    ])('maps a service %i error with its code and field errors', async (status, code, errors) => {
+      requestService.reserveUnitForRequest.mockRejectedValue(serviceError(status, 'refused', { code, errors }));
+
+      const res = await request(app).post(base).set(authHeader('LAB_TECH')).send({ unitCode: 'U-2026-000001' });
+
+      expect(res.status).toBe(status);
+      expect(res.body.message).toBe('refused');
+      if (code) expect(res.body.code).toBe(code);
+      if (errors) expect(res.body.errors).toEqual(errors);
+    });
+
+    it('returns 500 for an unexpected failure', async () => {
+      requestService.reserveUnitForRequest.mockRejectedValue(new Error('boom'));
+      const res = await request(app).post(base).set(authHeader('LAB_TECH')).send({ unitCode: 'U-2026-000001' });
+      expect(res.status).toBe(500);
+      expect(res.body.message).toBe('Failed to reserve blood unit');
+    });
+  });
+
+  describe('GET /:idOrCode/reservations', () => {
+    it.each(['HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'])('lets %s view reservations (200)', async (role) => {
+      requestService.getReservationsForRequest.mockResolvedValue({ request: { requestCode: 'R-000001' }, reservations: [] });
+      const res = await request(app).get(base).set(authHeader(role));
+      expect(res.status).toBe(200);
+      expect(res.body.reservations).toEqual([]);
+    });
+
+    it('returns 403 for DONOR', async () => {
+      const res = await request(app).get(base).set(authHeader('DONOR'));
+      expect(res.status).toBe(403);
+    });
+
+    it("passes on the service's 403 for another hospital's request", async () => {
+      requestService.getReservationsForRequest.mockRejectedValue(serviceError(403, 'Access forbidden'));
+      const res = await request(app).get(base).set(authHeader('HOSPITAL'));
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('DELETE /:idOrCode/reservations/:unitCode', () => {
+    it.each(['HOSPITAL', 'DONOR'])('returns 403 for %s', async (role) => {
+      const res = await request(app).delete(`${base}/U-2026-000001`).set(authHeader(role));
+      expect(res.status).toBe(403);
+      expect(requestService.releaseUnitReservation).not.toHaveBeenCalled();
+    });
+
+    it('releases a hold (200)', async () => {
+      requestService.releaseUnitReservation.mockResolvedValue({ unitCode: 'U-2026-000001', unitStatus: 'AVAILABLE' });
+      const res = await request(app).delete(`${base}/U-2026-000001`).set(authHeader('MANAGER'));
+      expect(res.status).toBe(200);
+      expect(res.body.released.unitStatus).toBe('AVAILABLE');
+      expect(requestService.releaseUnitReservation).toHaveBeenCalledWith({
+        idOrCode: 'R-000001',
+        unitCode: 'U-2026-000001',
+        user: expect.objectContaining({ role: 'MANAGER' }),
+      });
+    });
+
+    it('returns 409 when the unit is not held for the request', async () => {
+      requestService.releaseUnitReservation.mockRejectedValue(serviceError(409, 'not reserved', { code: 'NOT_RESERVED' }));
+      const res = await request(app).delete(`${base}/U-2026-000001`).set(authHeader('LAB_TECH'));
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('NOT_RESERVED');
+    });
+  });
+
+  describe('POST /:idOrCode/crossmatch (F-042 guard)', () => {
+    it('returns 409 when the unit is reserved for another request', async () => {
+      requestService.recordCrossmatch.mockRejectedValue(
+        serviceError(409, 'reserved elsewhere', { code: 'RESERVED_FOR_OTHER_REQUEST' })
+      );
+      const res = await request(app)
+        .post('/api/blood-requests/R-000001/crossmatch')
+        .set(authHeader('LAB_TECH'))
+        .send({ unitCode: 'U-2026-000001', result: 'COMPATIBLE' });
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('RESERVED_FOR_OTHER_REQUEST');
+    });
+  });
+});

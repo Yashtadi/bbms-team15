@@ -80,6 +80,19 @@ All pre-seeded demo accounts use the default password: `Password@123` (populated
 
 ---
 
+## Health checks and availability (NF-002)
+
+| Path | Purpose |
+|---|---|
+| `GET /api/health` | Simple "is the server alive?" check: `{ "status": "ok" }` |
+| `GET /api/health/live` | Liveness: the process is up, with `uptimeSeconds` |
+| `GET /api/health/ready` | Readiness: 200 when the database answers within 2 s, **503** when it is down or the server is shutting down |
+
+These are public so uptime monitors can call them. The hosting, monitoring and maintenance plan for the
+99.5% availability target is in [docs/OPERATIONS.md](docs/OPERATIONS.md).
+
+---
+
 ## Running tests
 
 ### Server (Jest + Supertest)
@@ -92,6 +105,12 @@ npm run test:integration   # only tests/integration
 ```
 
 Integration tests need MySQL running, a filled-in `server/.env`, and the database created with `npm run db:setup`.
+
+**Performance (TC-Perf-01, NF-001):** `tests/integration/performance.test.js` loads about 1,200 extra units,
+300 donors and 300 requests, sends 100 requests (10 at a time) to each search and inventory endpoint, and fails if
+any endpoint's 95th-percentile response time reaches 2 seconds. It prints a p50/p95/max table and deletes its data
+afterwards. Every API response also carries a `Server-Timing: app;dur=<ms>` header, and requests slower than
+`SLOW_REQUEST_MS` (default 2000) are logged as `[NF-001] Slow request`.
 
 ### Client (Vitest + React Testing Library)
 
@@ -148,6 +167,13 @@ Hospital staff and administrators submit and manage patient blood requests:
 | `POST` | `/api/blood-requests/:idOrCode/crossmatch` | `LAB_TECH`, `MANAGER`, `ADMIN` | Record cross-match test result (`COMPATIBLE` / `INCOMPATIBLE`) for a blood unit (F-041) |
 | `GET` | `/api/blood-requests/:idOrCode/crossmatches` | `HOSPITAL`, `LAB_TECH`, `MANAGER`, `ADMIN` | List all cross-match test records for a blood request |
 | `GET` | `/api/blood-requests/:idOrCode/crossmatch/:unitCode/check` | `HOSPITAL`, `LAB_TECH`, `MANAGER`, `ADMIN` | Check whether a unit is verified compatible and ready for issuance (blocks un-crossmatched or incompatible units) |
+| `POST` | `/api/blood-requests/:idOrCode/reservations` | `LAB_TECH`, `MANAGER`, `ADMIN` | Reserve a cross-matched unit for the request: `{ unitCode, holdMinutes? }` (15–1440, default `RESERVATION_HOLD_MINUTES` = 120) (F-042) |
+| `GET` | `/api/blood-requests/:idOrCode/reservations` | `HOSPITAL`, `LAB_TECH`, `MANAGER`, `ADMIN` | Units currently held for the request, with `reservedUntil` and `secondsRemaining` |
+| `DELETE` | `/api/blood-requests/:idOrCode/reservations/:unitCode` | `LAB_TECH`, `MANAGER`, `ADMIN` | Release a hold early; the unit goes back to `AVAILABLE` |
+
+A reserved unit is left out of stock counts, FEFO suggestions and every other request until it is
+released or its hold time runs out. Lapsed holds are returned to stock automatically (a sweep runs
+every minute, and again before any reservation is placed or listed).
 
 ---
 
@@ -167,6 +193,7 @@ A unified 3-step chair-side wizard replacing disconnected forms:
 ### 3. Hospital Blood Request & Cross-match Desk (`HOSPITAL`, `LAB_TECH`, `MANAGER`, `ADMIN`)
 * **Request Submission (F-040):** Hospital staff submit patient transfusion requests specifying recipient name, blood group, component, units requested (1–20), priority (`ROUTINE`, `URGENT`, `EMERGENCY`), and optional required-by time. Each request is assigned a sequential ID (`R-XXXXXX`, status `PENDING`).
 * **Cross-matching & Issuance Readiness (F-041):** Laboratory technicians test candidate blood units against patient requests. Units in quarantine, discarded, or expired states cannot be cross-matched. Enforces clinical ABO/Rh compatibility rules for red blood cells (PRBC, WHOLE_BLOOD) and plasma (FFP). A unit is strictly blocked from issuance until a cross-match result is recorded as `COMPATIBLE`.
+* **Unit Reservation (F-042):** From the cross-match history, lab staff reserve a compatible unit for the request for a chosen hold time (15–1440 minutes, default 120). The **Reserved Units** panel shows a live countdown and a **Release** button; hospital users see the same panel read-only. The request becomes `RESERVED` once all its units are held and returns to `PENDING` if a hold is released or runs out.
 
 ### 4. Security & Encryption at Rest (SR-003)
 * **AES-256-GCM Encryption:** Sensitive personally identifiable information (PII) and medical records (`medical_history`, `address`, `deferral_reason`, `follow_up_reason`) are encrypted at rest in MySQL using authenticated AES-256-GCM with unique 96-bit IVs and 128-bit authentication tags (`enc:v1:<iv>:<tag>:<ciphertext>`).

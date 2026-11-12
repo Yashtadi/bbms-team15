@@ -201,7 +201,7 @@ You will almost never touch it.
 **`server/src/app.js`.** This file builds the app. It:
 1. Turns on `cors` (so the React app on port 5173 is allowed to call the API on port 4000).
 2. Turns on `express.json()` (so `req.body` contains the JSON the frontend sent).
-3. Defines `GET /api/health` (a simple "is the server alive?" check).
+3. Connects the health checks (`GET /api/health`, `/api/health/live`, `/api/health/ready`) from `modules/health/`. They are public on purpose so uptime monitors can reach them (NF-002, see `docs/OPERATIONS.md`).
 4. Connects each module to a URL prefix:
 
 | URL prefix | Module folder |

@@ -45,7 +45,13 @@ function startServer() {
 }
 
 if (require.main === module) {
-  startServer();
+  const { setupGracefulShutdown, logUnhandledRejections } = require('./lifecycle');
+  const server = startServer();
+  // BBMS-NF-002: drain and close cleanly on restart/deploy; never lose a rejection silently
+  setupGracefulShutdown(server);
+  logUnhandledRejections();
+  // BBMS-F-042: put lapsed reservations back in stock every minute
+  require('./modules/request/request.service').startReservationExpirySweep();
 }
 
 module.exports = {
