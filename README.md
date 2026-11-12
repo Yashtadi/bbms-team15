@@ -93,6 +93,12 @@ npm run test:integration   # only tests/integration
 
 Integration tests need MySQL running, a filled-in `server/.env`, and the database created with `npm run db:setup`.
 
+**Performance (TC-Perf-01, NF-001):** `tests/integration/performance.test.js` loads about 1,200 extra units,
+300 donors and 300 requests, sends 100 requests (10 at a time) to each search and inventory endpoint, and fails if
+any endpoint's 95th-percentile response time reaches 2 seconds. It prints a p50/p95/max table and deletes its data
+afterwards. Every API response also carries a `Server-Timing: app;dur=<ms>` header, and requests slower than
+`SLOW_REQUEST_MS` (default 2000) are logged as `[NF-001] Slow request`.
+
 ### Client (Vitest + React Testing Library)
 
 ```bash

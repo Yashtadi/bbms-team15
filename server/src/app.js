@@ -1,12 +1,15 @@
 const express = require('express');
 const cors = require('cors');
 const { enforceTlsAndHttps, getTlsPolicy } = require('./middleware/tls.enforcement');
+const { responseTime } = require('./middleware/response.time');
 
 const app = express();
 
 // Trust proxy headers (e.g. X-Forwarded-Proto) from the upstream reverse proxy/load balancer
 app.set('trust proxy', 1);
 
+// BBMS-NF-001: time every request (Server-Timing header) and log any slower than 2 s
+app.use(responseTime());
 app.use(cors());
 app.use(enforceTlsAndHttps);
 app.use(express.json());
