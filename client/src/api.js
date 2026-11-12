@@ -20,6 +20,15 @@ export function clearSession() {
 }
 
 export function apiFetch(path, options = {}) {
+  // BBMS-SR-001: Enforce HTTPS / TLS 1.2+ for all client-server and integration traffic
+  if (
+    typeof path === 'string' &&
+    path.startsWith('http://') &&
+    !path.includes('localhost') &&
+    !path.includes('127.0.0.1')
+  ) {
+    throw new Error('Insecure plaintext HTTP channel is not accepted. HTTPS / TLS 1.2+ is required (BBMS-SR-001).');
+  }
   const session = getSession();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (session?.token) {
