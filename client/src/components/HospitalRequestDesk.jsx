@@ -29,8 +29,10 @@ export default function HospitalRequestDesk() {
   const session = getSession();
   const hospitalUser = session?.user;
   const isHospitalRole = hospitalUser?.role === 'HOSPITAL';
+  const isLabStaff = ['LAB_TECH', 'MANAGER', 'ADMIN'].includes(hospitalUser?.role);
 
-  const [activeTab, setActiveTab] = useState('form'); // 'form' | 'list'
+  const defaultTab = isHospitalRole ? 'form' : 'list';
+  const [activeTab, setActiveTab] = useState(defaultTab); // 'form' | 'list'
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -41,6 +43,91 @@ export default function HospitalRequestDesk() {
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [listError, setListError] = useState(null);
   const [filterStatus, setFilterStatus] = useState('ALL');
+
+  // BBMS-F-041: Cross-match state
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [crossmatches, setCrossmatches] = useState([]);
+  const [loadingCrossmatches, setLoadingCrossmatches] = useState(false);
+  const [crossmatchUnitCode, setCrossmatchUnitCode] = useState('');
+  const [crossmatchResult, setCrossmatchResult] = useState('COMPATIBLE');
+  const [crossmatchSubmitting, setCrossmatchSubmitting] = useState(false);
+  const [crossmatchError, setCrossmatchError] = useState(null);
+  const [crossmatchSuccess, setCrossmatchSuccess] = useState(null);
+
+  const loadCrossmatches = useCallback(async (reqCode) => {
+    setLoadingCrossmatches(true);
+    setCrossmatchError(null);
+    try {
+      const res = await apiFetch(`/api/blood-requests/${reqCode}/crossmatches`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to load cross-match records');
+      }
+      const data = await res.json();
+      setCrossmatches(data.crossmatches || []);
+    } catch (err) {
+      setCrossmatchError(err.message || 'Error loading cross-matches');
+    } finally {
+      setLoadingCrossmatches(false);
+    }
+  }, []);
+
+  const handleSelectRequest = (req) => {
+    setSelectedRequest(req);
+    setCrossmatchSuccess(null);
+    setCrossmatchError(null);
+    setCrossmatchUnitCode('');
+    setCrossmatchResult('COMPATIBLE');
+    loadCrossmatches(req.requestCode);
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedRequest(null);
+    setCrossmatches([]);
+    setCrossmatchError(null);
+    setCrossmatchSuccess(null);
+  };
+
+  const handleRecordCrossmatch = async (e) => {
+    e.preventDefault();
+    if (!crossmatchUnitCode.trim()) {
+      setCrossmatchError('Unit code is required');
+      return;
+    }
+
+    setCrossmatchSubmitting(true);
+    setCrossmatchError(null);
+    setCrossmatchSuccess(null);
+
+    try {
+      const res = await apiFetch(`/api/blood-requests/${selectedRequest.requestCode}/crossmatch`, {
+        method: 'POST',
+        body: JSON.stringify({
+          unitCode: crossmatchUnitCode.trim(),
+          result: crossmatchResult,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to record cross-match');
+      }
+
+      const outcomeMsg =
+        data.crossmatch?.result === 'COMPATIBLE'
+          ? `Cross-match recorded: COMPATIBLE. Unit ${data.crossmatch.unitCode} is ready for issuance.`
+          : `Cross-match recorded: INCOMPATIBLE. Issuance is blocked for unit ${data.crossmatch.unitCode}.`;
+
+      setCrossmatchSuccess(outcomeMsg);
+      setCrossmatchUnitCode('');
+      await loadCrossmatches(selectedRequest.requestCode);
+      await fetchRequests(); // Refresh requests in case status changes
+    } catch (err) {
+      setCrossmatchError(err.message || 'Error recording cross-match');
+    } finally {
+      setCrossmatchSubmitting(false);
+    }
+  };
 
   const fetchRequests = useCallback(async () => {
     setLoadingRequests(true);
@@ -486,6 +573,7 @@ export default function HospitalRequestDesk() {
                       <th scope="col">Priority</th>
                       <th scope="col">Status</th>
                       <th scope="col">Submitted</th>
+                      <th scope="col">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -513,10 +601,226 @@ export default function HospitalRequestDesk() {
                         <td className="date-cell">
                           {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : '—'}
                         </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn-details"
+                            data-testid={`btn-view-${req.requestCode}`}
+                            onClick={() => handleSelectRequest(req)}
+                          >
+                            Cross-match & Details
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {selectedRequest && (
+              <div className="crossmatch-panel-card" data-testid="crossmatch-panel">
+                <div className="crossmatch-panel-header">
+                  <div>
+                    <span className="hospital-badge-tag">REQUEST DETAILS &amp; CROSS-MATCH</span>
+                    <h3>Request {selectedRequest.requestCode} — {selectedRequest.patientName}</h3>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={handleCloseDetails}
+                  >
+                    Close Panel
+                  </button>
+                </div>
+
+                <div className="request-summary-grid">
+                  <div>
+                    <span className="summary-label">Patient Name:</span>
+                    <strong>{selectedRequest.patientName}</strong>
+                  </div>
+                  <div>
+                    <span className="summary-label">Blood Group:</span>
+                    <strong className="badge-group">{selectedRequest.patientBloodGroup}</strong>
+                  </div>
+                  <div>
+                    <span className="summary-label">Component:</span>
+                    <strong>{selectedRequest.component}</strong>
+                  </div>
+                  <div>
+                    <span className="summary-label">Units Requested:</span>
+                    <strong>{selectedRequest.unitsRequested}</strong>
+                  </div>
+                  <div>
+                    <span className="summary-label">Priority:</span>
+                    <strong className={`priority-text priority-${selectedRequest.priority.toLowerCase()}`}>
+                      {selectedRequest.priority}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="summary-label">Status:</span>
+                    <strong className={`status-tag status-tag-${selectedRequest.status.toLowerCase()}`}>
+                      {selectedRequest.status}
+                    </strong>
+                  </div>
+                </div>
+
+                <div
+                  className={`issuance-status-banner ${
+                    crossmatches.some((c) => c.result === 'COMPATIBLE')
+                      ? 'banner-ready'
+                      : crossmatches.length > 0
+                      ? 'banner-blocked'
+                      : 'banner-awaiting'
+                  }`}
+                  data-testid="issuance-banner"
+                >
+                  {crossmatches.some((c) => c.result === 'COMPATIBLE') ? (
+                    <div>
+                      <h4 className="banner-title">Ready for Issuance</h4>
+                      <p className="banner-desc">
+                        Compatible cross-match verified for unit(s):{' '}
+                        <strong>
+                          {crossmatches
+                            .filter((c) => c.result === 'COMPATIBLE')
+                            .map((c) => c.unitCode)
+                            .join(', ')}
+                        </strong>.
+                        This unit is cleared for patient issuance.
+                      </p>
+                    </div>
+                  ) : crossmatches.length > 0 ? (
+                    <div>
+                      <h4 className="banner-title">Issuance Blocked</h4>
+                      <p className="banner-desc">
+                        Cross-match result is INCOMPATIBLE. Issuance is strictly blocked until a compatible unit is verified.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <h4 className="banner-title">Issuance Blocked: Awaiting Cross-match</h4>
+                      <p className="banner-desc">
+                        A unit can only be marked ready for issuance after a cross-match result is recorded as compatible.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="crossmatch-records-section">
+                  <h4>Cross-match History</h4>
+                  {loadingCrossmatches ? (
+                    <p className="loading-text">Loading cross-match records...</p>
+                  ) : crossmatches.length === 0 ? (
+                    <p className="empty-subtext" data-testid="no-crossmatches-msg">
+                      No cross-match tests recorded for this request yet.
+                    </p>
+                  ) : (
+                    <div className="requests-table-container">
+                      <table className="requests-table crossmatch-table" aria-label="Cross-match Records">
+                        <thead>
+                          <tr>
+                            <th scope="col">Unit Code</th>
+                            <th scope="col">Unit Group</th>
+                            <th scope="col">Component</th>
+                            <th scope="col">Result</th>
+                            <th scope="col">Issuance Readiness</th>
+                            <th scope="col">Performed By</th>
+                            <th scope="col">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {crossmatches.map((cm) => (
+                            <tr key={cm.id} data-testid={`crossmatch-row-${cm.unitCode}`}>
+                              <td className="code-cell font-mono">{cm.unitCode}</td>
+                              <td><span className="badge-group">{cm.unitBloodGroup || '—'}</span></td>
+                              <td>{cm.component || '—'}</td>
+                              <td>
+                                <span className={`result-tag tag-${cm.result.toLowerCase()}`}>
+                                  {cm.result}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={`readiness-pill ${cm.readyForIssuance ? 'pill-ready' : 'pill-blocked'}`}>
+                                  {cm.readyForIssuance ? 'Ready for Issuance' : 'Blocked'}
+                                </span>
+                              </td>
+                              <td>{cm.performedBy?.fullName || 'Technician'}</td>
+                              <td>{cm.performedAt ? new Date(cm.performedAt).toLocaleString() : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {isLabStaff && (
+                  <div className="record-crossmatch-section">
+                    <h4>Record Cross-match Test</h4>
+                    <p className="section-desc">
+                      Verify ABO/Rh compatibility between patient sample and blood unit before recording test result.
+                    </p>
+
+                    {crossmatchSuccess && (
+                      <div className="alert-box alert-success" role="alert">
+                        {crossmatchSuccess}
+                      </div>
+                    )}
+
+                    {crossmatchError && (
+                      <div className="alert-box alert-error" role="alert">
+                        {crossmatchError}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleRecordCrossmatch} className="crossmatch-form" noValidate>
+                      <div className="form-row align-end">
+                        <div className="form-group flex-2">
+                          <label htmlFor="crossmatchUnitCode">
+                            Blood Unit Code <span className="req-star">*</span>
+                          </label>
+                          <input
+                            id="crossmatchUnitCode"
+                            data-testid="crossmatch-unit-input"
+                            type="text"
+                            className="form-input"
+                            placeholder="e.g. U-2026-000001"
+                            value={crossmatchUnitCode}
+                            onChange={(e) => setCrossmatchUnitCode(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group flex-1">
+                          <label htmlFor="crossmatchResult">
+                            Cross-match Result <span className="req-star">*</span>
+                          </label>
+                          <select
+                            id="crossmatchResult"
+                            data-testid="crossmatch-result-select"
+                            className="form-select"
+                            value={crossmatchResult}
+                            onChange={(e) => setCrossmatchResult(e.target.value)}
+                          >
+                            <option value="COMPATIBLE">Compatible</option>
+                            <option value="INCOMPATIBLE">Incompatible</option>
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <button
+                            type="submit"
+                            data-testid="btn-record-crossmatch"
+                            className="btn-primary"
+                            disabled={crossmatchSubmitting || !crossmatchUnitCode.trim()}
+                          >
+                            {crossmatchSubmitting ? 'Recording...' : 'Record Cross-match'}
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                )}
               </div>
             )}
           </div>

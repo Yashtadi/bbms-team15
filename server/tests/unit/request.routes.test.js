@@ -166,4 +166,147 @@ describe('TC-Req-01: request.routes access and error mapping (unit)', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('TC-Req-02: Cross-match & Issuance Endpoints (Unit)', () => {
+    describe('POST /api/blood-requests/:idOrCode/crossmatch', () => {
+      const validCrossmatchBody = {
+        unitCode: 'U-000001',
+        result: 'COMPATIBLE',
+      };
+
+      it('returns 401 without token', async () => {
+        const res = await request(app)
+          .post('/api/blood-requests/R-000001/crossmatch')
+          .send(validCrossmatchBody);
+        expect(res.status).toBe(401);
+      });
+
+      it.each(['HOSPITAL', 'DONOR'])(
+        'returns 403 for unauthorized role %s',
+        async (role) => {
+          const res = await request(app)
+            .post('/api/blood-requests/R-000001/crossmatch')
+            .set(authHeader(role))
+            .send(validCrossmatchBody);
+          expect(res.status).toBe(403);
+          expect(requestService.recordCrossmatch).not.toHaveBeenCalled();
+        }
+      );
+
+      it.each(['LAB_TECH', 'MANAGER', 'ADMIN'])(
+        'allows authorized role %s to record crossmatch (201)',
+        async (role) => {
+          requestService.recordCrossmatch.mockResolvedValue({
+            id: 1,
+            requestId: 1,
+            requestCode: 'R-000001',
+            unitCode: 'U-000001',
+            result: 'COMPATIBLE',
+            readyForIssuance: true,
+          });
+
+          const res = await request(app)
+            .post('/api/blood-requests/R-000001/crossmatch')
+            .set(authHeader(role))
+            .send(validCrossmatchBody);
+
+          expect(res.status).toBe(201);
+          expect(res.body.crossmatch.result).toBe('COMPATIBLE');
+          expect(res.body.crossmatch.readyForIssuance).toBe(true);
+        }
+      );
+
+      it('returns 400 when validation fails', async () => {
+        const err = new Error('Result must be COMPATIBLE or INCOMPATIBLE');
+        err.status = 400;
+        requestService.recordCrossmatch.mockRejectedValue(err);
+
+        const res = await request(app)
+          .post('/api/blood-requests/R-000001/crossmatch')
+          .set(authHeader('LAB_TECH'))
+          .send({ unitCode: 'U-000001', result: 'INVALID' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/result must be compatible or incompatible/i);
+      });
+
+      it('returns 404 when request or unit is not found', async () => {
+        const err = new Error("Blood unit 'U-999999' not found");
+        err.status = 404;
+        requestService.recordCrossmatch.mockRejectedValue(err);
+
+        const res = await request(app)
+          .post('/api/blood-requests/R-000001/crossmatch')
+          .set(authHeader('LAB_TECH'))
+          .send({ unitCode: 'U-999999', result: 'COMPATIBLE' });
+
+        expect(res.status).toBe(404);
+        expect(res.body.message).toMatch(/not found/i);
+      });
+
+      it('returns 422 when unit is clinically incompatible or ineligible', async () => {
+        const err = new Error('Unit blood group (B+) is clinically incompatible with patient blood group (A+)');
+        err.status = 422;
+        requestService.recordCrossmatch.mockRejectedValue(err);
+
+        const res = await request(app)
+          .post('/api/blood-requests/R-000001/crossmatch')
+          .set(authHeader('LAB_TECH'))
+          .send(validCrossmatchBody);
+
+        expect(res.status).toBe(422);
+        expect(res.body.message).toMatch(/clinically incompatible/i);
+      });
+    });
+
+    describe('GET /api/blood-requests/:idOrCode/crossmatches', () => {
+      it('returns 401 without token', async () => {
+        const res = await request(app).get('/api/blood-requests/R-000001/crossmatches');
+        expect(res.status).toBe(401);
+      });
+
+      it('returns 403 for DONOR', async () => {
+        const res = await request(app)
+          .get('/api/blood-requests/R-000001/crossmatches')
+          .set(authHeader('DONOR'));
+        expect(res.status).toBe(403);
+      });
+
+      it.each(['HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'])(
+        'allows %s to list crossmatches (200)',
+        async (role) => {
+          requestService.getCrossmatchesForRequest.mockResolvedValue({
+            request: { id: 1, requestCode: 'R-000001' },
+            crossmatches: [{ id: 1, unitCode: 'U-000001', result: 'COMPATIBLE', readyForIssuance: true }],
+          });
+
+          const res = await request(app)
+            .get('/api/blood-requests/R-000001/crossmatches')
+            .set(authHeader(role));
+
+          expect(res.status).toBe(200);
+          expect(res.body.crossmatches).toHaveLength(1);
+        }
+      );
+    });
+
+    describe('GET /api/blood-requests/:idOrCode/crossmatch/:unitCode/check', () => {
+      it('returns issuance readiness status (200)', async () => {
+        requestService.getBloodRequestById.mockResolvedValue({ id: 1, requestCode: 'R-000001' });
+        requestService.checkIssuanceReadiness.mockResolvedValue({
+          readyForIssuance: true,
+          unitCode: 'U-000001',
+          crossmatchId: 10,
+          result: 'COMPATIBLE',
+        });
+
+        const res = await request(app)
+          .get('/api/blood-requests/R-000001/crossmatch/U-000001/check')
+          .set(authHeader('LAB_TECH'));
+
+        expect(res.status).toBe(200);
+        expect(res.body.readyForIssuance).toBe(true);
+      });
+    });
+  });
 });

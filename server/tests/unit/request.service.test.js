@@ -3,6 +3,9 @@ const {
   submitBloodRequest,
   getBloodRequests,
   getBloodRequestById,
+  recordCrossmatch,
+  checkIssuanceReadiness,
+  getCrossmatchesForRequest,
 } = require('../../src/modules/request/request.service');
 
 describe('TC-Req-01: BBMS-F-040 Blood Request Service (Unit)', () => {
@@ -256,6 +259,288 @@ describe('TC-Req-01: BBMS-F-040 Blood Request Service (Unit)', () => {
 
       const result = await getBloodRequestById('R-000001', { id: 1, role: 'ADMIN' }, mockRepo);
       expect(result).toEqual(mockRequest);
+    });
+  });
+
+  describe('TC-Req-02: BBMS-F-041 Crossmatch & Issuance Readiness', () => {
+    const mockRequest = {
+      id: 1,
+      requestCode: 'R-000001',
+      hospitalUserId: 5,
+      patientName: 'Kavita Rao',
+      patientBloodGroup: 'A+',
+      component: 'PRBC',
+      unitsRequested: 1,
+      status: 'PENDING',
+    };
+
+    const futureDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+    const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const mockUnit = {
+      id: 10,
+      unit_code: 'U-000001',
+      blood_group: 'O-',
+      component: 'PRBC',
+      status: 'AVAILABLE',
+      expires_at: futureDate,
+    };
+
+    describe('recordCrossmatch', () => {
+      it('successfully records a COMPATIBLE crossmatch for compatible blood groups', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue(mockUnit),
+          createCrossmatch: jest.fn().mockResolvedValue({
+            id: 42,
+            performedAt: '2026-11-12T00:00:00.000Z',
+          }),
+        };
+
+        const result = await recordCrossmatch(
+          { idOrCode: 'R-000001', unitCode: 'U-000001', result: 'COMPATIBLE', performedBy: 3 },
+          mockRepo
+        );
+
+        expect(result).toMatchObject({
+          id: 42,
+          requestId: 1,
+          requestCode: 'R-000001',
+          unitId: 10,
+          unitCode: 'U-000001',
+          result: 'COMPATIBLE',
+          readyForIssuance: true,
+          performedBy: 3,
+        });
+
+        expect(mockRepo.createCrossmatch).toHaveBeenCalledWith({
+          requestId: 1,
+          unitId: 10,
+          result: 'COMPATIBLE',
+          performedBy: 3,
+        });
+      });
+
+      it('successfully records an INCOMPATIBLE crossmatch and marks readyForIssuance false', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue(mockUnit),
+          createCrossmatch: jest.fn().mockResolvedValue({
+            id: 43,
+            performedAt: '2026-11-12T00:00:00.000Z',
+          }),
+        };
+
+        const result = await recordCrossmatch(
+          { idOrCode: 'R-000001', unitCode: 'U-000001', result: 'INCOMPATIBLE', performedBy: 3 },
+          mockRepo
+        );
+
+        expect(result.result).toBe('INCOMPATIBLE');
+        expect(result.readyForIssuance).toBe(false);
+      });
+
+      it('throws 400 when idOrCode is missing', async () => {
+        await expect(
+          recordCrossmatch({ idOrCode: '', unitCode: 'U-000001', result: 'COMPATIBLE', performedBy: 3 })
+        ).rejects.toMatchObject({ status: 400, message: /request id or code is required/i });
+      });
+
+      it('throws 400 when unitCode is missing or empty', async () => {
+        await expect(
+          recordCrossmatch({ idOrCode: 'R-000001', unitCode: '   ', result: 'COMPATIBLE', performedBy: 3 })
+        ).rejects.toMatchObject({ status: 400, message: /unit code is required/i });
+      });
+
+      it('throws 400 when result is invalid', async () => {
+        await expect(
+          recordCrossmatch({ idOrCode: 'R-000001', unitCode: 'U-000001', result: 'MAYBE', performedBy: 3 })
+        ).rejects.toMatchObject({ status: 400, message: /result must be COMPATIBLE or INCOMPATIBLE/i });
+      });
+
+      it('throws 404 when request is not found', async () => {
+        const mockRepo = { findByIdOrCode: jest.fn().mockResolvedValue(null) };
+        await expect(
+          recordCrossmatch({ idOrCode: 'R-999999', unitCode: 'U-000001', result: 'COMPATIBLE', performedBy: 3 }, mockRepo)
+        ).rejects.toMatchObject({ status: 404, message: /not found/i });
+      });
+
+      it('throws 404 when unit is not found', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue(null),
+        };
+        await expect(
+          recordCrossmatch({ idOrCode: 'R-000001', unitCode: 'U-999999', result: 'COMPATIBLE', performedBy: 3 }, mockRepo)
+        ).rejects.toMatchObject({ status: 404, message: /not found/i });
+      });
+
+      it('throws 422 when request is CANCELLED or REJECTED', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue({ ...mockRequest, status: 'CANCELLED' }),
+          findUnitByCode: jest.fn().mockResolvedValue(mockUnit),
+        };
+        await expect(
+          recordCrossmatch({ idOrCode: 'R-000001', unitCode: 'U-000001', result: 'COMPATIBLE', performedBy: 3 }, mockRepo)
+        ).rejects.toMatchObject({ status: 422, message: /cancelled/i });
+      });
+
+      it('throws 422 when blood unit is in QUARANTINE', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue({ ...mockUnit, status: 'QUARANTINE' }),
+        };
+        await expect(
+          recordCrossmatch({ idOrCode: 'R-000001', unitCode: 'U-000001', result: 'COMPATIBLE', performedBy: 3 }, mockRepo)
+        ).rejects.toMatchObject({ status: 422, message: /quarantine/i });
+      });
+
+      it('throws 422 when blood unit is DISCARDED', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue({ ...mockUnit, status: 'DISCARDED' }),
+        };
+        await expect(
+          recordCrossmatch({ idOrCode: 'R-000001', unitCode: 'U-000001', result: 'COMPATIBLE', performedBy: 3 }, mockRepo)
+        ).rejects.toMatchObject({ status: 422, message: /discarded/i });
+      });
+
+      it('throws 422 when blood unit has expired', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue({ ...mockUnit, expires_at: pastDate }),
+        };
+        await expect(
+          recordCrossmatch({ idOrCode: 'R-000001', unitCode: 'U-000001', result: 'COMPATIBLE', performedBy: 3 }, mockRepo)
+        ).rejects.toMatchObject({ status: 422, message: /expired/i });
+      });
+
+      it('throws 422 when attempting to record COMPATIBLE for clinically incompatible ABO blood groups', async () => {
+        // Patient is A+, donor unit is B+
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest), // Patient is A+
+          findUnitByCode: jest.fn().mockResolvedValue({ ...mockUnit, blood_group: 'B+' }),
+        };
+        await expect(
+          recordCrossmatch({ idOrCode: 'R-000001', unitCode: 'U-000001', result: 'COMPATIBLE', performedBy: 3 }, mockRepo)
+        ).rejects.toMatchObject({
+          status: 422,
+          message: /clinically incompatible/i,
+        });
+      });
+
+      it('allows recording INCOMPATIBLE even when ABO blood groups are clinically incompatible', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue({ ...mockUnit, blood_group: 'B+' }),
+          createCrossmatch: jest.fn().mockResolvedValue({ id: 45, performedAt: '2026-11-12T00:00:00.000Z' }),
+        };
+
+        const result = await recordCrossmatch(
+          { idOrCode: 'R-000001', unitCode: 'U-000001', result: 'INCOMPATIBLE', performedBy: 3 },
+          mockRepo
+        );
+
+        expect(result.result).toBe('INCOMPATIBLE');
+        expect(result.readyForIssuance).toBe(false);
+      });
+    });
+
+    describe('checkIssuanceReadiness', () => {
+      it('blocks issuance when no crossmatch has been recorded', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue(mockUnit),
+          findLatestCrossmatch: jest.fn().mockResolvedValue(null),
+        };
+
+        const status = await checkIssuanceReadiness({ idOrCode: 'R-000001', unitCode: 'U-000001' }, mockRepo);
+        expect(status.readyForIssuance).toBe(false);
+        expect(status.error).toBe('NO_CROSSMATCH');
+        expect(status.message).toMatch(/issuance is blocked/i);
+      });
+
+      it('blocks issuance when latest crossmatch is INCOMPATIBLE', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue(mockUnit),
+          findLatestCrossmatch: jest.fn().mockResolvedValue({
+            id: 101,
+            result: 'INCOMPATIBLE',
+            performedAt: '2026-11-12T00:00:00.000Z',
+          }),
+        };
+
+        const status = await checkIssuanceReadiness({ idOrCode: 'R-000001', unitCode: 'U-000001' }, mockRepo);
+        expect(status.readyForIssuance).toBe(false);
+        expect(status.error).toBe('INCOMPATIBLE_CROSSMATCH');
+        expect(status.message).toMatch(/issuance is blocked/i);
+      });
+
+      it('blocks issuance when unit is expired even if crossmatch was COMPATIBLE', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue({ ...mockUnit, expires_at: pastDate }),
+          findLatestCrossmatch: jest.fn().mockResolvedValue({
+            id: 102,
+            result: 'COMPATIBLE',
+            performedAt: '2026-11-12T00:00:00.000Z',
+          }),
+        };
+
+        const status = await checkIssuanceReadiness({ idOrCode: 'R-000001', unitCode: 'U-000001' }, mockRepo);
+        expect(status.readyForIssuance).toBe(false);
+        expect(status.error).toBe('EXPIRED_UNIT');
+      });
+
+      it('permits issuance when crossmatch is COMPATIBLE and unit is active and unexpired', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          findUnitByCode: jest.fn().mockResolvedValue(mockUnit),
+          findLatestCrossmatch: jest.fn().mockResolvedValue({
+            id: 103,
+            result: 'COMPATIBLE',
+            performedAt: '2026-11-12T00:00:00.000Z',
+          }),
+        };
+
+        const status = await checkIssuanceReadiness({ idOrCode: 'R-000001', unitCode: 'U-000001' }, mockRepo);
+        expect(status.readyForIssuance).toBe(true);
+        expect(status.crossmatchId).toBe(103);
+        expect(status.result).toBe('COMPATIBLE');
+        expect(status.message).toMatch(/ready for issuance/i);
+      });
+    });
+
+    describe('getCrossmatchesForRequest', () => {
+      it('returns request and crossmatches list for authorized hospital', async () => {
+        const mockCrossmatches = [
+          {
+            id: 1,
+            unitCode: 'U-000001',
+            result: 'COMPATIBLE',
+            readyForIssuance: true,
+          },
+        ];
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue(mockRequest),
+          listCrossmatchesForRequest: jest.fn().mockResolvedValue(mockCrossmatches),
+        };
+
+        const result = await getCrossmatchesForRequest('R-000001', { id: 5, role: 'HOSPITAL' }, mockRepo);
+        expect(result.request).toEqual(mockRequest);
+        expect(result.crossmatches).toEqual(mockCrossmatches);
+      });
+
+      it('throws 403 when hospital tries to view another hospital crossmatches', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue({ ...mockRequest, hospitalUserId: 99 }),
+        };
+
+        await expect(
+          getCrossmatchesForRequest('R-000001', { id: 5, role: 'HOSPITAL' }, mockRepo)
+        ).rejects.toMatchObject({ status: 403 });
+      });
     });
   });
 });

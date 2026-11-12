@@ -1,9 +1,11 @@
 const defaultRepository = require('./request.repository');
+const { isBloodGroupCompatible } = require('./blood.compatibility');
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const VALID_COMPONENTS = ['WHOLE_BLOOD', 'PRBC', 'FFP', 'PLATELETS', 'CRYO'];
 const VALID_PRIORITIES = ['ROUTINE', 'URGENT', 'EMERGENCY'];
 const VALID_STATUSES = ['PENDING', 'RESERVED', 'ISSUED', 'REJECTED', 'CANCELLED'];
+const VALID_CROSSMATCH_RESULTS = ['COMPATIBLE', 'INCOMPATIBLE'];
 const MIN_UNITS = 1;
 const MAX_UNITS = 20;
 
@@ -180,15 +182,237 @@ async function getBloodRequestById(idOrCode, user, repository = defaultRepositor
   return request;
 }
 
+/**
+ * BBMS-F-041: Records a cross-match result between a blood request patient and a blood unit.
+ * Validates clinical compatibility, unit status (not quarantine, discarded, or expired).
+ * A unit can only be marked ready for issuance after a cross-match result is COMPATIBLE.
+ *
+ * @param {object} params
+ * @param {number|string} params.idOrCode Request ID or code (e.g. 'R-000001')
+ * @param {string} params.unitCode Blood unit code (e.g. 'U-000001')
+ * @param {'COMPATIBLE'|'INCOMPATIBLE'} params.result
+ * @param {number} params.performedBy User ID of technician
+ * @param {object} [repository]
+ * @returns {Promise<object>}
+ */
+async function recordCrossmatch({ idOrCode, unitCode, result, performedBy }, repository = defaultRepository) {
+  if (!idOrCode) {
+    const error = new Error('Request ID or code is required');
+    error.status = 400;
+    throw error;
+  }
+
+  if (!unitCode || typeof unitCode !== 'string' || !unitCode.trim()) {
+    const error = new Error('Unit code is required');
+    error.status = 400;
+    throw error;
+  }
+
+  const normalizedResult = typeof result === 'string' ? result.trim().toUpperCase() : '';
+  if (!VALID_CROSSMATCH_RESULTS.includes(normalizedResult)) {
+    const error = new Error(`Result must be ${VALID_CROSSMATCH_RESULTS.join(' or ')}`);
+    error.status = 400;
+    throw error;
+  }
+
+  const request = await repository.findByIdOrCode(idOrCode);
+  if (!request) {
+    const error = new Error(`Blood request '${idOrCode}' not found`);
+    error.status = 404;
+    throw error;
+  }
+
+  if (request.status === 'CANCELLED' || request.status === 'REJECTED') {
+    const error = new Error(`Cannot record cross-match for a ${request.status.toLowerCase()} blood request`);
+    error.status = 422;
+    throw error;
+  }
+
+  const unit = await repository.findUnitByCode(unitCode.trim());
+  if (!unit) {
+    const error = new Error(`Blood unit '${unitCode}' not found`);
+    error.status = 404;
+    throw error;
+  }
+
+  // Unit eligibility checks
+  if (unit.status === 'DISCARDED') {
+    const error = new Error(`Unit ${unit.unit_code} has been discarded and cannot be cross-matched`);
+    error.status = 422;
+    throw error;
+  }
+
+  if (unit.status === 'QUARANTINE') {
+    const error = new Error(`Unit ${unit.unit_code} is in quarantine and cannot be cross-matched`);
+    error.status = 422;
+    throw error;
+  }
+
+  if (unit.expires_at && new Date(unit.expires_at) < new Date()) {
+    const error = new Error(`Unit ${unit.unit_code} has expired and cannot be cross-matched`);
+    error.status = 422;
+    throw error;
+  }
+
+  // Clinical ABO/Rh compatibility rule check
+  const isCompatibleByGroup = isBloodGroupCompatible(request.patientBloodGroup, unit.blood_group, request.component);
+  if (normalizedResult === 'COMPATIBLE' && !isCompatibleByGroup) {
+    const error = new Error(
+      `Unit blood group (${unit.blood_group}) is clinically incompatible with patient blood group (${request.patientBloodGroup}) for component ${request.component}; cannot record as COMPATIBLE`
+    );
+    error.status = 422;
+    throw error;
+  }
+
+  const created = await repository.createCrossmatch({
+    requestId: request.id,
+    unitId: unit.id,
+    result: normalizedResult,
+    performedBy,
+  });
+
+  return {
+    id: created.id,
+    requestId: request.id,
+    requestCode: request.requestCode,
+    unitId: unit.id,
+    unitCode: unit.unit_code,
+    result: normalizedResult,
+    readyForIssuance: normalizedResult === 'COMPATIBLE',
+    performedBy,
+    performedAt: created.performedAt,
+  };
+}
+
+/**
+ * BBMS-F-041: Checks whether a specific blood unit is ready for issuance for a request.
+ * Issuance is blocked unless a cross-match result is COMPATIBLE.
+ *
+ * @param {object} params
+ * @param {number|string} params.idOrCode
+ * @param {string} params.unitCode
+ * @param {object} [repository]
+ * @returns {Promise<object>}
+ */
+async function checkIssuanceReadiness({ idOrCode, unitCode }, repository = defaultRepository) {
+  if (!idOrCode) {
+    const error = new Error('Request ID or code is required');
+    error.status = 400;
+    throw error;
+  }
+
+  if (!unitCode || typeof unitCode !== 'string' || !unitCode.trim()) {
+    const error = new Error('Unit code is required');
+    error.status = 400;
+    throw error;
+  }
+
+  const request = await repository.findByIdOrCode(idOrCode);
+  if (!request) {
+    const error = new Error(`Blood request '${idOrCode}' not found`);
+    error.status = 404;
+    throw error;
+  }
+
+  const unit = await repository.findUnitByCode(unitCode.trim());
+  if (!unit) {
+    const error = new Error(`Blood unit '${unitCode}' not found`);
+    error.status = 404;
+    throw error;
+  }
+
+  const crossmatch = await repository.findLatestCrossmatch(request.id, unit.id);
+
+  if (!crossmatch) {
+    return {
+      readyForIssuance: false,
+      error: 'NO_CROSSMATCH',
+      requestCode: request.requestCode,
+      unitCode: unit.unit_code,
+      message: `No cross-match test recorded for unit ${unit.unit_code} and request ${request.requestCode}. Issuance is blocked.`,
+    };
+  }
+
+  if (crossmatch.result !== 'COMPATIBLE') {
+    return {
+      readyForIssuance: false,
+      error: 'INCOMPATIBLE_CROSSMATCH',
+      requestCode: request.requestCode,
+      unitCode: unit.unit_code,
+      crossmatchId: crossmatch.id,
+      result: crossmatch.result,
+      performedAt: crossmatch.performedAt,
+      message: `Cross-match result for unit ${unit.unit_code} is ${crossmatch.result}. Issuance is blocked.`,
+    };
+  }
+
+  // Check unit availability
+  if (unit.status === 'DISCARDED' || unit.status === 'QUARANTINE') {
+    return {
+      readyForIssuance: false,
+      error: 'INVALID_UNIT_STATUS',
+      requestCode: request.requestCode,
+      unitCode: unit.unit_code,
+      crossmatchId: crossmatch.id,
+      result: 'COMPATIBLE',
+      message: `Unit ${unit.unit_code} is in status ${unit.status}. Issuance is blocked.`,
+    };
+  }
+
+  if (unit.expires_at && new Date(unit.expires_at) < new Date()) {
+    return {
+      readyForIssuance: false,
+      error: 'EXPIRED_UNIT',
+      requestCode: request.requestCode,
+      unitCode: unit.unit_code,
+      crossmatchId: crossmatch.id,
+      result: 'COMPATIBLE',
+      message: `Unit ${unit.unit_code} has expired. Issuance is blocked.`,
+    };
+  }
+
+  return {
+    readyForIssuance: true,
+    requestCode: request.requestCode,
+    unitCode: unit.unit_code,
+    crossmatchId: crossmatch.id,
+    result: 'COMPATIBLE',
+    performedAt: crossmatch.performedAt,
+    message: `Unit ${unit.unit_code} is cross-match compatible with patient ${request.patientName} and ready for issuance.`,
+  };
+}
+
+/**
+ * BBMS-F-041: Retrieves all cross-match records for a blood request.
+ * Enforces hospital tenancy.
+ *
+ * @param {number|string} idOrCode
+ * @param {object} user
+ * @param {object} [repository]
+ * @returns {Promise<Array<object>>}
+ */
+async function getCrossmatchesForRequest(idOrCode, user, repository = defaultRepository) {
+  const request = await getBloodRequestById(idOrCode, user, repository);
+  const crossmatches = await repository.listCrossmatchesForRequest(request.id);
+  return {
+    request,
+    crossmatches,
+  };
+}
+
 module.exports = {
   VALID_BLOOD_GROUPS,
   VALID_COMPONENTS,
   VALID_PRIORITIES,
   VALID_STATUSES,
+  VALID_CROSSMATCH_RESULTS,
   MIN_UNITS,
   MAX_UNITS,
   validateBloodRequestInput,
   submitBloodRequest,
   getBloodRequests,
   getBloodRequestById,
+  recordCrossmatch,
+  checkIssuanceReadiness,
+  getCrossmatchesForRequest,
 };

@@ -79,4 +79,81 @@ router.get('/:idOrCode', requireRole('HOSPITAL', 'MANAGER', 'ADMIN', 'LAB_TECH')
   }
 });
 
+/**
+ * BBMS-F-041: Record cross-match result for a blood request and blood unit.
+ * POST /api/blood-requests/:idOrCode/crossmatch -> 201 { crossmatch }
+ * Roles: LAB_TECH, MANAGER, ADMIN (others get 403).
+ */
+router.post('/:idOrCode/crossmatch', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const { unitCode, result } = req.body;
+    const crossmatch = await requestService.recordCrossmatch({
+      idOrCode: req.params.idOrCode,
+      unitCode,
+      result,
+      performedBy: req.user.id,
+    });
+
+    return res.status(201).json({ crossmatch });
+  } catch (error) {
+    if (error.status === 400 || error.status === 404 || error.status === 422) {
+      return res.status(error.status).json({ message: error.message });
+    }
+
+    return res.status(500).json({
+      message: 'Failed to record cross-match',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * BBMS-F-041: List all cross-matches recorded for a blood request.
+ * GET /api/blood-requests/:idOrCode/crossmatches -> 200 { request, crossmatches: [...] }
+ * Roles: HOSPITAL, LAB_TECH, MANAGER, ADMIN
+ */
+router.get('/:idOrCode/crossmatches', requireRole('HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const result = await requestService.getCrossmatchesForRequest(req.params.idOrCode, req.user);
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error.status === 404 || error.status === 403) {
+      return res.status(error.status).json({ message: error.message });
+    }
+
+    return res.status(500).json({
+      message: 'Failed to retrieve cross-matches',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * BBMS-F-041: Check whether a specific blood unit is ready for issuance for this request.
+ * GET /api/blood-requests/:idOrCode/crossmatch/:unitCode/check -> 200 { readyForIssuance: boolean, ... }
+ * Roles: HOSPITAL, LAB_TECH, MANAGER, ADMIN
+ */
+router.get('/:idOrCode/crossmatch/:unitCode/check', requireRole('HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    // Check tenancy first if user is HOSPITAL
+    await requestService.getBloodRequestById(req.params.idOrCode, req.user);
+
+    const check = await requestService.checkIssuanceReadiness({
+      idOrCode: req.params.idOrCode,
+      unitCode: req.params.unitCode,
+    });
+
+    return res.status(200).json(check);
+  } catch (error) {
+    if (error.status === 404 || error.status === 403 || error.status === 400) {
+      return res.status(error.status).json({ message: error.message });
+    }
+
+    return res.status(500).json({
+      message: 'Failed to check issuance readiness',
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

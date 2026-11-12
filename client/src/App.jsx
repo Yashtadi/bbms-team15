@@ -21,7 +21,7 @@ import './components/DonorRegistrationForm.css';
 const LAB_STAFF_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 const INVENTORY_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
 const UNIT_LABEL_ROLES = ['LAB_TECH', 'MANAGER', 'ADMIN'];
-const REQUEST_ROLES = ['HOSPITAL', 'MANAGER', 'ADMIN'];
+const REQUEST_ROLES = ['HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'];
 
 export default function App({ initialTab } = {}) {
   const [session, setSession] = useState(getSession);
@@ -37,7 +37,7 @@ export default function App({ initialTab } = {}) {
   const canSeeInventory = !isCollector && INVENTORY_ROLES.includes(role);
   const canSeeLabels = isCollector || UNIT_LABEL_ROLES.includes(role);
   const canSeeDonors = role === 'DONOR';
-  const canSeeRequests = REQUEST_ROLES.includes(role);
+  const canSeeRequests = role === 'HOSPITAL' || (!isCollector && REQUEST_ROLES.includes(role));
 
   // Default landing tab per role & persona
   const getDefaultTab = () => {

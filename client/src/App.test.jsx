@@ -78,6 +78,13 @@ describe('App', () => {
     expect(screen.getByRole('tab', { name: /Blood Requests/i })).toBeInTheDocument();
   });
 
+  it('TC-Req-02: shows Blood Requests tab to central lab tech for cross-matching', () => {
+    logInAs('LAB_TECH', 'labtech@bbms.test', 'Labtech 1');
+    render(<App />);
+
+    expect(screen.getByRole('tab', { name: /Blood Requests/i })).toBeInTheDocument();
+  });
+
   it.each(['DONOR'])('TC-Req-01: hides Blood Requests tab from %s', (role) => {
     logInAs(role);
     render(<App />);
