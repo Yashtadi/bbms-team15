@@ -167,3 +167,7 @@ A unified 3-step chair-side wizard replacing disconnected forms:
 ### 3. Hospital Blood Request & Cross-match Desk (`HOSPITAL`, `LAB_TECH`, `MANAGER`, `ADMIN`)
 * **Request Submission (F-040):** Hospital staff submit patient transfusion requests specifying recipient name, blood group, component, units requested (1–20), priority (`ROUTINE`, `URGENT`, `EMERGENCY`), and optional required-by time. Each request is assigned a sequential ID (`R-XXXXXX`, status `PENDING`).
 * **Cross-matching & Issuance Readiness (F-041):** Laboratory technicians test candidate blood units against patient requests. Units in quarantine, discarded, or expired states cannot be cross-matched. Enforces clinical ABO/Rh compatibility rules for red blood cells (PRBC, WHOLE_BLOOD) and plasma (FFP). A unit is strictly blocked from issuance until a cross-match result is recorded as `COMPATIBLE`.
+
+### 4. Security & Encryption at Rest (SR-003)
+* **AES-256-GCM Encryption:** Sensitive personally identifiable information (PII) and medical records (`medical_history`, `address`, `deferral_reason`, `follow_up_reason`) are encrypted at rest in MySQL using authenticated AES-256-GCM with unique 96-bit IVs and 128-bit authentication tags (`enc:v1:<iv>:<tag>:<ciphertext>`).
+* **Transparent Decryption:** Authorized application services, portal views, and REST endpoints transparently decrypt records for clinical use. Legacy unencrypted rows are seamlessly read without errors.
