@@ -7,6 +7,8 @@ Software Engineering mini project, PES University.
 
 **Stack:** React (Vite) · Node.js + Express · MySQL
 
+**Full project documentation:** [docs/PROJECT-GUIDE.md](docs/PROJECT-GUIDE.md)
+
 ---
 
 ## Sprint 1 Demo Video
@@ -31,7 +33,7 @@ cd server
 npm install
 # Ensure MySQL is running and server/.env is configured
 npm run db:setup     # creates database, runs schema.sql and seed.sql
-npm start            # runs backend on http://localhost:5000
+npm start            # runs backend on http://localhost:4000
 ```
 
 ### 2. Client Setup
@@ -191,7 +193,7 @@ components or priorities (F-044).
 
 ## Core UI Workflows
 
-### 1. Frontline Blood Collection Desk (`HOSPITAL`, `ADMIN`)
+### 1. Frontline Blood Collection Desk (collector `LAB_TECH`, `ADMIN`)
 A unified 3-step chair-side wizard replacing disconnected forms:
 1. **Donor Check-in:** Search existing donors by Donor ID / Phone, or register a new walk-in donor (`D-XXXXXX`).
 2. **Draw & Vitals:** Captures collection parameters (Whole Blood / Apheresis) and chair-side pre-vitals (BP, pulse, Hb). Automatically evaluates donor eligibility against clinical criteria (Hb ≥ 12.5 g/dL, age 18–65, 90-day cooldown) before initializing the collection session.
