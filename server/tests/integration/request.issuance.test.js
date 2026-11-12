@@ -129,10 +129,10 @@ describe('TC-Req-04: BBMS-F-043 chain of custody (integration)', () => {
     expect(auditRows).toHaveLength(1);
     expect(auditRows[0].user_id).toBe(2);
     expect(auditRows[0].details).toMatchObject({
+      issuanceId: issued.body.issuance.id,
       requestId,
       requestCode,
       unitId,
-      unitCode,
       crossmatchId: issued.body.issuance.crossmatchId,
       receivedBy: 'City General Hospital Ward 4',
     });
