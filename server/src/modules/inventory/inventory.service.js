@@ -1,4 +1,5 @@
 const inventoryRepository = require('./inventory.repository');
+const defaultNotificationGateway = require('./notification.gateway');
 const { formatUnitCode, normaliseUnitCode, buildUnitRecord } = require('../collection/collection.service');
 const { isBloodGroupCompatible } = require('../request/blood.compatibility');
 
@@ -378,6 +379,122 @@ async function suggestFefoAllocation({
   };
 }
 
+/**
+ * BBMS-F-034: Generates alerts when available units of a blood group fall below a configurable safety threshold.
+ * Invokes the notification gateway (mocked) and returns in-app alerts for the manager dashboard.
+ * @param {object} options
+ * @param {number|string} [options.threshold=3] (configurable safety threshold, default 3)
+ * @param {string} [options.bloodGroup] (optional specific blood group filter)
+ * @param {Date} [options.now=new Date()]
+ * @param {object} [options.repository=inventoryRepository]
+ * @param {object} [options.gateway=defaultNotificationGateway]
+ * @returns {Promise<{ generatedAt: string, threshold: number, alertCount: number, alerts: Array<object>, stockByGroup: Array<object> }>}
+ */
+async function getLowStockAlerts({
+  threshold = 3,
+  bloodGroup = null,
+  now = new Date(),
+  repository = inventoryRepository,
+  gateway = defaultNotificationGateway,
+} = {}) {
+  const parsedThreshold = Number(threshold);
+  if (!Number.isInteger(parsedThreshold) || parsedThreshold < 1 || parsedThreshold > 100) {
+    throw httpError(400, 'Safety threshold must be a whole number between 1 and 100', {
+      code: 'INVALID_THRESHOLD',
+      errors: { threshold: 'Safety threshold must be a whole number between 1 and 100' },
+    });
+  }
+
+  if (bloodGroup !== null && bloodGroup !== undefined && bloodGroup !== '') {
+    const rawGroup = String(bloodGroup).trim().toUpperCase();
+    if (!VALID_BLOOD_GROUPS.includes(rawGroup)) {
+      throw httpError(400, `Blood group must be one of: ${VALID_BLOOD_GROUPS.join(', ')}`, {
+        code: 'INVALID_BLOOD_GROUP',
+        errors: { bloodGroup: `Blood group must be one of: ${VALID_BLOOD_GROUPS.join(', ')}` },
+      });
+    }
+  }
+
+  const rows = await repository.summarizeStockByBloodGroup();
+  const countsMap = new Map();
+  rows.forEach((row) => {
+    countsMap.set(row.blood_group, {
+      units: Number(row.units),
+      volumeMl: Number(row.volume_ml),
+    });
+  });
+
+  const targetGroups = bloodGroup
+    ? [String(bloodGroup).trim().toUpperCase()]
+    : VALID_BLOOD_GROUPS;
+
+  const stockByGroup = targetGroups.map((group) => {
+    const data = countsMap.get(group) || { units: 0, volumeMl: 0 };
+    return {
+      bloodGroup: group,
+      availableUnits: data.units,
+      volumeMl: data.volumeMl,
+      threshold: parsedThreshold,
+      isLow: data.units < parsedThreshold,
+      deficit: Math.max(0, parsedThreshold - data.units),
+    };
+  });
+
+  const alerts = [];
+  for (const item of stockByGroup) {
+    if (item.availableUnits < parsedThreshold) {
+      const urgency = item.availableUnits === 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK';
+      const alert = {
+        bloodGroup: item.bloodGroup,
+        availableUnits: item.availableUnits,
+        volumeMl: item.volumeMl,
+        threshold: parsedThreshold,
+        deficit: item.deficit,
+        urgency,
+        message:
+          urgency === 'OUT_OF_STOCK'
+            ? `Critical shortage: Blood group ${item.bloodGroup} is OUT OF STOCK (0 units available, safety threshold is ${parsedThreshold})`
+            : `Low stock alert: Blood group ${item.bloodGroup} has ${item.availableUnits} unit${item.availableUnits === 1 ? '' : 's'} available (below safety threshold of ${parsedThreshold})`,
+      };
+
+      alerts.push(alert);
+
+      // Trigger the notification gateway (mocked per SRS/issue notes)
+      if (gateway && typeof gateway.sendLowStockAlert === 'function') {
+        try {
+          await gateway.sendLowStockAlert({
+            bloodGroup: alert.bloodGroup,
+            availableUnits: alert.availableUnits,
+            threshold: parsedThreshold,
+          });
+        } catch {
+          // Non-fatal gateway notification error
+        }
+      }
+    }
+  }
+
+  // Sort: OUT_OF_STOCK first, then availableUnits ASC, then bloodGroup
+  alerts.sort((a, b) => {
+    if (a.urgency !== b.urgency) {
+      return a.urgency === 'OUT_OF_STOCK' ? -1 : 1;
+    }
+    if (a.availableUnits !== b.availableUnits) {
+      return a.availableUnits - b.availableUnits;
+    }
+    return a.bloodGroup.localeCompare(b.bloodGroup);
+  });
+
+  return {
+    generatedAt: now.toISOString(),
+    threshold: parsedThreshold,
+    totalGroupsMonitored: targetGroups.length,
+    alertCount: alerts.length,
+    alerts,
+    stockByGroup,
+  };
+}
+
 module.exports = {
   getStockSummary,
   COMPONENT_SPECS,
@@ -389,4 +506,5 @@ module.exports = {
   getLineage,
   getExpiryAlerts,
   suggestFefoAllocation,
+  getLowStockAlerts,
 };

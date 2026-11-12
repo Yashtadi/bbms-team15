@@ -243,3 +243,91 @@ describe('TC-Inv-04 (BBMS-F-033) FEFO allocation service', () => {
     expect(result.allCompatibleUnits).toEqual([]);
   });
 });
+
+describe('TC-Inv-05 (BBMS-F-034) low-stock alerts service', () => {
+  const now = new Date('2026-11-03T12:00:00.000Z');
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('rejects invalid threshold values with 400', async () => {
+    await expect(inventoryService.getLowStockAlerts({ threshold: 0, now })).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+    await expect(inventoryService.getLowStockAlerts({ threshold: -5, now })).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+    await expect(inventoryService.getLowStockAlerts({ threshold: 'bad', now })).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+    await expect(inventoryService.getLowStockAlerts({ threshold: 101, now })).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+  });
+
+  it('detects low stock and zero stock (OUT_OF_STOCK), invokes notification gateway, and calculates deficits', async () => {
+    // Only A+ (2 units) and O- (5 units) are present in inventory
+    const mockStock = [
+      { blood_group: 'A+', units: 2, volume_ml: 440 },
+      { blood_group: 'O-', units: 5, volume_ml: 1200 },
+    ];
+    inventoryRepository.summarizeStockByBloodGroup.mockResolvedValue(mockStock);
+
+    const mockGateway = {
+      sendLowStockAlert: jest.fn().mockResolvedValue({ success: true }),
+    };
+
+    const result = await inventoryService.getLowStockAlerts({
+      threshold: 3,
+      now,
+      gateway: mockGateway,
+    });
+
+    expect(result.threshold).toBe(3);
+    // 6 groups have 0 units (OUT_OF_STOCK), 1 group (A+) has 2 units < 3 (LOW_STOCK), O- has 5 units >= 3 (safe)
+    expect(result.alertCount).toBe(7);
+
+    // OUT_OF_STOCK groups must appear first
+    const firstAlert = result.alerts[0];
+    expect(firstAlert.urgency).toBe('OUT_OF_STOCK');
+    expect(firstAlert.availableUnits).toBe(0);
+    expect(firstAlert.deficit).toBe(3);
+
+    // A+ alert
+    const aPlusAlert = result.alerts.find((a) => a.bloodGroup === 'A+');
+    expect(aPlusAlert).toBeDefined();
+    expect(aPlusAlert.availableUnits).toBe(2);
+    expect(aPlusAlert.deficit).toBe(1);
+    expect(aPlusAlert.urgency).toBe('LOW_STOCK');
+
+    // O- should NOT be in alerts
+    const oMinusAlert = result.alerts.find((a) => a.bloodGroup === 'O-');
+    expect(oMinusAlert).toBeUndefined();
+
+    // Gateway was triggered for each alert
+    expect(mockGateway.sendLowStockAlert).toHaveBeenCalledTimes(7);
+    expect(mockGateway.sendLowStockAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ bloodGroup: 'A+', availableUnits: 2, threshold: 3 })
+    );
+  });
+
+  it('filters by single blood group when bloodGroup parameter is specified', async () => {
+    inventoryRepository.summarizeStockByBloodGroup.mockResolvedValue([
+      { blood_group: 'A+', units: 1, volume_ml: 220 },
+    ]);
+
+    const result = await inventoryService.getLowStockAlerts({
+      threshold: 3,
+      bloodGroup: 'A+',
+      now,
+    });
+
+    expect(result.totalGroupsMonitored).toBe(1);
+    expect(result.alertCount).toBe(1);
+    expect(result.alerts[0].bloodGroup).toBe('A+');
+    expect(result.alerts[0].availableUnits).toBe(1);
+  });
+});

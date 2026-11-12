@@ -344,3 +344,26 @@
   color: #fbbf24;
 }
 
+/* BBMS-F-034: Low-stock alerts styling */
+.low-stock-alerts-card {
+  border-left: 4px solid #ef4444;
+}
+
+.deficit-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+[data-theme="dark"] .deficit-badge {
+  background: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+

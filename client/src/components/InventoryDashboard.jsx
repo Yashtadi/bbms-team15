@@ -32,21 +32,25 @@ async function getJson(path) {
   return data;
 }
 
-async function loadInventory(filters, thresholdDays = 3) {
+async function loadInventory(filters, thresholdDays = 3, lowStockThreshold = 3) {
   // URLSearchParams encodes "A+" as "A%2B"; a raw "+" in a URL would be read as a space.
   const params = new URLSearchParams();
   if (filters.bloodGroup) params.set('bloodGroup', filters.bloodGroup);
   if (filters.component) params.set('component', filters.component);
   const query = params.toString();
 
-  const [summary, list, alertsData] = await Promise.all([
+  const [summary, list, alertsData, lowStockData] = await Promise.all([
     getJson('/api/inventory/summary'),
     getJson(`/api/inventory${query ? `?${query}` : ''}`),
     getJson(`/api/inventory/alerts/expiry?thresholdDays=${thresholdDays}`).catch(() => ({ alertCount: 0, alerts: [] })),
+    getJson(`/api/inventory/alerts/low-stock?threshold=${lowStockThreshold}`).catch(() => ({ alertCount: 0, alerts: [], stockByGroup: [] })),
   ]);
 
   const alerts = Array.isArray(alertsData?.alerts) ? alertsData.alerts : [];
   const alertCount = typeof alertsData?.alertCount === 'number' ? alertsData.alertCount : alerts.length;
+
+  const lowStockAlerts = Array.isArray(lowStockData?.alerts) ? lowStockData.alerts : [];
+  const lowStockCount = typeof lowStockData?.alertCount === 'number' ? lowStockData.alertCount : lowStockAlerts.length;
 
   return {
     summary,
@@ -55,6 +59,12 @@ async function loadInventory(filters, thresholdDays = 3) {
       thresholdDays: alertsData?.thresholdDays || thresholdDays,
       alertCount,
       alerts,
+    },
+    lowStockAlerts: {
+      threshold: lowStockData?.threshold || lowStockThreshold,
+      alertCount: lowStockCount,
+      alerts: lowStockAlerts,
+      stockByGroup: Array.isArray(lowStockData?.stockByGroup) ? lowStockData.stockByGroup : [],
     },
   };
 }
@@ -75,6 +85,7 @@ function daysLeft(value) {
 export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }) {
   const [filters, setFilters] = useState({ bloodGroup: '', component: '' });
   const [thresholdDays, setThresholdDays] = useState(3);
+  const [lowStockThreshold, setLowStockThreshold] = useState(3);
   const [inventory, setInventory] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState('');
@@ -108,7 +119,7 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
 
     async function poll() {
       try {
-        const next = await loadInventory(filters, thresholdDays);
+        const next = await loadInventory(filters, thresholdDays, lowStockThreshold);
         if (!active) return;
         setInventory(next);
         setLastUpdated(new Date());
@@ -125,7 +136,7 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
       active = false;
       clearTimeout(timerId);
     };
-  }, [filters, thresholdDays, pollIntervalMs]);
+  }, [filters, thresholdDays, lowStockThreshold, pollIntervalMs]);
 
   const updateFilter = (name) => (e) => {
     const { value } = e.target;
@@ -136,12 +147,17 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
     setThresholdDays(Number(e.target.value));
   };
 
+  const handleLowStockThresholdChange = (e) => {
+    setLowStockThreshold(Number(e.target.value));
+  };
+
   const counts = {};
   inventory?.summary.stock.forEach((entry) => {
     counts[`${entry.bloodGroup}|${entry.component}`] = entry.units;
   });
   const totals = inventory?.summary.totals;
   const expiryAlerts = inventory?.expiryAlerts || { thresholdDays, alertCount: 0, alerts: [] };
+  const lowStockAlerts = inventory?.lowStockAlerts || { threshold: lowStockThreshold, alertCount: 0, alerts: [], stockByGroup: [] };
 
   return (
     <section className="inventory-dashboard registration-form-container">
@@ -195,6 +211,15 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
                 style={{ color: expiryAlerts.alertCount > 0 ? '#ef4444' : 'inherit' }}
               >
                 {expiryAlerts.alertCount}
+              </strong>
+            </div>
+            <div className="inventory-stat">
+              <span className="inventory-stat-label">Low-stock groups</span>
+              <strong
+                data-testid="stat-low-stock-groups"
+                style={{ color: lowStockAlerts.alertCount > 0 ? '#ef4444' : 'inherit' }}
+              >
+                {lowStockAlerts.alertCount}
               </strong>
             </div>
           </div>
@@ -263,6 +288,76 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
                               : `${alert.daysRemaining} days left (${alert.urgency})`}
                           </span>
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* BBMS-F-034 / TC-Inv-05: Low-stock alerts visible on manager dashboard */}
+          <div className="inventory-card low-stock-alerts-card" data-testid="low-stock-alerts-card">
+            <div className="expiry-alerts-header">
+              <div>
+                <h3 id="low-stock-alerts-heading">Low-Stock Blood Group Alerts</h3>
+                <p className="subtitle">
+                  BBMS-F-034 · Alert blood bank manager when blood group stock falls below safety threshold
+                </p>
+              </div>
+              <div className="expiry-threshold-control">
+                <label htmlFor="low-stock-threshold-select">Safety threshold</label>
+                <select
+                  id="low-stock-threshold-select"
+                  data-testid="low-stock-threshold-select"
+                  value={lowStockThreshold}
+                  onChange={handleLowStockThresholdChange}
+                >
+                  <option value={1}>Below 1 unit</option>
+                  <option value={2}>Below 2 units</option>
+                  <option value={3}>Below 3 units (Default)</option>
+                  <option value={5}>Below 5 units</option>
+                  <option value={10}>Below 10 units</option>
+                </select>
+              </div>
+            </div>
+
+            {lowStockAlerts.alertCount === 0 ? (
+              <p className="inventory-muted" data-testid="no-low-stock-alerts">
+                All blood groups meet or exceed the safety threshold of {lowStockThreshold} unit{lowStockThreshold > 1 ? 's' : ''}. Safe inventory levels.
+              </p>
+            ) : (
+              <div className="inventory-table-wrap">
+                <table className="inventory-table" aria-labelledby="low-stock-alerts-heading" data-testid="low-stock-alerts-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Blood group</th>
+                      <th scope="col">Available units</th>
+                      <th scope="col">Total volume</th>
+                      <th scope="col">Safety threshold</th>
+                      <th scope="col">Deficit</th>
+                      <th scope="col">Urgency</th>
+                      <th scope="col">Status message</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lowStockAlerts.alerts.map((alert) => (
+                      <tr key={alert.bloodGroup} data-testid={`low-stock-row-${alert.bloodGroup}`}>
+                        <td><strong>{alert.bloodGroup}</strong></td>
+                        <td>{alert.availableUnits} unit{alert.availableUnits === 1 ? '' : 's'}</td>
+                        <td>{alert.volumeMl ? `${alert.volumeMl} ml` : '0 ml'}</td>
+                        <td>{alert.threshold} units</td>
+                        <td>
+                          <span className="deficit-badge">
+                            +{alert.deficit} needed
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`urgency-pill ${alert.urgency === 'OUT_OF_STOCK' ? 'urgency-critical' : 'urgency-warning'}`}>
+                            {alert.urgency === 'OUT_OF_STOCK' ? 'Out of stock' : 'Low stock'}
+                          </span>
+                        </td>
+                        <td className="inventory-muted">{alert.message}</td>
                       </tr>
                     ))}
                   </tbody>

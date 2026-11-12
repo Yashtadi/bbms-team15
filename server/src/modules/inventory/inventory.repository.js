@@ -259,6 +259,25 @@ async function findAvailableForAllocation({ component = null } = {}) {
   return rows;
 }
 
+/**
+ * BBMS-F-034: Aggregates total releasable stock units per blood group.
+ * @returns {Promise<Array<{ blood_group: string, units: number, volume_ml: number }>>}
+ */
+async function summarizeStockByBloodGroup() {
+  const { where, values } = releasableStockFilter();
+  const [rows] = await db.query(
+    `SELECT bu.blood_group,
+            COUNT(*) AS units,
+            SUM(bu.volume_ml) AS volume_ml
+     FROM blood_units bu
+     WHERE ${where}
+     GROUP BY bu.blood_group
+     ORDER BY bu.blood_group`,
+    values
+  );
+  return rows;
+}
+
 module.exports = {
   listAvailable,
   summarizeAvailable,
@@ -267,4 +286,5 @@ module.exports = {
   separateUnit,
   findExpiringUnits,
   findAvailableForAllocation,
+  summarizeStockByBloodGroup,
 };

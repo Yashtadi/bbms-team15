@@ -113,3 +113,25 @@ describe('TC-Inv-04 (BBMS-F-033) FEFO allocation repository query', () => {
     expect(result).toBe(fakeRows);
   });
 });
+
+describe('TC-Inv-05 (BBMS-F-034) low-stock repository query', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('aggregates available stock grouped by blood group', async () => {
+    const fakeRows = [
+      { blood_group: 'A+', units: 2, volume_ml: '440' },
+      { blood_group: 'O-', units: 2, volume_ml: '480' },
+    ];
+    db.query.mockResolvedValue([fakeRows]);
+
+    const result = await inventoryRepository.summarizeStockByBloodGroup();
+
+    const [sql] = db.query.mock.calls[0];
+    expect(sql).toContain("bu.status = 'AVAILABLE'");
+    expect(sql).toContain('bu.expires_at > NOW()');
+    expect(sql).toContain('GROUP BY bu.blood_group');
+    expect(sql).toContain('COUNT(*) AS units');
+    expect(sql).toContain('SUM(bu.volume_ml) AS volume_ml');
+    expect(result).toBe(fakeRows);
+  });
+});

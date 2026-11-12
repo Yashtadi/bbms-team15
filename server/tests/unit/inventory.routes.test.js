@@ -300,3 +300,75 @@ describe('TC-Inv-04 (BBMS-F-033) FEFO allocation routes', () => {
     expect(response.body.code).toBe('INVALID_BLOOD_GROUP');
   });
 });
+
+describe('TC-Inv-05 (BBMS-F-034) low-stock alerts routes', () => {
+  let app;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/inventory', inventoryRouter);
+    jest.clearAllMocks();
+  });
+
+  it('requires authentication (401)', async () => {
+    const response = await request(app).get('/api/inventory/alerts/low-stock');
+    expect(response.status).toBe(401);
+  });
+
+  it.each(['HOSPITAL', 'DONOR'])('blocks %s from low-stock alerts (403)', async (role) => {
+    const response = await request(app)
+      .get('/api/inventory/alerts/low-stock')
+      .set(authHeader(role));
+    expect(response.status).toBe(403);
+  });
+
+  it.each(['LAB_TECH', 'MANAGER', 'ADMIN'])(
+    'returns low-stock alerts to %s with default threshold of 3 (200)',
+    async (role) => {
+      const mockAlerts = {
+        threshold: 3,
+        alertCount: 1,
+        alerts: [{ bloodGroup: 'B+', availableUnits: 0, urgency: 'OUT_OF_STOCK' }],
+      };
+      inventoryService.getLowStockAlerts.mockResolvedValue(mockAlerts);
+
+      const response = await request(app)
+        .get('/api/inventory/alerts/low-stock')
+        .set(authHeader(role));
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(mockAlerts);
+      expect(inventoryService.getLowStockAlerts).toHaveBeenCalledWith({ threshold: 3, bloodGroup: undefined });
+    }
+  );
+
+  it('supports configurable threshold query parameters (threshold and minUnits)', async () => {
+    inventoryService.getLowStockAlerts.mockResolvedValue({ alertCount: 0, alerts: [] });
+
+    await request(app)
+      .get('/api/inventory/alerts/low-stock?threshold=5&bloodGroup=O-')
+      .set(authHeader('MANAGER'));
+    expect(inventoryService.getLowStockAlerts).toHaveBeenCalledWith({ threshold: '5', bloodGroup: 'O-' });
+
+    await request(app)
+      .get('/api/inventory/low-stock-alerts?minUnits=2')
+      .set(authHeader('MANAGER'));
+    expect(inventoryService.getLowStockAlerts).toHaveBeenCalledWith({ threshold: '2', bloodGroup: undefined });
+  });
+
+  it('returns 400 when service rejects an invalid threshold', async () => {
+    const err = Object.assign(new Error('Safety threshold must be a whole number between 1 and 100'), {
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+    inventoryService.getLowStockAlerts.mockRejectedValue(err);
+
+    const response = await request(app)
+      .get('/api/inventory/alerts/low-stock?threshold=-1')
+      .set(authHeader('MANAGER'));
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('INVALID_THRESHOLD');
+  });
+});

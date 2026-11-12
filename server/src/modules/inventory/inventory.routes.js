@@ -52,6 +52,27 @@ router.get('/alerts/expiry', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), handle
 router.get('/expiry-alerts', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), handleExpiryAlerts);
 
 /**
+ * BBMS-F-034: Low-stock alerts for blood groups falling below safety threshold
+ * GET /api/inventory/alerts/low-stock?threshold=3
+ * GET /api/inventory/low-stock-alerts?threshold=3
+ * Allowed roles: LAB_TECH, MANAGER, ADMIN
+ */
+async function handleLowStockAlerts(req, res) {
+  try {
+    const rawThreshold = req.query.threshold !== undefined ? req.query.threshold : req.query.minUnits;
+    const threshold = rawThreshold !== undefined ? rawThreshold : 3;
+    const { bloodGroup } = req.query;
+    const result = await inventoryService.getLowStockAlerts({ threshold, bloodGroup });
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendServiceError(res, error, 'Failed to load low-stock alerts');
+  }
+}
+
+router.get('/alerts/low-stock', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), handleLowStockAlerts);
+router.get('/low-stock-alerts', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), handleLowStockAlerts);
+
+/**
  * BBMS-F-033: FEFO allocation suggestion for issuance
  * GET /api/inventory/fefo?patientBloodGroup=A+&component=PRBC&unitsRequested=1
  * Allowed roles: LAB_TECH, MANAGER, ADMIN, HOSPITAL

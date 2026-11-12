@@ -60,12 +60,43 @@ const SEED_ALERTS = {
   ],
 };
 
+const SEED_LOW_STOCK_ALERTS = {
+  threshold: 3,
+  alertCount: 2,
+  alerts: [
+    {
+      bloodGroup: 'B+',
+      availableUnits: 0,
+      volumeMl: 0,
+      threshold: 3,
+      deficit: 3,
+      urgency: 'OUT_OF_STOCK',
+      message: 'Critical shortage: Blood group B+ is OUT OF STOCK (0 units available, safety threshold is 3)',
+    },
+    {
+      bloodGroup: 'O-',
+      availableUnits: 2,
+      volumeMl: 560,
+      threshold: 3,
+      deficit: 1,
+      urgency: 'LOW_STOCK',
+      message: 'Low stock alert: Blood group O- has 2 units available (below safety threshold of 3)',
+    },
+  ],
+  stockByGroup: [
+    { bloodGroup: 'B+', availableUnits: 0, volumeMl: 0, threshold: 3, isLow: true, deficit: 3 },
+    { bloodGroup: 'O-', availableUnits: 2, volumeMl: 560, threshold: 3, isLow: true, deficit: 1 },
+    { bloodGroup: 'A+', availableUnits: 3, volumeMl: 660, threshold: 3, isLow: false, deficit: 0 },
+  ],
+};
+
 describe('TC-Inv-01 (BBMS-F-030) inventory dashboard', () => {
   beforeEach(() => {
     server = {
       summary: jsonResponse(200, SEED_SUMMARY),
       list: jsonResponse(200, { units: SEED_UNITS }),
       alerts: jsonResponse(200, SEED_ALERTS),
+      lowStockAlerts: jsonResponse(200, SEED_LOW_STOCK_ALERTS),
       fefo: jsonResponse(200, {
         patientBloodGroup: 'A+',
         component: 'PRBC',
@@ -86,6 +117,8 @@ describe('TC-Inv-01 (BBMS-F-030) inventory dashboard', () => {
       let route;
       if (path.startsWith('/api/inventory/summary')) {
         route = server.summary;
+      } else if (path.startsWith('/api/inventory/alerts/low-stock') || path.startsWith('/api/inventory/low-stock-alerts')) {
+        route = server.lowStockAlerts;
       } else if (path.startsWith('/api/inventory/alerts') || path.startsWith('/api/inventory/expiry-alerts')) {
         route = server.alerts;
       } else if (path.startsWith('/api/inventory/fefo')) {
@@ -199,11 +232,14 @@ describe('TC-Inv-03 (BBMS-F-032) expiry alerts on manager dashboard', () => {
       summary: jsonResponse(200, SEED_SUMMARY),
       list: jsonResponse(200, { units: SEED_UNITS }),
       alerts: jsonResponse(200, SEED_ALERTS),
+      lowStockAlerts: jsonResponse(200, SEED_LOW_STOCK_ALERTS),
     };
     apiFetch.mockImplementation(async (path) => {
       let route;
       if (path.startsWith('/api/inventory/summary')) {
         route = server.summary;
+      } else if (path.startsWith('/api/inventory/alerts/low-stock') || path.startsWith('/api/inventory/low-stock-alerts')) {
+        route = server.lowStockAlerts;
       } else if (path.startsWith('/api/inventory/alerts') || path.startsWith('/api/inventory/expiry-alerts')) {
         route = server.alerts;
       } else {
@@ -271,6 +307,7 @@ describe('TC-Inv-04 (BBMS-F-033) FEFO allocation on manager dashboard', () => {
       summary: jsonResponse(200, SEED_SUMMARY),
       list: jsonResponse(200, { units: SEED_UNITS }),
       alerts: jsonResponse(200, SEED_ALERTS),
+      lowStockAlerts: jsonResponse(200, SEED_LOW_STOCK_ALERTS),
       fefo: jsonResponse(200, {
         patientBloodGroup: 'A+',
         component: 'PRBC',
@@ -291,6 +328,8 @@ describe('TC-Inv-04 (BBMS-F-033) FEFO allocation on manager dashboard', () => {
       let route;
       if (path.startsWith('/api/inventory/summary')) {
         route = server.summary;
+      } else if (path.startsWith('/api/inventory/alerts/low-stock') || path.startsWith('/api/inventory/low-stock-alerts')) {
+        route = server.lowStockAlerts;
       } else if (path.startsWith('/api/inventory/alerts') || path.startsWith('/api/inventory/expiry-alerts')) {
         route = server.alerts;
       } else if (path.startsWith('/api/inventory/fefo')) {
@@ -338,5 +377,107 @@ describe('TC-Inv-04 (BBMS-F-033) FEFO allocation on manager dashboard', () => {
 
     expect(await screen.findByTestId('no-fefo-units-msg')).toBeInTheDocument();
     expect(screen.queryByTestId('fefo-allocation-table')).not.toBeInTheDocument();
+  });
+});
+
+describe('TC-Inv-05 (BBMS-F-034) low-stock alerts on manager dashboard', () => {
+  beforeEach(() => {
+    server = {
+      summary: jsonResponse(200, SEED_SUMMARY),
+      list: jsonResponse(200, { units: SEED_UNITS }),
+      alerts: jsonResponse(200, SEED_ALERTS),
+      lowStockAlerts: jsonResponse(200, SEED_LOW_STOCK_ALERTS),
+    };
+    apiFetch.mockImplementation(async (path) => {
+      let route;
+      if (path.startsWith('/api/inventory/summary')) {
+        route = server.summary;
+      } else if (path.startsWith('/api/inventory/alerts/low-stock') || path.startsWith('/api/inventory/low-stock-alerts')) {
+        route = server.lowStockAlerts;
+      } else if (path.startsWith('/api/inventory/alerts') || path.startsWith('/api/inventory/expiry-alerts')) {
+        route = server.alerts;
+      } else if (path.startsWith('/api/inventory/fefo')) {
+        route = server.fefo;
+      } else {
+        route = server.list;
+      }
+      if (route instanceof Error) throw route;
+      return route;
+    });
+  });
+
+  afterEach(() => vi.clearAllMocks());
+
+  it('renders the low-stock alerts card with default threshold 3 and displays groups below safety threshold', async () => {
+    render(<InventoryDashboard />);
+
+    expect(await screen.findByTestId('low-stock-alerts-card')).toBeInTheDocument();
+    expect(screen.getByTestId('stat-low-stock-groups')).toHaveTextContent('2');
+
+    const lowStockTable = screen.getByTestId('low-stock-alerts-table');
+    expect(lowStockTable).toBeInTheDocument();
+
+    // Out of stock group: B+
+    const bPlusRow = screen.getByTestId('low-stock-row-B+');
+    expect(bPlusRow).toHaveTextContent('B+');
+    expect(bPlusRow).toHaveTextContent('0 units');
+    expect(bPlusRow).toHaveTextContent('+3 needed');
+    expect(bPlusRow).toHaveTextContent('Out of stock');
+
+    // Low stock group: O-
+    const oMinusRow = screen.getByTestId('low-stock-row-O-');
+    expect(oMinusRow).toHaveTextContent('O-');
+    expect(oMinusRow).toHaveTextContent('2 units');
+    expect(oMinusRow).toHaveTextContent('+1 needed');
+    expect(oMinusRow).toHaveTextContent('Low stock');
+  });
+
+  it('allows changing the safety threshold and re-fetches alerts with the new threshold', async () => {
+    render(<InventoryDashboard pollIntervalMs={50} />);
+
+    const select = await screen.findByTestId('low-stock-threshold-select');
+    expect(select).toHaveValue('3');
+
+    // Change threshold to 2 where O- (2 units) is no longer below threshold
+    server.lowStockAlerts = jsonResponse(200, {
+      threshold: 2,
+      alertCount: 1,
+      alerts: [
+        {
+          bloodGroup: 'B+',
+          availableUnits: 0,
+          volumeMl: 0,
+          threshold: 2,
+          deficit: 2,
+          urgency: 'OUT_OF_STOCK',
+          message: 'Critical shortage: Blood group B+ is OUT OF STOCK (0 units available, safety threshold is 2)',
+        },
+      ],
+      stockByGroup: [],
+    });
+
+    fireEvent.change(select, { target: { value: '2' } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stat-low-stock-groups')).toHaveTextContent('1');
+    });
+    expect(screen.queryByTestId('low-stock-row-O-')).not.toBeInTheDocument();
+    expect(screen.getByTestId('low-stock-row-B+')).toBeInTheDocument();
+  });
+
+  it('displays a reassurance message when all blood groups meet the safety threshold', async () => {
+    server.lowStockAlerts = jsonResponse(200, {
+      threshold: 1,
+      alertCount: 0,
+      alerts: [],
+      stockByGroup: [],
+    });
+
+    render(<InventoryDashboard />);
+
+    expect(await screen.findByTestId('no-low-stock-alerts')).toHaveTextContent(
+      'All blood groups meet or exceed the safety threshold of 3 units. Safe inventory levels.'
+    );
+    expect(screen.queryByTestId('low-stock-alerts-table')).not.toBeInTheDocument();
   });
 });
