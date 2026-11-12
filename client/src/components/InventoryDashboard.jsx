@@ -32,18 +32,31 @@ async function getJson(path) {
   return data;
 }
 
-async function loadInventory(filters) {
+async function loadInventory(filters, thresholdDays = 3) {
   // URLSearchParams encodes "A+" as "A%2B"; a raw "+" in a URL would be read as a space.
   const params = new URLSearchParams();
   if (filters.bloodGroup) params.set('bloodGroup', filters.bloodGroup);
   if (filters.component) params.set('component', filters.component);
   const query = params.toString();
 
-  const [summary, list] = await Promise.all([
+  const [summary, list, alertsData] = await Promise.all([
     getJson('/api/inventory/summary'),
     getJson(`/api/inventory${query ? `?${query}` : ''}`),
+    getJson(`/api/inventory/alerts/expiry?thresholdDays=${thresholdDays}`).catch(() => ({ alertCount: 0, alerts: [] })),
   ]);
-  return { summary, units: list.units || [] };
+
+  const alerts = Array.isArray(alertsData?.alerts) ? alertsData.alerts : [];
+  const alertCount = typeof alertsData?.alertCount === 'number' ? alertsData.alertCount : alerts.length;
+
+  return {
+    summary,
+    units: list.units || [],
+    expiryAlerts: {
+      thresholdDays: alertsData?.thresholdDays || thresholdDays,
+      alertCount,
+      alerts,
+    },
+  };
 }
 
 function formatDate(value) {
@@ -61,20 +74,21 @@ function daysLeft(value) {
 
 export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }) {
   const [filters, setFilters] = useState({ bloodGroup: '', component: '' });
+  const [thresholdDays, setThresholdDays] = useState(3);
   const [inventory, setInventory] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState('');
 
   // Polling loop. setTimeout (not setInterval) waits for each request to finish before
-  // scheduling the next, so slow responses never pile up. Changing a filter restarts the
-  // loop, which also fetches straight away. The cleanup stops polling when the tab closes.
+  // scheduling the next, so slow responses never pile up. Changing a filter or threshold
+  // restarts the loop, which also fetches straight away. The cleanup stops polling when the tab closes.
   useEffect(() => {
     let active = true;
     let timerId;
 
     async function poll() {
       try {
-        const next = await loadInventory(filters);
+        const next = await loadInventory(filters, thresholdDays);
         if (!active) return;
         setInventory(next);
         setLastUpdated(new Date());
@@ -91,11 +105,15 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
       active = false;
       clearTimeout(timerId);
     };
-  }, [filters, pollIntervalMs]);
+  }, [filters, thresholdDays, pollIntervalMs]);
 
   const updateFilter = (name) => (e) => {
     const { value } = e.target;
     setFilters((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleThresholdChange = (e) => {
+    setThresholdDays(Number(e.target.value));
   };
 
   const counts = {};
@@ -103,6 +121,7 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
     counts[`${entry.bloodGroup}|${entry.component}`] = entry.units;
   });
   const totals = inventory?.summary.totals;
+  const expiryAlerts = inventory?.expiryAlerts || { thresholdDays, alertCount: 0, alerts: [] };
 
   return (
     <section className="inventory-dashboard registration-form-container">
@@ -149,6 +168,87 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
               <span className="inventory-stat-label">Soonest expiry</span>
               <strong>{totals.nextExpiry ? formatDate(totals.nextExpiry) : '—'}</strong>
             </div>
+            <div className="inventory-stat">
+              <span className="inventory-stat-label">Nearing expiry</span>
+              <strong
+                data-testid="stat-expiring-units"
+                style={{ color: expiryAlerts.alertCount > 0 ? '#ef4444' : 'inherit' }}
+              >
+                {expiryAlerts.alertCount}
+              </strong>
+            </div>
+          </div>
+
+          {/* BBMS-F-032 / TC-Inv-03: Expiry alerts visible on manager dashboard */}
+          <div className="inventory-card expiry-alerts-card" data-testid="expiry-alerts-card">
+            <div className="expiry-alerts-header">
+              <div>
+                <h3 id="expiry-alerts-heading">Units Nearing Expiry · Alerts</h3>
+                <p className="subtitle">
+                  BBMS-F-032 · Configurable threshold alerts for perishable blood inventory
+                </p>
+              </div>
+              <div className="expiry-threshold-control">
+                <label htmlFor="expiry-threshold-select">Alert threshold</label>
+                <select
+                  id="expiry-threshold-select"
+                  data-testid="expiry-threshold-select"
+                  value={thresholdDays}
+                  onChange={handleThresholdChange}
+                >
+                  <option value={1}>Within 1 day (24 hours)</option>
+                  <option value={3}>Within 3 days (Default)</option>
+                  <option value={7}>Within 7 days</option>
+                  <option value={14}>Within 14 days</option>
+                  <option value={30}>Within 30 days</option>
+                </select>
+              </div>
+            </div>
+
+            {expiryAlerts.alertCount === 0 ? (
+              <p className="inventory-muted" data-testid="no-expiry-alerts">
+                No units nearing expiry within {thresholdDays} day{thresholdDays > 1 ? 's' : ''}. Safe shelf life.
+              </p>
+            ) : (
+              <div className="inventory-table-wrap">
+                <table className="inventory-table" aria-labelledby="expiry-alerts-heading" data-testid="expiry-alerts-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Unit ID</th>
+                      <th scope="col">Blood group</th>
+                      <th scope="col">Component</th>
+                      <th scope="col">Volume</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Expires</th>
+                      <th scope="col">Time remaining</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expiryAlerts.alerts.map((alert) => (
+                      <tr key={alert.id} data-testid={`alert-row-${alert.unitCode}`}>
+                        <td className="inventory-code">{alert.unitCode}</td>
+                        <td><strong>{alert.bloodGroup || 'PENDING'}</strong></td>
+                        <td>{COMPONENT_LABELS[alert.component] || alert.component}</td>
+                        <td>{alert.volumeMl} ml</td>
+                        <td>
+                          <span className={`status-pill status-${(alert.status || '').toLowerCase()}`}>
+                            {alert.status}
+                          </span>
+                        </td>
+                        <td>{formatDate(alert.expiresAt)}</td>
+                        <td>
+                          <span className={`urgency-pill urgency-${(alert.urgency || '').toLowerCase()}`}>
+                            {alert.hoursRemaining <= 24
+                              ? `${alert.hoursRemaining}h left (${alert.urgency})`
+                              : `${alert.daysRemaining} days left (${alert.urgency})`}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div className="inventory-card">

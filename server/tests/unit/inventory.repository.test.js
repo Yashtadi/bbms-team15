@@ -63,3 +63,31 @@ describe('TC-Inv-01 (BBMS-F-030) stock summary query', () => {
     expect(result).toBe(rows);
   });
 });
+
+describe('TC-Inv-03 (BBMS-F-032) expiry alerts repository query', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('queries blood units expiring between now and threshold date with status in active bank inventory', async () => {
+    const fakeRows = [
+      { id: 4, unit_code: 'U-2026-000004', blood_group: 'A+', component: 'PRBC', expires_at: '2026-11-05T00:00:00.000Z' },
+    ];
+    db.query.mockResolvedValue([fakeRows]);
+
+    const now = new Date('2026-11-03T00:00:00.000Z');
+    const result = await inventoryRepository.findExpiringUnits({
+      thresholdDays: 3,
+      statuses: ['AVAILABLE', 'QUARANTINE', 'RESERVED'],
+      now,
+    });
+
+    const [sql, values] = db.query.mock.calls[0];
+    expect(sql).toContain('bu.status IN (?)');
+    expect(sql).toContain('bu.expires_at > ?');
+    expect(sql).toContain('bu.expires_at <= ?');
+    expect(sql).toContain('ORDER BY bu.expires_at ASC, bu.id ASC');
+    expect(values[0]).toEqual(['AVAILABLE', 'QUARANTINE', 'RESERVED']);
+    expect(values[1]).toEqual(now);
+    expect(values[2]).toEqual(new Date('2026-11-06T00:00:00.000Z'));
+    expect(result).toBe(fakeRows);
+  });
+});

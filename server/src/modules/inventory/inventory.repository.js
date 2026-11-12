@@ -211,10 +211,39 @@ async function separateUnit(unitCode, planChildren, { userId, buildUnitCode }) {
   }
 }
 
+/**
+ * BBMS-F-032: Finds units nearing expiry within a given threshold (default 3 days).
+ * Only unexpired units in physical bank inventory (AVAILABLE, QUARANTINE, RESERVED) are included.
+ * @param {object} options
+ * @param {number} [options.thresholdDays=3]
+ * @param {string[]} [options.statuses=['AVAILABLE', 'QUARANTINE', 'RESERVED']]
+ * @param {Date} [options.now=new Date()]
+ * @returns {Promise<Array<object>>}
+ */
+async function findExpiringUnits({
+  thresholdDays = 3,
+  statuses = ['AVAILABLE', 'QUARANTINE', 'RESERVED'],
+  now = new Date(),
+} = {}) {
+  const targetDate = new Date(now.getTime() + thresholdDays * 24 * 60 * 60 * 1000);
+  const [rows] = await db.query(
+    `SELECT bu.id, bu.unit_code, bu.donation_id, bu.component, bu.blood_group,
+            bu.volume_ml, bu.collected_at, bu.expires_at, bu.status, bu.discard_reason
+     FROM blood_units bu
+     WHERE bu.status IN (?)
+       AND bu.expires_at > ?
+       AND bu.expires_at <= ?
+     ORDER BY bu.expires_at ASC, bu.id ASC`,
+    [statuses, now, targetDate]
+  );
+  return rows;
+}
+
 module.exports = {
   listAvailable,
   summarizeAvailable,
   findUnitByCode,
   findLineage,
   separateUnit,
+  findExpiringUnits,
 };

@@ -55,3 +55,99 @@ describe('TC-Inv-01 (BBMS-F-030) inventory stock summary service', () => {
     await expect(inventoryService.getStockSummary({ now })).rejects.toThrow('connection lost');
   });
 });
+
+describe('TC-Inv-03 (BBMS-F-032) expiry alerts service', () => {
+  const now = new Date('2026-11-03T12:00:00.000Z');
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('rejects non-integer, negative, zero or out-of-bounds threshold days (400)', async () => {
+    await expect(inventoryService.getExpiryAlerts({ thresholdDays: 0, now })).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+    await expect(inventoryService.getExpiryAlerts({ thresholdDays: -2, now })).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+    await expect(inventoryService.getExpiryAlerts({ thresholdDays: 'abc', now })).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+    await expect(inventoryService.getExpiryAlerts({ thresholdDays: 61, now })).rejects.toMatchObject({
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+  });
+
+  it('calculates remaining time, urgency level (CRITICAL <= 24h, WARNING <= 3d) and formats alert items', async () => {
+    const units = [
+      {
+        id: 4,
+        unit_code: 'U-2026-000004',
+        donation_id: 2,
+        component: 'PRBC',
+        blood_group: 'A+',
+        volume_ml: 220,
+        status: 'AVAILABLE',
+        collected_at: '2026-09-24T12:00:00.000Z',
+        expires_at: '2026-11-04T00:00:00.000Z', // 12 hours from now -> CRITICAL
+      },
+      {
+        id: 7,
+        unit_code: 'U-2026-000007',
+        donation_id: 4,
+        component: 'WHOLE_BLOOD',
+        blood_group: 'B+',
+        volume_ml: 350,
+        status: 'QUARANTINE',
+        collected_at: '2026-10-01T12:00:00.000Z',
+        expires_at: '2026-11-05T12:00:00.000Z', // 48 hours (2 days) -> WARNING
+      },
+    ];
+    inventoryRepository.findExpiringUnits.mockResolvedValue(units);
+
+    const result = await inventoryService.getExpiryAlerts({ thresholdDays: 3, now });
+
+    expect(result.thresholdDays).toBe(3);
+    expect(result.alertCount).toBe(2);
+    expect(result.alerts[0]).toEqual({
+      id: 4,
+      unitCode: 'U-2026-000004',
+      donationId: 2,
+      component: 'PRBC',
+      bloodGroup: 'A+',
+      volumeMl: 220,
+      status: 'AVAILABLE',
+      collectedAt: '2026-09-24T12:00:00.000Z',
+      expiresAt: '2026-11-04T00:00:00.000Z',
+      hoursRemaining: 12,
+      daysRemaining: 1,
+      urgency: 'CRITICAL',
+    });
+    expect(result.alerts[1]).toEqual({
+      id: 7,
+      unitCode: 'U-2026-000007',
+      donationId: 4,
+      component: 'WHOLE_BLOOD',
+      bloodGroup: 'B+',
+      volumeMl: 350,
+      status: 'QUARANTINE',
+      collectedAt: '2026-10-01T12:00:00.000Z',
+      expiresAt: '2026-11-05T12:00:00.000Z',
+      hoursRemaining: 48,
+      daysRemaining: 2,
+      urgency: 'WARNING',
+    });
+  });
+
+  it('returns empty alert list when no units are nearing expiry', async () => {
+    inventoryRepository.findExpiringUnits.mockResolvedValue([]);
+
+    const result = await inventoryService.getExpiryAlerts({ thresholdDays: '3', now });
+
+    expect(result.alertCount).toBe(0);
+    expect(result.alerts).toEqual([]);
+    expect(result.thresholdDays).toBe(3);
+  });
+});

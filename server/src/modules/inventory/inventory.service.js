@@ -225,6 +225,66 @@ async function getLineage(rawCode, { repository = inventoryRepository } = {}) {
   };
 }
 
+/**
+ * BBMS-F-032: Generates near-expiry alerts for units expiring within the given threshold (default 3 days).
+ * @param {object} options
+ * @param {number|string} [options.thresholdDays=3]
+ * @param {string[]} [options.statuses]
+ * @param {Date} [options.now=new Date()]
+ * @param {object} [options.repository=inventoryRepository]
+ * @returns {Promise<{ generatedAt: string, thresholdDays: number, alertCount: number, alerts: Array<object> }>}
+ */
+async function getExpiryAlerts({
+  thresholdDays = 3,
+  statuses = ['AVAILABLE', 'QUARANTINE', 'RESERVED'],
+  now = new Date(),
+  repository = inventoryRepository,
+} = {}) {
+  const parsedDays = Number(thresholdDays);
+  if (!Number.isInteger(parsedDays) || parsedDays < 1 || parsedDays > 60) {
+    throw httpError(400, 'Threshold days must be an integer between 1 and 60', {
+      code: 'INVALID_THRESHOLD',
+      errors: { thresholdDays: 'Threshold days must be an integer between 1 and 60' },
+    });
+  }
+
+  const rows = await repository.findExpiringUnits({
+    thresholdDays: parsedDays,
+    statuses,
+    now,
+  });
+
+  const alerts = rows.map((unit) => {
+    const expiresAt = new Date(unit.expires_at);
+    const msRemaining = expiresAt.getTime() - now.getTime();
+    const hoursRemaining = Math.max(0, Math.round(msRemaining / (1000 * 60 * 60)));
+    const daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+    const urgency = hoursRemaining <= 24 ? 'CRITICAL' : daysRemaining <= 3 ? 'WARNING' : 'INFO';
+
+    return {
+      id: unit.id,
+      unitCode: unit.unit_code,
+      donationId: unit.donation_id,
+      component: unit.component,
+      bloodGroup: unit.blood_group,
+      volumeMl: unit.volume_ml,
+      status: unit.status,
+      collectedAt: unit.collected_at,
+      expiresAt: unit.expires_at,
+      hoursRemaining,
+      daysRemaining,
+      urgency,
+    };
+  });
+
+  return {
+    generatedAt: now.toISOString(),
+    thresholdDays: parsedDays,
+    alertCount: alerts.length,
+    alerts,
+  };
+}
+
 module.exports = {
   getStockSummary,
   COMPONENT_SPECS,
@@ -234,4 +294,5 @@ module.exports = {
   planComponents,
   separateUnit,
   getLineage,
+  getExpiryAlerts,
 };

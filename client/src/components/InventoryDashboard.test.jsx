@@ -41,11 +41,41 @@ function cellFor(bloodGroup, columnIndex) {
   return within(row).getAllByRole('cell')[columnIndex];
 }
 
+const SEED_ALERTS = {
+  thresholdDays: 3,
+  alertCount: 1,
+  alerts: [
+    {
+      id: 4,
+      unitCode: 'U-2026-000004',
+      bloodGroup: 'A+',
+      component: 'PRBC',
+      volumeMl: 220,
+      status: 'AVAILABLE',
+      expiresAt: IN_TWO_DAYS,
+      hoursRemaining: 48,
+      daysRemaining: 2,
+      urgency: 'WARNING',
+    },
+  ],
+};
+
 describe('TC-Inv-01 (BBMS-F-030) inventory dashboard', () => {
   beforeEach(() => {
-    server = { summary: jsonResponse(200, SEED_SUMMARY), list: jsonResponse(200, { units: SEED_UNITS }) };
+    server = {
+      summary: jsonResponse(200, SEED_SUMMARY),
+      list: jsonResponse(200, { units: SEED_UNITS }),
+      alerts: jsonResponse(200, SEED_ALERTS),
+    };
     apiFetch.mockImplementation(async (path) => {
-      const route = path.startsWith('/api/inventory/summary') ? server.summary : server.list;
+      let route;
+      if (path.startsWith('/api/inventory/summary')) {
+        route = server.summary;
+      } else if (path.startsWith('/api/inventory/alerts') || path.startsWith('/api/inventory/expiry-alerts')) {
+        route = server.alerts;
+      } else {
+        route = server.list;
+      }
       if (route instanceof Error) throw route;
       return route;
     });
@@ -143,5 +173,77 @@ describe('TC-Inv-01 (BBMS-F-030) inventory dashboard', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 120));
     expect(apiFetch.mock.calls.length).toBe(callsAtUnmount);
+  });
+});
+
+describe('TC-Inv-03 (BBMS-F-032) expiry alerts on manager dashboard', () => {
+  beforeEach(() => {
+    server = {
+      summary: jsonResponse(200, SEED_SUMMARY),
+      list: jsonResponse(200, { units: SEED_UNITS }),
+      alerts: jsonResponse(200, SEED_ALERTS),
+    };
+    apiFetch.mockImplementation(async (path) => {
+      let route;
+      if (path.startsWith('/api/inventory/summary')) {
+        route = server.summary;
+      } else if (path.startsWith('/api/inventory/alerts') || path.startsWith('/api/inventory/expiry-alerts')) {
+        route = server.alerts;
+      } else {
+        route = server.list;
+      }
+      if (route instanceof Error) throw route;
+      return route;
+    });
+  });
+
+  afterEach(() => vi.clearAllMocks());
+
+  it('renders the expiry alerts card with default 3-day threshold and units nearing expiry', async () => {
+    render(<InventoryDashboard />);
+
+    expect(await screen.findByTestId('expiry-alerts-card')).toBeInTheDocument();
+    expect(screen.getByTestId('stat-expiring-units')).toHaveTextContent('1');
+
+    const alertTable = screen.getByTestId('expiry-alerts-table');
+    expect(alertTable).toBeInTheDocument();
+    expect(within(alertTable).getByText('U-2026-000004')).toBeInTheDocument();
+    expect(within(alertTable).getByText('2 days left (WARNING)')).toBeInTheDocument();
+  });
+
+  it('allows changing the alert threshold and re-fetches alerts with the new threshold', async () => {
+    render(<InventoryDashboard pollIntervalMs={50} />);
+
+    const select = await screen.findByTestId('expiry-threshold-select');
+    expect(select).toHaveValue('3');
+
+    // Change threshold to 1 day (24 hours) where no units are nearing expiry
+    server.alerts = jsonResponse(200, {
+      thresholdDays: 1,
+      alertCount: 0,
+      alerts: [],
+    });
+
+    fireEvent.change(select, { target: { value: '1' } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stat-expiring-units')).toHaveTextContent('0');
+    });
+    expect(screen.getByTestId('no-expiry-alerts')).toHaveTextContent('No units nearing expiry within 1 day');
+  });
+
+  it('displays a reassurance message when no units are nearing expiry', async () => {
+    server.alerts = jsonResponse(200, {
+      thresholdDays: 3,
+      alertCount: 0,
+      alerts: [],
+    });
+
+    render(<InventoryDashboard />);
+
+    expect(await screen.findByTestId('no-expiry-alerts')).toHaveTextContent(
+      'No units nearing expiry within 3 days. Safe shelf life.'
+    );
+    expect(screen.queryByTestId('expiry-alerts-table')).not.toBeInTheDocument();
   });
 });
