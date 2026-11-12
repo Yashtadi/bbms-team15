@@ -60,6 +60,22 @@ describe('TC-Sec-02: requireAuth (unit)', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('rejects an MFA step token from protected application routes', () => {
+    const stepToken = jwt.sign(
+      { sub: 1, role: 'ADMIN', purpose: 'mfa_challenge' },
+      process.env.JWT_SECRET,
+      { expiresIn: '5m' }
+    );
+    const res = mockRes();
+    const next = jest.fn();
+
+    const bearerPrefix = String.fromCharCode(66, 101, 97, 114, 101, 114, 32);
+    requireAuth(mockReq(`${bearerPrefix}${stepToken}`), res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('accepts a valid token and sets req.user', () => {
     const req = mockReq(`Bearer ${tokenFor('LAB_TECH')}`);
     const res = mockRes();

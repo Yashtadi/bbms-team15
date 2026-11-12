@@ -434,4 +434,49 @@ describe('TC-Req-03: BBMS-F-042 reservation routes access and error mapping (uni
       expect(res.body.code).toBe('RESERVED_FOR_OTHER_REQUEST');
     });
   });
+
+  describe('BBMS-F-043 issuance routes', () => {
+    it.each(['HOSPITAL', 'DONOR'])('rejects %s from issuing a unit', async (role) => {
+      const res = await request(app)
+        .post('/api/blood-requests/R-000001/issuances')
+        .set(authHeader(role))
+        .send({ unitCode: 'U-2026-000001', receivedBy: 'City Hospital Desk' });
+      expect(res.status).toBe(403);
+      expect(requestService.issueUnitForRequest).not.toHaveBeenCalled();
+    });
+
+    it('lets authorized staff issue a unit and captures the authenticated user', async () => {
+      requestService.issueUnitForRequest.mockResolvedValue({
+        request: { requestCode: 'R-000001', status: 'ISSUED' },
+        issuance: { id: 1, unitCode: 'U-2026-000001', receivedBy: 'City Hospital Desk' },
+      });
+
+      const res = await request(app)
+        .post('/api/blood-requests/R-000001/issuances')
+        .set(authHeader('MANAGER'))
+        .send({ unitCode: 'U-2026-000001', receivedBy: 'City Hospital Desk' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.issuance.unitCode).toBe('U-2026-000001');
+      expect(requestService.issueUnitForRequest).toHaveBeenCalledWith({
+        idOrCode: 'R-000001',
+        body: { unitCode: 'U-2026-000001', receivedBy: 'City Hospital Desk' },
+        user: expect.objectContaining({ role: 'MANAGER' }),
+      });
+    });
+
+    it('allows hospitals to read custody history for their own request', async () => {
+      requestService.getIssuancesForRequest.mockResolvedValue({
+        request: { requestCode: 'R-000001' },
+        issuances: [{ unitCode: 'U-2026-000001', receivedBy: 'City Hospital Desk' }],
+      });
+
+      const res = await request(app)
+        .get('/api/blood-requests/R-000001/issuances')
+        .set(authHeader('HOSPITAL'));
+
+      expect(res.status).toBe(200);
+      expect(res.body.issuances).toHaveLength(1);
+    });
+  });
 });

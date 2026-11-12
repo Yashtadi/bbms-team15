@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { login } from '../api';
+import { beginMfaSetup, login, verifyMfa, verifyMfaSetup } from '../api';
 import ThemeToggle from './ThemeToggle';
 import './LoginForm.css';
 
@@ -9,13 +9,38 @@ export default function LoginForm({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mfaState, setMfaState] = useState(null);
+  const [mfaCode, setMfaCode] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
     try {
-      const session = await login(email, password);
+      const result = await login(email, password);
+      if (result.mfaSetupRequired) {
+        const setup = await beginMfaSetup(result.setupToken);
+        setMfaState({ type: 'setup', token: result.setupToken, ...setup });
+      } else if (result.mfaRequired) {
+        setMfaState({ type: 'verify', token: result.challengeToken });
+      } else {
+        onLogin(result);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleMfaSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+    try {
+      const session = mfaState.type === 'setup'
+        ? await verifyMfaSetup(mfaState.token, mfaCode)
+        : await verifyMfa(mfaState.token, mfaCode);
       onLogin(session);
     } catch (err) {
       setError(err.message);
@@ -30,7 +55,7 @@ export default function LoginForm({ onLogin }) {
         <ThemeToggle />
       </div>
 
-      <form className="login-card" onSubmit={handleSubmit} noValidate>
+      <section className="login-card">
         <div className="login-icon">
           <DropIcon />
         </div>
@@ -40,54 +65,88 @@ export default function LoginForm({ onLogin }) {
           Sign in to manage donors, blood units and hospital requests.
         </p>
 
-        <div className="login-field">
-          <label htmlFor="login-email" className="sr-only">Email</label>
-          <span className="field-icon"><MailIcon /></span>
-          <input
-            id="login-email"
-            type="text"
-            placeholder="Email / Donor ID"
-            autoComplete="username"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
+        {mfaState ? (
+          <form onSubmit={handleMfaSubmit} noValidate>
+            {mfaState.type === 'setup' ? (
+              <div className="mfa-instructions">
+                <p>Set up an authenticator app, then enter its 6-digit code to finish signing in.</p>
+                <p>Enter this setup key in your authenticator app:</p>
+                <code className="mfa-setup-key" data-testid="mfa-setup-secret">{mfaState.secret}</code>
+              </div>
+            ) : (
+              <p className="mfa-instructions">Enter the 6-digit code from your authenticator app.</p>
+            )}
+            <div className="login-field">
+              <label htmlFor="mfa-code">Authenticator code</label>
+              <input
+                id="mfa-code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                required
+              />
+            </div>
+            {error && <p className="login-error" role="alert">{error}</p>}
+            <button type="submit" className="login-submit" disabled={isSubmitting || mfaCode.length !== 6}>
+              {isSubmitting ? 'Verifying…' : 'Verify and sign in'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="login-field">
+              <label htmlFor="login-email" className="sr-only">Email</label>
+              <span className="field-icon"><MailIcon /></span>
+              <input
+                id="login-email"
+                type="text"
+                placeholder="Email / Donor ID"
+                autoComplete="username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
 
-        <div className="login-field">
-          <label htmlFor="login-password" className="sr-only">Password</label>
-          <span className="field-icon"><LockIcon /></span>
-          <input
-            id="login-password"
-            type={showPassword ? 'text' : 'password'}
-            placeholder="Password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <button
-            type="button"
-            className="toggle-password"
-            onClick={() => setShowPassword((shown) => !shown)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-          >
-            {showPassword ? <EyeIcon /> : <EyeOffIcon />}
-          </button>
-        </div>
+            <div className="login-field">
+              <label htmlFor="login-password" className="sr-only">Password</label>
+              <span className="field-icon"><LockIcon /></span>
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword((shown) => !shown)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeIcon /> : <EyeOffIcon />}
+              </button>
+            </div>
 
-        {error && <p className="login-error" role="alert">{error}</p>}
+            {error && <p className="login-error" role="alert">{error}</p>}
 
-        <button type="submit" className="login-submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Logging in…' : 'Log in'}
-        </button>
+            <button type="submit" className="login-submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Logging in…' : 'Log in'}
+            </button>
 
-        {import.meta.env.DEV && (
-          <p className="login-hint">
-            Demo: <code>collector@bbms.test</code> · <code>labtech@bbms.test</code> · <code>Password@123</code>
-          </p>
+            {import.meta.env.DEV && (
+              <p className="login-hint">
+                Demo: <code>collector@bbms.test</code> · <code>labtech@bbms.test</code> · <code>Password@123</code>
+              </p>
+            )}
+          </form>
         )}
-      </form>
+      </section>
     </main>
   );
 }

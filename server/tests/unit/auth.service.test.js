@@ -2,6 +2,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { login, changePassword } = require('../../src/modules/auth/auth.service');
 const repository = require('../../src/modules/auth/auth.repository');
+const { generateTotp } = require('../../src/modules/auth/mfa.totp');
+const { decrypt } = require('../../src/utils/encryption');
 
 jest.mock('../../src/modules/auth/auth.repository');
 
@@ -74,6 +76,96 @@ describe('TC-Sec-02: auth.service login (unit)', () => {
     await expect(login({ email: 'labtech@bbms.test' })).rejects.toMatchObject({ status: 400 });
     await expect(login({ password: PASSWORD })).rejects.toMatchObject({ status: 400 });
     await expect(login()).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('requires privileged users to enroll in MFA before receiving an access token', async () => {
+    const admin = { ...fakeUser, role: 'ADMIN', mfa_enabled: 0, mfa_secret: null };
+    repository.findUserByEmail.mockResolvedValue(admin);
+
+    const result = await login({ email: admin.email, password: PASSWORD });
+
+    expect(result.mfaSetupRequired).toBe(true);
+    expect(result.setupToken).toEqual(expect.any(String));
+    expect(result).not.toHaveProperty('token');
+  });
+
+  it('requires an authenticator code at login after MFA enrollment', async () => {
+    repository.findUserByEmail.mockResolvedValue({
+      ...fakeUser,
+      role: 'MANAGER',
+      mfa_enabled: 1,
+      mfa_secret: 'encrypted-secret',
+    });
+
+    const result = await login({ email: fakeUser.email, password: PASSWORD });
+
+    expect(result.mfaRequired).toBe(true);
+    expect(result.challengeToken).toEqual(expect.any(String));
+    expect(result).not.toHaveProperty('token');
+  });
+});
+
+describe('SR-005 MFA service flow (unit)', () => {
+  const admin = { ...fakeUser, role: 'ADMIN', mfa_enabled: 0, mfa_secret: null };
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('only returns a session after a valid setup code confirms the secret', async () => {
+    const { beginMfaSetup, verifyMfaSetup } = require('../../src/modules/auth/auth.service');
+    const jwt = require('jsonwebtoken');
+    repository.findUserById.mockResolvedValue(admin);
+    repository.updateMfaSecret.mockResolvedValue(true);
+    repository.enableMfa.mockResolvedValue(true);
+    repository.isMfaLocked.mockResolvedValue(false);
+    repository.recordMfaFailure.mockResolvedValue(false);
+
+    const setupToken = jwt.sign(
+      { sub: admin.id, role: admin.role, purpose: 'mfa_setup' },
+      process.env.JWT_SECRET,
+      { expiresIn: '10m' }
+    );
+    const setup = await beginMfaSetup({ setupToken });
+    const savedSecret = decrypt(repository.updateMfaSecret.mock.calls[0][1]);
+    repository.findUserById.mockResolvedValue({ ...admin, mfa_secret: repository.updateMfaSecret.mock.calls[0][1] });
+
+    await expect(verifyMfaSetup({ setupToken, code: '000000' })).rejects.toMatchObject({ status: 401 });
+    const session = await verifyMfaSetup({ setupToken, code: generateTotp(savedSecret) });
+
+    expect(setup.secret).toBe(savedSecret);
+    expect(setup.otpauthUrl).toContain(encodeURIComponent(admin.email));
+    expect(repository.enableMfa).toHaveBeenCalledWith(admin.id);
+    expect(session.token).toEqual(expect.any(String));
+    expect(session.user.role).toBe('ADMIN');
+  });
+
+  it('locks MFA verification after five invalid codes', async () => {
+    const { verifyMfa } = require('../../src/modules/auth/auth.service');
+    const secret = 'JBSWY3DPEHPK3PXP';
+    const challengeToken = jwt.sign(
+      { sub: admin.id, role: admin.role, purpose: 'mfa_challenge' },
+      process.env.JWT_SECRET,
+      { expiresIn: '5m' }
+    );
+    repository.findUserById.mockResolvedValue({
+      ...admin,
+      mfa_enabled: 1,
+      mfa_secret: require('../../src/utils/encryption').encrypt(secret),
+    });
+    repository.isMfaLocked.mockResolvedValue(false);
+    repository.recordMfaFailure
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expect(verifyMfa({ challengeToken, code: 'not-a-code' }))
+        .rejects.toMatchObject({ status: attempt === 4 ? 429 : 401 });
+    }
+    expect(repository.recordMfaFailure).toHaveBeenCalledTimes(5);
   });
 });
 

@@ -6,6 +6,14 @@ const router = express.Router();
 
 // Auth module: login + roles (SR-002), MFA (SR-005)
 
+function sendMfaError(res, error, fallbackMessage) {
+  if ([400, 401, 404, 409, 429].includes(error.status)) {
+    return res.status(error.status).json({ message: error.message });
+  }
+  console.error('MFA error (500):', error);
+  return res.status(500).json({ message: fallbackMessage });
+}
+
 /**
  * POST /api/auth/login
  * Body: { email, password }  →  200 { token, user } | 400 | 401
@@ -24,6 +32,33 @@ router.post('/login', async (req, res) => {
       message: 'Server error during login. Please verify database connection and configuration.',
       error: process.env.NODE_ENV === 'production' ? undefined : error.message,
     });
+  }
+});
+
+router.post('/mfa/setup', async (req, res) => {
+  try {
+    const result = await authService.beginMfaSetup(req.body);
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendMfaError(res, error, 'Could not start multi-factor setup');
+  }
+});
+
+router.post('/mfa/setup/verify', async (req, res) => {
+  try {
+    const result = await authService.verifyMfaSetup(req.body);
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendMfaError(res, error, 'Could not verify multi-factor setup');
+  }
+});
+
+router.post('/mfa/verify', async (req, res) => {
+  try {
+    const result = await authService.verifyMfa(req.body);
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendMfaError(res, error, 'Could not verify multi-factor code');
   }
 });
 

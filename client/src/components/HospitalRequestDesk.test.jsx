@@ -176,6 +176,53 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
     expect(screen.getByText('Patient One')).toBeInTheDocument();
     expect(screen.getByText('Patient Two')).toBeInTheDocument();
     expect(screen.getByText('EMERGENCY')).toBeInTheDocument();
+    const requestRows = screen.getByRole('table', { name: 'Hospital Blood Requests' })
+      .querySelectorAll('tbody tr');
+    expect(requestRows[0]).toHaveAttribute('data-testid', 'request-row-R-000002');
+  });
+
+  it('shows the O-negative emergency fallback for an unknown-group emergency PRBC request', async () => {
+    const user = userEvent.setup();
+    const unknownEmergencyRequest = {
+      id: 8,
+      requestCode: 'R-000008',
+      patientName: 'Emergency Patient',
+      patientBloodGroup: null,
+      component: 'PRBC',
+      unitsRequested: 1,
+      priority: 'EMERGENCY',
+      status: 'PENDING',
+      createdAt: '2026-11-12T10:00:00.000Z',
+    };
+    vi.spyOn(api, 'apiFetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ requests: [unknownEmergencyRequest] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ crossmatches: [] }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          emergencyFallback: true,
+          suggestedUnits: [{
+            rank: 1,
+            unitCode: 'U-O-NEG',
+            bloodGroup: 'O-',
+            component: 'PRBC',
+            volumeMl: 280,
+            expiresAt: '2026-12-01T10:00:00.000Z',
+            daysRemaining: 19,
+            hoursRemaining: 456,
+          }],
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ reservations: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ issuances: [] }) });
+
+    render(<HospitalRequestDesk />);
+    await user.click(screen.getByRole('tab', { name: /Active Requests/i }));
+    await user.click(await screen.findByTestId('btn-view-R-000008'));
+
+    expect(screen.getAllByText('Unknown').length).toBeGreaterThan(0);
+    expect(await screen.findByTestId('o-negative-fallback-note')).toHaveTextContent(/cross-match is still required/i);
+    expect(screen.getByTestId('fefo-row-U-O-NEG')).toBeInTheDocument();
   });
 
   it('displays server validation errors if returned by API', async () => {
@@ -239,6 +286,10 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ reservations: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ issuances: [] }),
         });
 
       render(<HospitalRequestDesk />);
@@ -288,6 +339,10 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ reservations: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ issuances: [] }),
         })
         // 4. POST record crossmatch
         .mockResolvedValueOnce({
@@ -384,6 +439,10 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
           json: async () => ({ reservations: [] }),
         })
         .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ issuances: [] }),
+        })
+        .mockResolvedValueOnce({
           ok: false,
           status: 422,
           json: async () => ({
@@ -448,6 +507,10 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ reservations: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ issuances: [] }),
         });
 
       render(<HospitalRequestDesk />);
@@ -513,6 +576,7 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce(ok({ crossmatches: [compatibleCrossmatch] }))
         .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
         .mockResolvedValueOnce(ok({ request: mockRequest, reservations: [] }))
+        .mockResolvedValueOnce(ok({ issuances: [] }))
         // POST reservation
         .mockResolvedValueOnce({
           ok: true,
@@ -557,7 +621,8 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce(ok({ requests: [mockRequest] }))
         .mockResolvedValueOnce(ok({ crossmatches: [compatibleCrossmatch] }))
         .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
-        .mockResolvedValueOnce(ok({ request: mockRequest, reservations: [] }));
+        .mockResolvedValueOnce(ok({ request: mockRequest, reservations: [] }))
+        .mockResolvedValueOnce(ok({ issuances: [] }));
 
       render(<HospitalRequestDesk />);
       await user.click(await screen.findByTestId('btn-view-R-000001'));
@@ -567,7 +632,7 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
       await user.click(screen.getByTestId('btn-reserve-U-2026-000001'));
 
       expect(screen.getByText(/between 15 and 1440/i)).toBeInTheDocument();
-      expect(fetchSpy).toHaveBeenCalledTimes(4);
+      expect(fetchSpy).toHaveBeenCalledTimes(5);
     });
 
     it('shows the server message when the unit is held for another request', async () => {
@@ -578,6 +643,7 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce(ok({ crossmatches: [compatibleCrossmatch] }))
         .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
         .mockResolvedValueOnce(ok({ request: mockRequest, reservations: [] }))
+        .mockResolvedValueOnce(ok({ issuances: [] }))
         .mockResolvedValueOnce({
           ok: false,
           status: 409,
@@ -603,6 +669,7 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce(ok({ crossmatches: [compatibleCrossmatch] }))
         .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
         .mockResolvedValueOnce(ok({ request: { ...mockRequest, status: 'RESERVED' }, reservations: [heldUnit] }))
+        .mockResolvedValueOnce(ok({ issuances: [] }))
         .mockResolvedValueOnce(ok({ released: { unitCode: 'U-2026-000001', unitStatus: 'AVAILABLE' } }))
         .mockResolvedValueOnce(ok({ request: mockRequest, reservations: [] }))
         .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
@@ -625,7 +692,8 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce(ok({ requests: [mockRequest] }))
         .mockResolvedValueOnce(ok({ crossmatches: [compatibleCrossmatch] }))
         .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
-        .mockResolvedValueOnce(ok({ request: { ...mockRequest, status: 'RESERVED' }, reservations: [heldUnit] }));
+        .mockResolvedValueOnce(ok({ request: { ...mockRequest, status: 'RESERVED' }, reservations: [heldUnit] }))
+        .mockResolvedValueOnce(ok({ issuances: [] }));
 
       render(<HospitalRequestDesk />);
       await user.click(screen.getByRole('tab', { name: /Active Requests/i }));

@@ -37,14 +37,14 @@ export function apiFetch(path, options = {}) {
   return fetch(path, { ...options, headers });
 }
 
-export async function login(email, password) {
+async function postAuth(path, payload) {
   let response;
   try {
-    response = await apiFetch('/api/auth/login', {
+    response = await apiFetch(path, {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(payload),
     });
-  } catch (err) {
+  } catch {
     throw new Error('Unable to connect to server. Please ensure the backend is running on port 4000.');
   }
 
@@ -55,13 +55,29 @@ export async function login(email, password) {
     data = null;
   }
 
-  if (response.status !== 200) {
+  if (response.status < 200 || response.status >= 300) {
     if (response.status === 500) {
       throw new Error(data?.message || 'Server error during login. Please verify database connection and configuration.');
     }
-    throw new Error(data?.message || 'Login failed');
+    throw new Error(data?.message || 'Authentication failed');
   }
 
-  saveSession(data);
+  if (data?.token) saveSession(data);
   return data;
+}
+
+export function login(email, password) {
+  return postAuth('/api/auth/login', { email, password });
+}
+
+export function beginMfaSetup(setupToken) {
+  return postAuth('/api/auth/mfa/setup', { setupToken });
+}
+
+export function verifyMfaSetup(setupToken, code) {
+  return postAuth('/api/auth/mfa/setup/verify', { setupToken, code });
+}
+
+export function verifyMfa(challengeToken, code) {
+  return postAuth('/api/auth/mfa/verify', { challengeToken, code });
 }

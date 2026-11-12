@@ -20,6 +20,9 @@ function requireAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    if (payload.purpose) {
+      return res.status(401).json({ message: 'Complete multi-factor authentication before accessing this resource' });
+    }
     req.user = { id: payload.sub, role: payload.role };
     return next();
   } catch (error) {

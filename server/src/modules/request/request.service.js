@@ -58,7 +58,7 @@ function validateBloodRequestInput(input = {}) {
   const rawBloodGroup = typeof input.patientBloodGroup === 'string' ? input.patientBloodGroup.trim().toUpperCase() : '';
   if (!rawBloodGroup) {
     errors.patientBloodGroup = 'Patient blood group is required';
-  } else if (!VALID_BLOOD_GROUPS.includes(rawBloodGroup)) {
+  } else if (rawBloodGroup !== 'UNKNOWN' && !VALID_BLOOD_GROUPS.includes(rawBloodGroup)) {
     errors.patientBloodGroup = `Valid patient blood group is required (${VALID_BLOOD_GROUPS.join(', ')})`;
   }
 
@@ -112,7 +112,7 @@ function validateBloodRequestInput(input = {}) {
     errors,
     data: {
       patientName: rawPatientName,
-      patientBloodGroup: rawBloodGroup,
+      patientBloodGroup: rawBloodGroup === 'UNKNOWN' ? null : rawBloodGroup,
       component: rawComponent,
       unitsRequested: parsedUnits,
       priority,
@@ -292,11 +292,17 @@ async function recordCrossmatch({ idOrCode, unitCode, result, performedBy }, rep
 
   // Clinical ABO/Rh compatibility rule check
   const isCompatibleByGroup = isBloodGroupCompatible(request.patientBloodGroup, unit.blood_group, request.component);
-  if (normalizedResult === 'COMPATIBLE' && !isCompatibleByGroup) {
+  const isEmergencyUnknownGroupFallback =
+    Boolean(request.patientBloodGroup) ||
+    (request.priority === 'EMERGENCY' && request.component === 'PRBC');
+  if (normalizedResult === 'COMPATIBLE' && (!isCompatibleByGroup || !isEmergencyUnknownGroupFallback)) {
     const error = new Error(
-      `Unit blood group (${unit.blood_group}) is clinically incompatible with patient blood group (${request.patientBloodGroup}) for component ${request.component}; cannot record as COMPATIBLE`
+      request.patientBloodGroup
+        ? `Unit blood group (${unit.blood_group}) is clinically incompatible with patient blood group (${request.patientBloodGroup}) for component ${request.component}; cannot record as COMPATIBLE`
+        : 'An unknown blood group can only be cross-matched with O-negative PRBC for an emergency request'
     );
     error.status = 422;
+    if (!request.patientBloodGroup) error.code = 'EMERGENCY_FALLBACK_REQUIRED';
     throw error;
   }
 
@@ -449,6 +455,100 @@ async function getCrossmatchesForRequest(idOrCode, user, repository = defaultRep
   };
 }
 
+function planIssuance({
+  request,
+  unit,
+  isReleasable,
+  crossmatch,
+  issuedCount,
+  otherActiveReservationCount = 0,
+}) {
+  if (request.status === 'CANCELLED' || request.status === 'REJECTED') {
+    throw httpError(422, `Cannot issue units for a ${request.status.toLowerCase()} blood request`);
+  }
+  if (!request.patient_blood_group && (request.priority !== 'EMERGENCY' || request.component !== 'PRBC')) {
+    throw httpError(422, 'An unknown blood group can only be issued O-negative PRBC for an emergency request', {
+      code: 'EMERGENCY_FALLBACK_REQUIRED',
+    });
+  }
+  if (issuedCount >= request.units_requested) {
+    throw httpError(409, `Request ${request.request_code} has already been fulfilled`, {
+      code: 'REQUEST_ALREADY_FULFILLED',
+    });
+  }
+  if (issuedCount + otherActiveReservationCount >= request.units_requested) {
+    throw httpError(409, `Request ${request.request_code} already has enough units reserved or issued`, {
+      code: 'REQUEST_ALLOCATION_FULL',
+    });
+  }
+  if (unit.status === 'ISSUED') {
+    throw httpError(409, `Unit ${unit.unit_code} has already been issued`, { code: 'UNIT_ALREADY_ISSUED' });
+  }
+  if (isHeldForAnotherRequest(unit, request.id)) {
+    throw httpError(409, `Unit ${unit.unit_code} is reserved for another blood request`, {
+      code: 'RESERVED_FOR_OTHER_REQUEST',
+    });
+  }
+  if (unit.component !== request.component) {
+    throw httpError(422, `Unit ${unit.unit_code} is ${unit.component}, but the request is for ${request.component}`, {
+      code: 'COMPONENT_MISMATCH',
+    });
+  }
+  if (!isReleasable) {
+    throw httpError(422, `Unit ${unit.unit_code} is not available, has expired, or has not passed lab screening`, {
+      code: 'UNIT_NOT_AVAILABLE',
+    });
+  }
+  if (!crossmatch) {
+    throw httpError(422, `No cross-match recorded for unit ${unit.unit_code}`, { code: 'NO_CROSSMATCH' });
+  }
+  if (crossmatch.result !== 'COMPATIBLE') {
+    throw httpError(422, `The latest cross-match for unit ${unit.unit_code} is ${crossmatch.result}`, {
+      code: 'INCOMPATIBLE_CROSSMATCH',
+    });
+  }
+  if (!isBloodGroupCompatible(request.patient_blood_group, unit.blood_group, request.component)) {
+    throw httpError(422, `Unit ${unit.unit_code} is not ABO/Rh compatible with this request`, {
+      code: 'INCOMPATIBLE_BLOOD_GROUP',
+    });
+  }
+}
+
+async function issueUnitForRequest({ idOrCode, body = {}, user } = {}, repository = defaultRepository) {
+  const unitCode = typeof body.unitCode === 'string' ? body.unitCode.trim().toUpperCase() : '';
+  const receivedBy = typeof body.receivedBy === 'string' ? body.receivedBy.trim() : '';
+  const errors = {};
+  if (!unitCode) errors.unitCode = 'Unit code is required';
+  if (!receivedBy) errors.receivedBy = 'Recipient name is required';
+  else if (receivedBy.length > 100) errors.receivedBy = 'Recipient name must not exceed 100 characters';
+  if (Object.keys(errors).length > 0) throw httpError(400, 'Validation failed', { errors });
+
+  const request = await repository.findByIdOrCode(idOrCode);
+  if (!request) throw httpError(404, `Blood request '${idOrCode}' not found`);
+
+  const result = await repository.issueUnit(
+    { requestId: request.id, unitCode, userId: user.id, receivedBy },
+    planIssuance
+  );
+  if (result.requestNotFound) throw httpError(404, `Blood request '${idOrCode}' not found`);
+  if (result.unitNotFound) throw httpError(404, `Blood unit '${unitCode}' not found`);
+
+  return {
+    request: {
+      id: request.id,
+      requestCode: request.requestCode,
+      status: result.requestStatus,
+    },
+    issuance: result.issuance,
+  };
+}
+
+async function getIssuancesForRequest(idOrCode, user, repository = defaultRepository) {
+  const request = await getBloodRequestById(idOrCode, user, repository);
+  const issuances = await repository.listIssuancesForRequest(request.id);
+  return { request, issuances };
+}
+
 /**
  * BBMS-F-042: True when the unit is on an active hold for a request other than requestId.
  * A hold whose window has run out (reservation_active false) no longer blocks anyone.
@@ -501,11 +601,18 @@ function validateReservationInput(body = {}, env = process.env) {
  * @param {boolean} context.isReleasable unit passes the F-022 release gate
  * @param {object|null} context.crossmatch latest cross-match for this request and unit
  * @param {number} context.activeCount active holds already on this request
+ * @param {number} context.issuedCount units already issued for this request
  */
-function planReservation({ request, unit, isReleasable, crossmatch, activeCount }) {
+function planReservation({ request, unit, isReleasable, crossmatch, activeCount, issuedCount = 0 }) {
   if (!RESERVABLE_REQUEST_STATUSES.includes(request.status)) {
     throw httpError(409, `Units can't be reserved for a request that is ${request.status}`, {
       code: 'REQUEST_NOT_RESERVABLE',
+    });
+  }
+
+  if (!request.patient_blood_group && (request.priority !== 'EMERGENCY' || request.component !== 'PRBC')) {
+    throw httpError(422, 'An unknown blood group can only be reserved O-negative PRBC for an emergency request', {
+      code: 'EMERGENCY_FALLBACK_REQUIRED',
     });
   }
 
@@ -520,10 +627,10 @@ function planReservation({ request, unit, isReleasable, crossmatch, activeCount 
     });
   }
 
-  if (activeCount >= request.units_requested) {
+  if (activeCount + issuedCount >= request.units_requested) {
     throw httpError(
       409,
-      `Request ${request.request_code} already has ${activeCount} of ${request.units_requested} unit(s) reserved`,
+      `Request ${request.request_code} already has ${activeCount + issuedCount} of ${request.units_requested} unit(s) reserved or issued`,
       { code: 'RESERVATION_LIMIT_REACHED' }
     );
   }
@@ -701,4 +808,6 @@ module.exports = {
   recordCrossmatch,
   checkIssuanceReadiness,
   getCrossmatchesForRequest,
+  issueUnitForRequest,
+  getIssuancesForRequest,
 };

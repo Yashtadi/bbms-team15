@@ -90,4 +90,57 @@ describe('TC-Sec-02: LoginForm', () => {
     expect(onLogin).not.toHaveBeenCalled();
     expect(sessionStorage.getItem('bbms.session')).toBeNull();
   });
+
+  it('requires authenticator enrollment and code before Admin receives a session', async () => {
+    const user = userEvent.setup();
+    const session = { token: 'admin-token', user: { id: 1, fullName: 'Asha Admin', role: 'ADMIN' } };
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ mfaSetupRequired: true, setupToken: 'setup-token' }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ secret: 'JBSWY3DPEHPK3PXP', otpauthUrl: 'otpauth://totp/BBMS' }),
+      })
+      .mockResolvedValueOnce({ status: 200, json: async () => session });
+    const onLogin = vi.fn();
+
+    render(<LoginForm onLogin={onLogin} />);
+    await user.type(screen.getByLabelText('Email'), 'admin@bbms.test');
+    await user.type(screen.getByLabelText('Password'), 'Password@123');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    expect(await screen.findByTestId('mfa-setup-secret')).toHaveTextContent('JBSWY3DPEHPK3PXP');
+    expect(onLogin).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('bbms.session')).toBeNull();
+
+    await user.type(screen.getByLabelText('Authenticator code'), '123456');
+    await user.click(screen.getByRole('button', { name: 'Verify and sign in' }));
+    await waitFor(() => expect(onLogin).toHaveBeenCalledWith(session));
+    expect(JSON.parse(sessionStorage.getItem('bbms.session')).token).toBe('admin-token');
+  });
+
+  it('requires a valid authenticator challenge code for an enrolled Manager', async () => {
+    const user = userEvent.setup();
+    const session = { token: 'manager-token', user: { id: 2, fullName: 'Manoj Manager', role: 'MANAGER' } };
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ mfaRequired: true, challengeToken: 'challenge-token' }),
+      })
+      .mockResolvedValueOnce({ status: 200, json: async () => session });
+    const onLogin = vi.fn();
+
+    render(<LoginForm onLogin={onLogin} />);
+    await user.type(screen.getByLabelText('Email'), 'manager@bbms.test');
+    await user.type(screen.getByLabelText('Password'), 'Password@123');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+    expect(await screen.findByLabelText('Authenticator code')).toBeInTheDocument();
+    expect(sessionStorage.getItem('bbms.session')).toBeNull();
+
+    await user.type(screen.getByLabelText('Authenticator code'), '654321');
+    await user.click(screen.getByRole('button', { name: 'Verify and sign in' }));
+    await waitFor(() => expect(onLogin).toHaveBeenCalledWith(session));
+  });
 });

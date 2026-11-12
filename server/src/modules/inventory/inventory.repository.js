@@ -9,9 +9,13 @@ const EXPIRED_RESERVATION_SQL =
 // BBMS-F-022: the single definition of "releasable stock". Both the unit list and the
 // F-030 dashboard summary use it, so the dashboard can never count a unit the list hides.
 // F-042: units on an active reservation are excluded, so they can't be allocated twice.
-function releasableStockFilter({ bloodGroup = null, component = null } = {}) {
+function releasableStockFilter({ bloodGroup = null, component = null, reservedForRequestId = null } = {}) {
   const conditions = [
-    `(bu.status = 'AVAILABLE' OR ${EXPIRED_RESERVATION_SQL})`,
+    reservedForRequestId
+      ? `(bu.status = 'AVAILABLE' OR ${EXPIRED_RESERVATION_SQL} OR
+          (bu.status = 'RESERVED' AND bu.reserved_for_request_id = ?
+           AND (bu.reserved_until IS NULL OR bu.reserved_until > NOW())))`
+      : `(bu.status = 'AVAILABLE' OR ${EXPIRED_RESERVATION_SQL})`,
     'bu.expires_at > NOW()',
     `EXISTS (
       SELECT 1 FROM lab_results abo
@@ -26,7 +30,7 @@ function releasableStockFilter({ bloodGroup = null, component = null } = {}) {
         AND tti.result = 'NON_REACTIVE'
     ) = 5`,
   ];
-  const values = [];
+  const values = reservedForRequestId ? [reservedForRequestId] : [];
   if (bloodGroup) {
     conditions.push('bu.blood_group = ?');
     values.push(bloodGroup);

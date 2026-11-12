@@ -213,6 +213,21 @@
   cursor: not-allowed;
 }
 
+.mfa-instructions {
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.mfa-setup-key {
+  display: block;
+  margin: 8px 0 16px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--card-inner-bg);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .login-card .login-hint {
   margin: 20px 0 0;
   font-size: 0.8rem;

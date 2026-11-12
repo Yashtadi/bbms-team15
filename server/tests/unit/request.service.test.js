@@ -6,6 +6,9 @@ const {
   recordCrossmatch,
   checkIssuanceReadiness,
   getCrossmatchesForRequest,
+  issueUnitForRequest,
+  getIssuancesForRequest,
+  planReservation,
 } = require('../../src/modules/request/request.service');
 
 describe('TC-Req-01: BBMS-F-040 Blood Request Service (Unit)', () => {
@@ -29,6 +32,184 @@ describe('TC-Req-01: BBMS-F-040 Blood Request Service (Unit)', () => {
       expect(result.data.unitsRequested).toBe(2);
       expect(result.data.priority).toBe('ROUTINE');
       expect(result.data.requiredBy).toBe('2026-11-20T10:00:00.000Z');
+    });
+
+    describe('TC-Req-04: BBMS-F-043 chain of custody (unit)', () => {
+      const request = {
+        id: 8,
+        requestCode: 'R-000008',
+        hospitalUserId: 5,
+        status: 'PENDING',
+        unitsRequested: 1,
+      };
+      const lockedRequest = {
+        id: 8,
+        request_code: 'R-000008',
+        status: 'PENDING',
+        units_requested: 1,
+        patient_blood_group: 'A+',
+        component: 'PRBC',
+      };
+      const unit = {
+        id: 41,
+        unit_code: 'U-2026-000041',
+        component: 'PRBC',
+        blood_group: 'O-',
+        status: 'AVAILABLE',
+        reservation_active: false,
+      };
+      const issued = {
+        id: 5,
+        requestId: 8,
+        requestCode: 'R-000008',
+        unitId: 41,
+        unitCode: 'U-2026-000041',
+        crossmatchId: 12,
+        issuedBy: 3,
+        issuerName: 'Labtech 1',
+        issuedAt: '2026-11-12T10:00:00.000Z',
+        receivedBy: 'City Hospital Desk',
+      };
+
+      it('requires the recipient and unit code before attempting issuance', async () => {
+        const repository = { findByIdOrCode: jest.fn(), issueUnit: jest.fn() };
+        await expect(
+          issueUnitForRequest({ idOrCode: request.requestCode, body: {}, user: { id: 3 } }, repository)
+        ).rejects.toMatchObject({ status: 400, errors: expect.objectContaining({ receivedBy: expect.any(String) }) });
+        expect(repository.issueUnit).not.toHaveBeenCalled();
+      });
+
+      it('records an issuance only after a compatible cross-match and returns linked custody details', async () => {
+        const repository = {
+          findByIdOrCode: jest.fn().mockResolvedValue(request),
+          issueUnit: jest.fn(async (params, plan) => {
+            plan({
+              request: lockedRequest,
+              unit,
+              isReleasable: true,
+              crossmatch: { id: 12, result: 'COMPATIBLE' },
+              issuedCount: 0,
+            });
+            expect(params).toEqual({
+              requestId: 8,
+              unitCode: unit.unit_code,
+              userId: 3,
+              receivedBy: 'City Hospital Desk',
+            });
+            return { issuance: issued, requestStatus: 'ISSUED' };
+          }),
+        };
+
+        const result = await issueUnitForRequest({
+          idOrCode: request.requestCode,
+          body: { unitCode: unit.unit_code, receivedBy: '  City Hospital Desk  ' },
+          user: { id: 3 },
+        }, repository);
+
+        expect(result.request.status).toBe('ISSUED');
+        expect(result.issuance).toEqual(issued);
+      });
+
+      it('blocks issue when no compatible cross-match exists', async () => {
+        const repository = {
+          findByIdOrCode: jest.fn().mockResolvedValue(request),
+          issueUnit: jest.fn((params, plan) => plan({
+            request: lockedRequest,
+            unit,
+            isReleasable: true,
+            crossmatch: null,
+            issuedCount: 0,
+          })),
+        };
+        await expect(
+          issueUnitForRequest({
+            idOrCode: request.requestCode,
+            body: { unitCode: unit.unit_code, receivedBy: 'City Hospital Desk' },
+            user: { id: 3 },
+          }, repository)
+        ).rejects.toMatchObject({ status: 422, code: 'NO_CROSSMATCH' });
+      });
+
+      it('does not issue unknown-group fallback units for non-emergency requests', async () => {
+        const repository = {
+          findByIdOrCode: jest.fn().mockResolvedValue(request),
+          issueUnit: jest.fn((params, plan) => plan({
+            request: { ...lockedRequest, patient_blood_group: null, priority: 'ROUTINE' },
+            unit,
+            isReleasable: true,
+            crossmatch: { id: 12, result: 'COMPATIBLE' },
+            issuedCount: 0,
+          })),
+        };
+        await expect(
+          issueUnitForRequest({
+            idOrCode: request.requestCode,
+            body: { unitCode: unit.unit_code, receivedBy: 'City Hospital Desk' },
+            user: { id: 3 },
+          }, repository)
+        ).rejects.toMatchObject({ status: 422, code: 'EMERGENCY_FALLBACK_REQUIRED' });
+      });
+
+      it('allows unknown-group O-negative PRBC issuance for an emergency after cross-match', async () => {
+        const repository = {
+          findByIdOrCode: jest.fn().mockResolvedValue(request),
+          issueUnit: jest.fn((params, plan) => {
+            plan({
+              request: { ...lockedRequest, patient_blood_group: null, priority: 'EMERGENCY' },
+              unit,
+              isReleasable: true,
+              crossmatch: { id: 12, result: 'COMPATIBLE' },
+              issuedCount: 0,
+            });
+            return { issuance: issued, requestStatus: 'ISSUED' };
+          }),
+        };
+        await expect(
+          issueUnitForRequest({
+            idOrCode: request.requestCode,
+            body: { unitCode: unit.unit_code, receivedBy: 'City Hospital Desk' },
+            user: { id: 3 },
+          }, repository)
+        ).resolves.toMatchObject({ request: { status: 'ISSUED' } });
+      });
+
+      it('counts issued units against future reservation capacity', () => {
+        const reserveAfterPartialIssue = () => planReservation({
+          request: {
+            id: 8,
+            request_code: request.requestCode,
+            status: 'PENDING',
+            units_requested: 2,
+            patient_blood_group: 'A+',
+            component: 'PRBC',
+          },
+          unit: { ...unit, reservation_active: false },
+          isReleasable: true,
+          crossmatch: { id: 12, result: 'COMPATIBLE' },
+          activeCount: 1,
+          issuedCount: 1,
+        });
+        try {
+          reserveAfterPartialIssue();
+          throw new Error('Expected reservation to be rejected');
+        } catch (error) {
+          expect(error).toMatchObject({ status: 409, code: 'RESERVATION_LIMIT_REACHED' });
+        }
+      });
+
+      it('returns issuance history only after applying request tenancy checks', async () => {
+        const repository = {
+          findByIdOrCode: jest.fn().mockResolvedValue(request),
+          listIssuancesForRequest: jest.fn().mockResolvedValue([issued]),
+        };
+        const result = await getIssuancesForRequest(
+          request.requestCode,
+          { id: 5, role: 'HOSPITAL' },
+          repository
+        );
+        expect(result.issuances).toEqual([issued]);
+        expect(repository.listIssuancesForRequest).toHaveBeenCalledWith(request.id);
+      });
     });
 
     it('defaults priority to ROUTINE when omitted', () => {
@@ -94,6 +275,12 @@ describe('TC-Req-01: BBMS-F-040 Blood Request Service (Unit)', () => {
       const result = validateBloodRequestInput({ ...validPayload, patientBloodGroup: 'XYZ+' });
       expect(result.isValid).toBe(false);
       expect(result.errors.patientBloodGroup).toMatch(/Valid patient blood group is required/i);
+    });
+
+    it('accepts UNKNOWN blood group and normalizes it to null', () => {
+      const result = validateBloodRequestInput({ ...validPayload, patientBloodGroup: 'unknown' });
+      expect(result.isValid).toBe(true);
+      expect(result.data.patientBloodGroup).toBeNull();
     });
 
     it('rejects invalid blood component', () => {
@@ -427,6 +614,25 @@ describe('TC-Req-01: BBMS-F-040 Blood Request Service (Unit)', () => {
           status: 422,
           message: /clinically incompatible/i,
         });
+      });
+
+      it('does not mark an unknown-group non-emergency request compatible with O-negative blood', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue({
+            ...mockRequest,
+            patientBloodGroup: null,
+            priority: 'ROUTINE',
+          }),
+          findUnitByCode: jest.fn().mockResolvedValue(mockUnit),
+          createCrossmatch: jest.fn(),
+        };
+        await expect(
+          recordCrossmatch(
+            { idOrCode: 'R-000001', unitCode: 'U-000001', result: 'COMPATIBLE', performedBy: 3 },
+            mockRepo
+          )
+        ).rejects.toMatchObject({ status: 422, code: 'EMERGENCY_FALLBACK_REQUIRED' });
+        expect(mockRepo.createCrossmatch).not.toHaveBeenCalled();
       });
 
       it('allows recording INCOMPATIBLE even when ABO blood groups are clinically incompatible', async () => {

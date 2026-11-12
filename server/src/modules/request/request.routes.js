@@ -141,6 +141,7 @@ router.get('/:idOrCode/fefo-suggestions', requireRole('HOSPITAL', 'LAB_TECH', 'M
       patientBloodGroup: request.patientBloodGroup,
       component: request.component,
       unitsRequested: request.unitsRequested,
+      allowEmergencyFallback: request.priority === 'EMERGENCY',
     });
     return res.status(200).json({
       requestId: request.id,
@@ -181,6 +182,37 @@ router.get('/:idOrCode/crossmatch/:unitCode/check', requireRole('HOSPITAL', 'LAB
       message: 'Failed to check issuance readiness',
       error: error.message,
     });
+  }
+});
+
+/**
+ * BBMS-F-043: Issue a cross-matched unit and write its immutable chain-of-custody record.
+ * POST /api/blood-requests/:idOrCode/issuances { unitCode, receivedBy } -> 201
+ * Roles: LAB_TECH, MANAGER, ADMIN.
+ */
+router.post('/:idOrCode/issuances', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const result = await requestService.issueUnitForRequest({
+      idOrCode: req.params.idOrCode,
+      body: req.body || {},
+      user: req.user,
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    return sendReservationError(res, error, 'Failed to issue blood unit');
+  }
+});
+
+/**
+ * BBMS-F-043: Read custody records for a request. Hospital users can only read their own.
+ * GET /api/blood-requests/:idOrCode/issuances -> 200 { request, issuances }
+ */
+router.get('/:idOrCode/issuances', requireRole('HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const result = await requestService.getIssuancesForRequest(req.params.idOrCode, req.user);
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendReservationError(res, error, 'Failed to retrieve issuance records');
   }
 });
 

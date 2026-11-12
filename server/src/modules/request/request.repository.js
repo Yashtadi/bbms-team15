@@ -416,7 +416,7 @@ const RESERVATION_UNIT_COLUMNS = `id, unit_code, component, blood_group, volume_
 
 async function lockRequest(conn, requestId) {
   const [rows] = await conn.query(
-    `SELECT id, request_code, patient_blood_group, component, units_requested, status
+    `SELECT id, request_code, patient_blood_group, component, units_requested, priority, status
      FROM blood_requests WHERE id = ? FOR UPDATE`,
     [requestId]
   );
@@ -431,12 +431,14 @@ async function lockUnit(conn, unitCode) {
   return rows[0] || null;
 }
 
-async function countActiveReservations(requestId, connection = null) {
+async function countActiveReservations(requestId, connection = null, excludeUnitId = null) {
   const runner = connection || db;
+  const excludeClause = excludeUnitId === null ? '' : ' AND id <> ?';
+  const values = excludeUnitId === null ? [requestId] : [requestId, excludeUnitId];
   const [rows] = await runner.query(
     `SELECT COUNT(*) AS active FROM blood_units
-     WHERE reserved_for_request_id = ? AND ${RESERVATION_ACTIVE_SQL}`,
-    [requestId]
+     WHERE reserved_for_request_id = ? AND ${RESERVATION_ACTIVE_SQL}${excludeClause}`,
+    values
   );
   return Number(rows[0]?.active || 0);
 }
@@ -450,7 +452,8 @@ async function syncRequestStatus(conn, requestId) {
     `UPDATE blood_requests br
      SET br.status = IF(
        (SELECT COUNT(*) FROM blood_units
-        WHERE reserved_for_request_id = br.id AND ${RESERVATION_ACTIVE_SQL}) >= br.units_requested,
+        WHERE reserved_for_request_id = br.id AND ${RESERVATION_ACTIVE_SQL})
+       + (SELECT COUNT(*) FROM issuances WHERE request_id = br.id) >= br.units_requested,
        'RESERVED', 'PENDING')
      WHERE br.id = ? AND br.status IN ('PENDING', 'RESERVED')`,
     [requestId]
@@ -494,6 +497,11 @@ async function reserveUnit({ requestId, unitCode, holdMinutes, userId }, planRes
     );
     const crossmatch = await findLatestCrossmatch(request.id, unit.id, conn);
     const activeCount = await countActiveReservations(request.id, conn);
+    const [issuedRows] = await conn.query(
+      'SELECT COUNT(*) AS issued FROM issuances WHERE request_id = ?',
+      [request.id]
+    );
+    const issuedCount = Number(issuedRows[0]?.issued || 0);
 
     planReservation({
       request,
@@ -501,6 +509,7 @@ async function reserveUnit({ requestId, unitCode, holdMinutes, userId }, planRes
       isReleasable: releasableRows.length > 0,
       crossmatch,
       activeCount,
+      issuedCount,
     });
 
     await conn.query(
@@ -686,6 +695,133 @@ async function listReservationsForRequest(requestId, connection = null) {
   }));
 }
 
+async function issueUnit({ requestId, unitCode, userId, receivedBy }, planIssuance) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const request = await lockRequest(conn, requestId);
+    if (!request) {
+      await conn.rollback();
+      return { requestNotFound: true };
+    }
+
+    const unit = await lockUnit(conn, unitCode);
+    if (!unit) {
+      await conn.rollback();
+      return { unitNotFound: true };
+    }
+
+    const { where, values } = releasableStockFilter({ reservedForRequestId: request.id });
+    const [releasableRows] = await conn.query(
+      `SELECT bu.id FROM blood_units bu WHERE bu.id = ? AND ${where}`,
+      [unit.id, ...values]
+    );
+    const crossmatch = await findLatestCrossmatch(request.id, unit.id, conn);
+    const [issuedRows] = await conn.query(
+      'SELECT COUNT(*) AS issued FROM issuances WHERE request_id = ?',
+      [request.id]
+    );
+    const otherActiveReservationCount = await countActiveReservations(request.id, conn, unit.id);
+
+    planIssuance({
+      request,
+      unit: { ...unit, reservation_active: Boolean(Number(unit.reservation_active)) },
+      isReleasable: releasableRows.length > 0,
+      crossmatch,
+      issuedCount: Number(issuedRows[0]?.issued || 0),
+      otherActiveReservationCount,
+    });
+
+    const [insertResult] = await conn.query(
+      `INSERT INTO issuances (request_id, unit_id, crossmatch_id, issued_by, received_by)
+       VALUES (?, ?, ?, ?, ?)`,
+      [request.id, unit.id, crossmatch.id, userId, receivedBy]
+    );
+
+    await conn.query(
+      `UPDATE blood_units
+       SET status = 'ISSUED', reserved_for_request_id = NULL, reserved_until = NULL, reserved_by = NULL
+       WHERE id = ?`,
+      [unit.id]
+    );
+
+    const issuedCount = Number(issuedRows[0]?.issued || 0) + 1;
+    let requestStatus;
+    if (issuedCount >= request.units_requested) {
+      await conn.query("UPDATE blood_requests SET status = 'ISSUED' WHERE id = ?", [request.id]);
+      requestStatus = 'ISSUED';
+    } else {
+      requestStatus = await syncRequestStatus(conn, request.id);
+    }
+
+    await conn.query(
+      `INSERT INTO audit_log (user_id, action, entity_type, entity_id, details)
+       VALUES (?, 'UNIT_ISSUED', 'blood_unit', ?, ?)`,
+      [
+        userId,
+        unit.unit_code,
+        JSON.stringify({
+          issuanceId: insertResult.insertId,
+          requestId: request.id,
+          requestCode: request.request_code,
+          unitId: unit.id,
+          crossmatchId: crossmatch.id,
+          receivedBy,
+        }),
+      ]
+    );
+
+    const [[issuance]] = await conn.query(
+      `SELECT i.id, i.request_id AS requestId, br.request_code AS requestCode,
+              i.unit_id AS unitId, bu.unit_code AS unitCode, i.crossmatch_id AS crossmatchId,
+              i.issued_by AS issuedBy, u.full_name AS issuerName, i.issued_at AS issuedAt,
+              i.received_by AS receivedBy
+       FROM issuances i
+       JOIN blood_requests br ON br.id = i.request_id
+       JOIN blood_units bu ON bu.id = i.unit_id
+       JOIN users u ON u.id = i.issued_by
+       WHERE i.id = ?`,
+      [insertResult.insertId]
+    );
+
+    await conn.commit();
+    return {
+      issuance: {
+        ...issuance,
+        issuedAt: issuance.issuedAt ? new Date(issuance.issuedAt).toISOString() : null,
+      },
+      requestStatus,
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+async function listIssuancesForRequest(requestId, connection = null) {
+  const runner = connection || db;
+  const [rows] = await runner.query(
+    `SELECT i.id, i.request_id AS requestId, br.request_code AS requestCode,
+            i.unit_id AS unitId, bu.unit_code AS unitCode, i.crossmatch_id AS crossmatchId,
+            i.issued_by AS issuedBy, u.full_name AS issuerName, i.issued_at AS issuedAt,
+            i.received_by AS receivedBy
+     FROM issuances i
+     JOIN blood_requests br ON br.id = i.request_id
+     JOIN blood_units bu ON bu.id = i.unit_id
+     JOIN users u ON u.id = i.issued_by
+     WHERE i.request_id = ?
+     ORDER BY i.issued_at ASC, i.id ASC`,
+    [requestId]
+  );
+  return rows.map((row) => ({
+    ...row,
+    issuedAt: row.issuedAt ? new Date(row.issuedAt).toISOString() : null,
+  }));
+}
+
 module.exports = {
   formatRequestCode,
   parseRequestCode,
@@ -704,4 +840,6 @@ module.exports = {
   releaseReservation,
   releaseExpiredReservations,
   listReservationsForRequest,
+  issueUnit,
+  listIssuancesForRequest,
 };

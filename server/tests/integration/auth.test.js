@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../../src/app');
 const db = require('../../src/db');
+const { generateTotp } = require('../../src/modules/auth/mfa.totp');
 
 const PASSWORD = 'Password@123'; // seed password, see server/db/seed.sql
 const eligiblePayload = { age: 30, weight: 60, hemoglobin: 13.5, daysSinceLastDonation: 100 };
@@ -12,7 +13,15 @@ async function loginAs(email) {
 
 describe('TC-Sec-02: login and role-based access (integration)', () => {
   afterAll(async () => {
-    await db.end();
+    try {
+      await db.query(
+        `UPDATE users
+         SET mfa_secret = NULL, mfa_enabled = FALSE, mfa_failed_attempts = 0, mfa_locked_until = NULL
+         WHERE id IN (1, 2)`
+      );
+    } finally {
+      await db.end();
+    }
   });
 
   describe('POST /api/auth/login', () => {
@@ -40,6 +49,72 @@ describe('TC-Sec-02: login and role-based access (integration)', () => {
       const res = await request(app).post('/api/auth/login').send({ email: 'labtech@bbms.test' });
 
       expect(res.status).toBe(400);
+    });
+
+    it('requires an authenticator code before Admin can receive an access token', async () => {
+      await db.query(
+        `UPDATE users
+         SET mfa_secret = NULL, mfa_enabled = FALSE, mfa_failed_attempts = 0, mfa_locked_until = NULL
+         WHERE id = 1`
+      );
+      const firstFactor = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'admin@bbms.test', password: PASSWORD });
+
+      expect(firstFactor.status).toBe(200);
+      expect(firstFactor.body.mfaSetupRequired).toBe(true);
+      expect(firstFactor.body).not.toHaveProperty('token');
+
+      const setup = await request(app)
+        .post('/api/auth/mfa/setup')
+        .send({ setupToken: firstFactor.body.setupToken });
+      expect(setup.status).toBe(200);
+
+      const enrolled = await request(app)
+        .post('/api/auth/mfa/setup/verify')
+        .send({
+          setupToken: firstFactor.body.setupToken,
+          code: generateTotp(setup.body.secret),
+        });
+      expect(enrolled.status).toBe(200);
+      expect(enrolled.body.token).toEqual(expect.any(String));
+
+      const nextLogin = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'admin@bbms.test', password: PASSWORD });
+      expect(nextLogin.body.mfaRequired).toBe(true);
+      expect(nextLogin.body).not.toHaveProperty('token');
+
+      const denied = await request(app)
+        .post('/api/auth/mfa/verify')
+        .send({ challengeToken: nextLogin.body.challengeToken, code: 'not-a-code' });
+      expect(denied.status).toBe(401);
+      expect(denied.body).not.toHaveProperty('token');
+
+      const verified = await request(app)
+        .post('/api/auth/mfa/verify')
+        .send({
+          challengeToken: nextLogin.body.challengeToken,
+          code: generateTotp(setup.body.secret),
+        });
+      expect(verified.status).toBe(200);
+      expect(verified.body.token).toEqual(expect.any(String));
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const invalid = await request(app)
+          .post('/api/auth/mfa/verify')
+          .send({ challengeToken: nextLogin.body.challengeToken, code: 'not-a-code' });
+        expect(invalid.status).toBe(attempt === 4 ? 429 : 401);
+      }
+
+      const lockedOut = await request(app)
+        .post('/api/auth/mfa/verify')
+        .send({
+          challengeToken: nextLogin.body.challengeToken,
+          code: generateTotp(setup.body.secret),
+        });
+      expect(lockedOut.status).toBe(429);
+      expect(lockedOut.body).not.toHaveProperty('token');
     });
   });
 

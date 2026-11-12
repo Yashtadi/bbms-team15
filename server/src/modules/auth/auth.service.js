@@ -1,8 +1,52 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const repository = require('./auth.repository');
+const { encrypt, decrypt } = require('../../utils/encryption');
+const { generateSecret, verifyTotp, getOtpAuthUrl } = require('./mfa.totp');
 
 const TOKEN_EXPIRES_IN = '8h';
+const MFA_CHALLENGE_EXPIRES_IN = '5m';
+const MFA_SETUP_EXPIRES_IN = '10m';
+const MFA_ROLES = ['ADMIN', 'MANAGER'];
+
+function httpError(status, message) {
+  return Object.assign(new Error(message), { status });
+}
+
+function publicUser(user) {
+  return { id: user.id, email: user.email, fullName: user.full_name, role: user.role };
+}
+
+function signToken(user, claims = {}, expiresIn = TOKEN_EXPIRES_IN) {
+  return jwt.sign({ sub: user.id, role: user.role, ...claims }, process.env.JWT_SECRET, { expiresIn });
+}
+
+function verifyStepToken(token, purpose) {
+  if (typeof token !== 'string' || !token.trim()) throw httpError(401, 'A valid MFA token is required');
+  let payload;
+  try {
+    payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+  } catch {
+    throw httpError(401, 'MFA token is invalid or expired');
+  }
+  if (payload.purpose !== purpose || !payload.sub || !MFA_ROLES.includes(payload.role)) {
+    throw httpError(401, 'MFA token is invalid or expired');
+  }
+  return payload;
+}
+
+async function findPrivilegedUser(token, purpose) {
+  const payload = verifyStepToken(token, purpose);
+  const user = await repository.findUserById(payload.sub);
+  if (!user || !user.is_active || user.role !== payload.role || !MFA_ROLES.includes(user.role)) {
+    throw httpError(401, 'MFA token is invalid or expired');
+  }
+  return user;
+}
+
+function issueSession(user) {
+  return { token: signToken(user), user: publicUser(user) };
+}
 
 function invalidCredentials() {
   const error = new Error('Invalid email or password');
@@ -38,16 +82,66 @@ async function login({ email, password } = {}) {
     throw invalidCredentials();
   }
 
-  const token = jwt.sign(
-    { sub: user.id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: TOKEN_EXPIRES_IN }
-  );
+  if (MFA_ROLES.includes(user.role)) {
+    const enabled = user.mfa_enabled === true || Number(user.mfa_enabled) === 1;
+    if (!enabled) {
+      return {
+        mfaSetupRequired: true,
+        setupToken: signToken(user, { purpose: 'mfa_setup' }, MFA_SETUP_EXPIRES_IN),
+        user: publicUser(user),
+      };
+    }
+    return {
+      mfaRequired: true,
+      challengeToken: signToken(user, { purpose: 'mfa_challenge' }, MFA_CHALLENGE_EXPIRES_IN),
+      user: publicUser(user),
+    };
+  }
 
-  return {
-    token,
-    user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role },
-  };
+  return issueSession(user);
+}
+
+async function beginMfaSetup({ setupToken } = {}) {
+  const user = await findPrivilegedUser(setupToken, 'mfa_setup');
+  if (await repository.isMfaLocked(user.id)) throw httpError(429, 'Too many invalid authenticator codes; try again later');
+  if (user.mfa_enabled === true || Number(user.mfa_enabled) === 1) {
+    throw httpError(409, 'Multi-factor authentication is already enabled');
+  }
+  const secret = generateSecret();
+  const saved = await repository.updateMfaSecret(user.id, encrypt(secret));
+  if (!saved) throw httpError(404, 'User not found');
+  return { secret, otpauthUrl: getOtpAuthUrl(secret, user.email) };
+}
+
+async function verifyMfaSetup({ setupToken, code } = {}) {
+  const user = await findPrivilegedUser(setupToken, 'mfa_setup');
+  if (await repository.isMfaLocked(user.id)) throw httpError(429, 'Too many invalid authenticator codes; try again later');
+  if (!user.mfa_secret) throw httpError(409, 'Start multi-factor setup before verifying a code');
+  if (!verifyTotp(decrypt(user.mfa_secret), code)) {
+    const locked = await repository.recordMfaFailure(user.id);
+    throw httpError(locked ? 429 : 401, locked
+      ? 'Too many invalid authenticator codes; try again later'
+      : 'Invalid authenticator code');
+  }
+  const enabled = await repository.enableMfa(user.id);
+  if (!enabled) throw httpError(409, 'Could not enable multi-factor authentication');
+  return issueSession(user);
+}
+
+async function verifyMfa({ challengeToken, code } = {}) {
+  const user = await findPrivilegedUser(challengeToken, 'mfa_challenge');
+  if (await repository.isMfaLocked(user.id)) throw httpError(429, 'Too many invalid authenticator codes; try again later');
+  if (user.mfa_enabled !== true && Number(user.mfa_enabled) !== 1) {
+    throw httpError(401, 'Multi-factor authentication is not enabled for this account');
+  }
+  if (!user.mfa_secret || !verifyTotp(decrypt(user.mfa_secret), code)) {
+    const locked = await repository.recordMfaFailure(user.id);
+    throw httpError(locked ? 429 : 401, locked
+      ? 'Too many invalid authenticator codes; try again later'
+      : 'Invalid authenticator code');
+  }
+  await repository.clearMfaFailures(user.id);
+  return issueSession(user);
 }
 
 /**
@@ -98,4 +192,4 @@ async function changePassword({ userId, currentPassword, newPassword, confirmPas
   return { message: 'Password updated successfully' };
 }
 
-module.exports = { login, changePassword };
+module.exports = { login, beginMfaSetup, verifyMfaSetup, verifyMfa, changePassword };
