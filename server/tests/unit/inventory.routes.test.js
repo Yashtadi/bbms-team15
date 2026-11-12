@@ -234,3 +234,69 @@ describe('TC-Inv-03 (BBMS-F-032) expiry alerts routes', () => {
     expect(response.body).toEqual({ message: 'Failed to load expiry alerts' });
   });
 });
+
+describe('TC-Inv-04 (BBMS-F-033) FEFO allocation routes', () => {
+  let app;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/inventory', inventoryRouter);
+    jest.clearAllMocks();
+  });
+
+  it('requires a login token (401)', async () => {
+    const response = await request(app).get('/api/inventory/fefo?bloodGroup=A+&component=PRBC');
+    expect(response.status).toBe(401);
+  });
+
+  it('blocks DONOR from accessing FEFO allocation (403)', async () => {
+    const response = await request(app)
+      .get('/api/inventory/fefo?bloodGroup=A+&component=PRBC')
+      .set(authHeader('DONOR'));
+
+    expect(response.status).toBe(403);
+    expect(inventoryService.suggestFefoAllocation).not.toHaveBeenCalled();
+  });
+
+  it.each(['HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'])(
+    'returns FEFO allocation suggestions to %s (200)',
+    async (role) => {
+      const mockResult = {
+        patientBloodGroup: 'A+',
+        component: 'PRBC',
+        unitsRequested: 1,
+        totalCompatibleFound: 1,
+        suggestedUnits: [{ rank: 1, unitCode: 'U-2026-000004', bloodGroup: 'A+' }],
+      };
+      inventoryService.suggestFefoAllocation.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .get('/api/inventory/fefo?patientBloodGroup=A%2B&component=PRBC&unitsRequested=1')
+        .set(authHeader(role));
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(mockResult);
+      expect(inventoryService.suggestFefoAllocation).toHaveBeenCalledWith({
+        patientBloodGroup: 'A+',
+        component: 'PRBC',
+        unitsRequested: '1',
+      });
+    }
+  );
+
+  it('returns 400 when validation fails in service', async () => {
+    const err = Object.assign(new Error('Valid patient blood group is required'), {
+      status: 400,
+      code: 'INVALID_BLOOD_GROUP',
+    });
+    inventoryService.suggestFefoAllocation.mockRejectedValue(err);
+
+    const response = await request(app)
+      .get('/api/inventory/fefo?bloodGroup=INVALID&component=PRBC')
+      .set(authHeader('MANAGER'));
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('INVALID_BLOOD_GROUP');
+  });
+});

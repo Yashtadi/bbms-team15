@@ -66,6 +66,21 @@ describe('TC-Inv-01 (BBMS-F-030) inventory dashboard', () => {
       summary: jsonResponse(200, SEED_SUMMARY),
       list: jsonResponse(200, { units: SEED_UNITS }),
       alerts: jsonResponse(200, SEED_ALERTS),
+      fefo: jsonResponse(200, {
+        patientBloodGroup: 'A+',
+        component: 'PRBC',
+        suggestedUnits: [
+          {
+            rank: 1,
+            unitCode: 'U-2026-000004',
+            bloodGroup: 'A+',
+            component: 'PRBC',
+            volumeMl: 220,
+            expiresAt: IN_TWO_DAYS,
+            daysRemaining: 2,
+          },
+        ],
+      }),
     };
     apiFetch.mockImplementation(async (path) => {
       let route;
@@ -73,6 +88,8 @@ describe('TC-Inv-01 (BBMS-F-030) inventory dashboard', () => {
         route = server.summary;
       } else if (path.startsWith('/api/inventory/alerts') || path.startsWith('/api/inventory/expiry-alerts')) {
         route = server.alerts;
+      } else if (path.startsWith('/api/inventory/fefo')) {
+        route = server.fefo;
       } else {
         route = server.list;
       }
@@ -245,5 +262,81 @@ describe('TC-Inv-03 (BBMS-F-032) expiry alerts on manager dashboard', () => {
       'No units nearing expiry within 3 days. Safe shelf life.'
     );
     expect(screen.queryByTestId('expiry-alerts-table')).not.toBeInTheDocument();
+  });
+});
+
+describe('TC-Inv-04 (BBMS-F-033) FEFO allocation on manager dashboard', () => {
+  beforeEach(() => {
+    server = {
+      summary: jsonResponse(200, SEED_SUMMARY),
+      list: jsonResponse(200, { units: SEED_UNITS }),
+      alerts: jsonResponse(200, SEED_ALERTS),
+      fefo: jsonResponse(200, {
+        patientBloodGroup: 'A+',
+        component: 'PRBC',
+        suggestedUnits: [
+          {
+            rank: 1,
+            unitCode: 'U-2026-000004',
+            bloodGroup: 'A+',
+            component: 'PRBC',
+            volumeMl: 220,
+            expiresAt: IN_TWO_DAYS,
+            daysRemaining: 2,
+          },
+        ],
+      }),
+    };
+    apiFetch.mockImplementation(async (path) => {
+      let route;
+      if (path.startsWith('/api/inventory/summary')) {
+        route = server.summary;
+      } else if (path.startsWith('/api/inventory/alerts') || path.startsWith('/api/inventory/expiry-alerts')) {
+        route = server.alerts;
+      } else if (path.startsWith('/api/inventory/fefo')) {
+        route = server.fefo;
+      } else {
+        route = server.list;
+      }
+      if (route instanceof Error) throw route;
+      return route;
+    });
+  });
+
+  afterEach(() => vi.clearAllMocks());
+
+  it('renders the FEFO allocation finder card and finds soonest-to-expire compatible units', async () => {
+    render(<InventoryDashboard />);
+
+    expect(await screen.findByTestId('fefo-finder-card')).toBeInTheDocument();
+    expect(screen.getByTestId('fefo-patient-group-select')).toHaveValue('A+');
+    expect(screen.getByTestId('fefo-component-select')).toHaveValue('PRBC');
+
+    // Click "Suggest FEFO Units"
+    const findBtn = screen.getByTestId('btn-find-fefo');
+    fireEvent.click(findBtn);
+
+    expect(await screen.findByTestId('fefo-allocation-table')).toBeInTheDocument();
+    expect(screen.getByText('#1 (Soonest Expiry)')).toBeInTheDocument();
+    expect(screen.getByTestId('fefo-row-U-2026-000004')).toBeInTheDocument();
+  });
+
+  it('displays a clear message when no compatible units are found for the selected criteria', async () => {
+    server.fefo = jsonResponse(200, {
+      patientBloodGroup: 'O-',
+      component: 'CRYO',
+      suggestedUnits: [],
+    });
+
+    render(<InventoryDashboard />);
+
+    const groupSelect = await screen.findByTestId('fefo-patient-group-select');
+    fireEvent.change(groupSelect, { target: { value: 'O-' } });
+
+    const findBtn = screen.getByTestId('btn-find-fefo');
+    fireEvent.click(findBtn);
+
+    expect(await screen.findByTestId('no-fefo-units-msg')).toBeInTheDocument();
+    expect(screen.queryByTestId('fefo-allocation-table')).not.toBeInTheDocument();
   });
 });

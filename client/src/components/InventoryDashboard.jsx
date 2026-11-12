@@ -79,6 +79,26 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState('');
 
+  // BBMS-F-033: FEFO allocation state
+  const [fefoPatientGroup, setFefoPatientGroup] = useState('A+');
+  const [fefoComponent, setFefoComponent] = useState('PRBC');
+  const [fefoResults, setFefoResults] = useState(null);
+  const [loadingFefo, setLoadingFefo] = useState(false);
+
+  const handleCheckFefo = async () => {
+    setLoadingFefo(true);
+    try {
+      const data = await getJson(
+        `/api/inventory/fefo?patientBloodGroup=${encodeURIComponent(fefoPatientGroup)}&component=${encodeURIComponent(fefoComponent)}&unitsRequested=5`
+      );
+      setFefoResults(data);
+    } catch {
+      setFefoResults({ suggestedUnits: [] });
+    } finally {
+      setLoadingFefo(false);
+    }
+  };
+
   // Polling loop. setTimeout (not setInterval) waits for each request to finish before
   // scheduling the next, so slow responses never pile up. Changing a filter or threshold
   // restarts the loop, which also fetches straight away. The cleanup stops polling when the tab closes.
@@ -247,6 +267,103 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+
+          {/* BBMS-F-033 / TC-Inv-04: FEFO Unit Allocation Finder */}
+          <div className="inventory-card fefo-finder-card" data-testid="fefo-finder-card">
+            <h3 id="fefo-heading">FEFO Unit Allocation (First-Expiry-First-Out)</h3>
+            <p className="subtitle">
+              BBMS-F-033 · Suggests soonest-to-expire clinically compatible units for patient issuance
+            </p>
+
+            <div className="form-row align-end">
+              <div className="form-group">
+                <label htmlFor="fefo-patient-group">Patient blood group</label>
+                <select
+                  id="fefo-patient-group"
+                  data-testid="fefo-patient-group-select"
+                  value={fefoPatientGroup}
+                  onChange={(e) => setFefoPatientGroup(e.target.value)}
+                >
+                  {BLOOD_GROUPS.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="fefo-component">Required component</label>
+                <select
+                  id="fefo-component"
+                  data-testid="fefo-component-select"
+                  value={fefoComponent}
+                  onChange={(e) => setFefoComponent(e.target.value)}
+                >
+                  {COMPONENTS.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <button
+                  type="button"
+                  className="btn-fefo-find"
+                  data-testid="btn-find-fefo"
+                  onClick={handleCheckFefo}
+                  disabled={loadingFefo}
+                >
+                  {loadingFefo ? 'Allocating...' : 'Suggest FEFO Units'}
+                </button>
+              </div>
+            </div>
+
+            {fefoResults && (
+              <div className="fefo-results-container" data-testid="fefo-results-container">
+                {fefoResults.suggestedUnits.length === 0 ? (
+                  <p className="inventory-muted" data-testid="no-fefo-units-msg">
+                    No compatible available units in stock for {fefoPatientGroup} ({fefoComponent}).
+                  </p>
+                ) : (
+                  <div className="inventory-table-wrap">
+                    <table className="inventory-table" aria-labelledby="fefo-heading" data-testid="fefo-allocation-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Rank</th>
+                          <th scope="col">Unit ID</th>
+                          <th scope="col">Unit group</th>
+                          <th scope="col">Component</th>
+                          <th scope="col">Volume</th>
+                          <th scope="col">Expires</th>
+                          <th scope="col">FEFO Priority</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fefoResults.suggestedUnits.map((unit) => (
+                          <tr key={unit.unitCode} data-testid={`fefo-row-${unit.unitCode}`}>
+                            <td>
+                              <span className={`rank-badge ${unit.rank === 1 ? 'rank-top' : ''}`}>
+                                #{unit.rank} {unit.rank === 1 ? '(Soonest Expiry)' : ''}
+                              </span>
+                            </td>
+                            <td className="inventory-code">{unit.unitCode}</td>
+                            <td><strong>{unit.bloodGroup}</strong></td>
+                            <td>{COMPONENT_LABELS[unit.component] || unit.component}</td>
+                            <td>{unit.volumeMl} ml</td>
+                            <td>{formatDate(unit.expiresAt)}</td>
+                            <td>
+                              <span className="urgency-pill urgency-warning">
+                                {unit.daysRemaining <= 1 ? `${unit.hoursRemaining || 24}h left` : `${unit.daysRemaining} days left`}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </div>

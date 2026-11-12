@@ -52,6 +52,25 @@ router.get('/alerts/expiry', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), handle
 router.get('/expiry-alerts', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), handleExpiryAlerts);
 
 /**
+ * BBMS-F-033: FEFO allocation suggestion for issuance
+ * GET /api/inventory/fefo?patientBloodGroup=A+&component=PRBC&unitsRequested=1
+ * Allowed roles: LAB_TECH, MANAGER, ADMIN, HOSPITAL
+ */
+router.get('/fefo', requireRole('LAB_TECH', 'MANAGER', 'ADMIN', 'HOSPITAL'), async (req, res) => {
+  try {
+    const { patientBloodGroup, bloodGroup, component, unitsRequested, quantity, limit } = req.query;
+    const result = await inventoryService.suggestFefoAllocation({
+      patientBloodGroup: patientBloodGroup || bloodGroup,
+      component,
+      unitsRequested: unitsRequested || quantity || limit || 1,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendServiceError(res, error, 'Failed to suggest FEFO allocation');
+  }
+});
+
+/**
  * BBMS-F-031: Separate a whole-blood unit into components
  * POST /api/inventory/units/:unitCode/separate { components: ['PRBC','FFP','PLATELETS'], volumes? }
  *   -> 201 { parent, children }

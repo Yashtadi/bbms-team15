@@ -239,6 +239,26 @@ async function findExpiringUnits({
   return rows;
 }
 
+/**
+ * BBMS-F-033: Finds all releasable units available for allocation, ordered strictly FEFO (soonest-to-expire first).
+ * Uses releasableStockFilter to ensure only verified, safe, available units are selected.
+ * @param {object} options
+ * @param {string} [options.component]
+ * @returns {Promise<Array<object>>}
+ */
+async function findAvailableForAllocation({ component = null } = {}) {
+  const { where, values } = releasableStockFilter({ component });
+  const [rows] = await db.query(
+    `SELECT bu.id, bu.unit_code, bu.donation_id, bu.component, bu.blood_group,
+            bu.volume_ml, bu.collected_at, bu.expires_at, bu.status
+     FROM blood_units bu
+     WHERE ${where}
+     ORDER BY bu.expires_at ASC, bu.id ASC`,
+    values
+  );
+  return rows;
+}
+
 module.exports = {
   listAvailable,
   summarizeAvailable,
@@ -246,4 +266,5 @@ module.exports = {
   findLineage,
   separateUnit,
   findExpiringUnits,
+  findAvailableForAllocation,
 };

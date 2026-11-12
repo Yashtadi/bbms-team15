@@ -715,3 +715,57 @@
 .crossmatch-form .align-end {
   align-items: flex-end;
 }
+
+/* BBMS-F-033: FEFO suggested units styling */
+.fefo-suggestions-section {
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.fefo-header h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.rank-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+}
+
+.rank-top {
+  background: rgba(245, 158, 11, 0.18);
+  color: #d97706;
+  font-weight: 700;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .rank-top {
+  color: #fbbf24;
+}
+
+.btn-select-fefo {
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--accent-color, #e11d48);
+  background: transparent;
+  color: var(--accent-color, #e11d48);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-select-fefo:hover {
+  background: var(--accent-color, #e11d48);
+  color: #ffffff;
+}

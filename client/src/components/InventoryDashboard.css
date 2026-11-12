@@ -286,3 +286,61 @@
   color: #9333ea;
 }
 
+/* BBMS-F-033: FEFO allocation finder styles */
+.fefo-finder-card {
+  border-left: 4px solid #3b82f6;
+}
+
+.fefo-finder-card .form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.fefo-finder-card .align-end {
+  align-items: flex-end;
+}
+
+.btn-fefo-find {
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-fefo-find:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-fefo-find:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rank-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+}
+
+.rank-top {
+  background: rgba(245, 158, 11, 0.18);
+  color: #d97706;
+  font-weight: 700;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .rank-top {
+  color: #fbbf24;
+}
+

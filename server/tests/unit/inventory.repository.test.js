@@ -91,3 +91,25 @@ describe('TC-Inv-03 (BBMS-F-032) expiry alerts repository query', () => {
     expect(result).toBe(fakeRows);
   });
 });
+
+describe('TC-Inv-04 (BBMS-F-033) FEFO allocation repository query', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('queries releasable stock matching component and orders strictly FEFO (expires_at ASC, id ASC)', async () => {
+    const fakeRows = [
+      { id: 4, unit_code: 'U-2026-000004', blood_group: 'A+', component: 'PRBC', expires_at: '2026-11-05T00:00:00.000Z' },
+      { id: 1, unit_code: 'U-2026-000001', blood_group: 'O-', component: 'PRBC', expires_at: '2026-12-05T00:00:00.000Z' },
+    ];
+    db.query.mockResolvedValue([fakeRows]);
+
+    const result = await inventoryRepository.findAvailableForAllocation({ component: 'PRBC' });
+
+    const [sql, values] = db.query.mock.calls[0];
+    expect(sql).toContain("bu.status = 'AVAILABLE'");
+    expect(sql).toContain('bu.expires_at > NOW()');
+    expect(sql).toContain('bu.component = ?');
+    expect(sql).toContain('ORDER BY bu.expires_at ASC, bu.id ASC');
+    expect(values).toEqual(['PRBC']);
+    expect(result).toBe(fakeRows);
+  });
+});

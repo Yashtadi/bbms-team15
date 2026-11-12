@@ -229,6 +229,11 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ crossmatches: [] }),
+        })
+        // FEFO suggestions
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ suggestedUnits: [] }),
         });
 
       render(<HospitalRequestDesk />);
@@ -269,7 +274,12 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
           ok: true,
           json: async () => ({ crossmatches: [] }),
         })
-        // 3. POST record crossmatch
+        // 3. Fetch FEFO suggestions
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ suggestedUnits: [] }),
+        })
+        // 4. POST record crossmatch
         .mockResolvedValueOnce({
           ok: true,
           status: 201,
@@ -284,7 +294,7 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
             },
           }),
         })
-        // 4. Refresh crossmatches after post
+        // 5. Refresh crossmatches after post
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
@@ -302,7 +312,7 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
             ],
           }),
         })
-        // 5. Refresh requests
+        // 6. Refresh requests
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ requests: [mockRequest] }),
@@ -355,6 +365,10 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
           json: async () => ({ crossmatches: [] }),
         })
         .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ suggestedUnits: [] }),
+        })
+        .mockResolvedValueOnce({
           ok: false,
           status: 422,
           json: async () => ({
@@ -374,6 +388,63 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
           screen.getByText(/clinically incompatible with patient blood group/i)
         ).toBeInTheDocument();
       });
+    });
+
+    it('TC-Inv-04: renders FEFO suggested units for allocation and fills input on selection', async () => {
+      sessionStorage.clear();
+      api.saveSession({
+        token: 'fake-jwt-token',
+        user: {
+          id: 3,
+          email: 'labtech@bbms.test',
+          fullName: 'Labtech 1',
+          role: 'LAB_TECH',
+        },
+      });
+
+      const user = userEvent.setup();
+      vi.spyOn(api, 'apiFetch')
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ requests: [mockRequest] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ crossmatches: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            requestCode: 'R-000001',
+            patientBloodGroup: 'A+',
+            suggestedUnits: [
+              {
+                rank: 1,
+                unitCode: 'U-2026-000004',
+                bloodGroup: 'A+',
+                component: 'PRBC',
+                volumeMl: 220,
+                expiresAt: new Date(Date.now() + 2 * 86400000).toISOString(),
+                daysRemaining: 2,
+              },
+            ],
+          }),
+        });
+
+      render(<HospitalRequestDesk />);
+
+      const viewBtn = await screen.findByTestId('btn-view-R-000001');
+      await user.click(viewBtn);
+
+      expect(await screen.findByTestId('fefo-suggestions-section')).toBeInTheDocument();
+      expect(screen.getByTestId('fefo-row-U-2026-000004')).toBeInTheDocument();
+      expect(screen.getByText('#1 (Soonest Expiry)')).toBeInTheDocument();
+
+      // Clicking "Select for Cross-match" fills the unit code input
+      const selectBtn = screen.getByTestId('btn-select-fefo-U-2026-000004');
+      await user.click(selectBtn);
+
+      expect(screen.getByTestId('crossmatch-unit-input')).toHaveValue('U-2026-000004');
     });
   });
 });

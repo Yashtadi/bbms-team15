@@ -151,3 +151,95 @@ describe('TC-Inv-03 (BBMS-F-032) expiry alerts service', () => {
     expect(result.thresholdDays).toBe(3);
   });
 });
+
+describe('TC-Inv-04 (BBMS-F-033) FEFO allocation service', () => {
+  const now = new Date('2026-11-03T12:00:00.000Z');
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('rejects invalid blood group or component with 400', async () => {
+    await expect(
+      inventoryService.suggestFefoAllocation({ patientBloodGroup: 'INVALID', component: 'PRBC', now })
+    ).rejects.toMatchObject({ status: 400, code: 'INVALID_BLOOD_GROUP' });
+
+    await expect(
+      inventoryService.suggestFefoAllocation({ patientBloodGroup: 'A+', component: 'UNKNOWN', now })
+    ).rejects.toMatchObject({ status: 400, code: 'INVALID_COMPONENT' });
+
+    await expect(
+      inventoryService.suggestFefoAllocation({ patientBloodGroup: 'A+', component: 'PRBC', unitsRequested: 0, now })
+    ).rejects.toMatchObject({ status: 400, code: 'INVALID_QUANTITY' });
+  });
+
+  it('filters by clinical compatibility and suggests soonest-to-expire unit first (FEFO)', async () => {
+    // Inventory has 3 units for PRBC in order of expiry:
+    // 1. U-B-EXPIRING: B+ (incompatible with A+ recipient), expires in 1 day
+    // 2. U-A-EXPIRING: A+ (compatible), expires in 2 days
+    // 3. U-O-LATER: O- (compatible universal donor), expires in 30 days
+    const mockInventory = [
+      { id: 10, unit_code: 'U-B-EXPIRING', blood_group: 'B+', component: 'PRBC', volume_ml: 250, expires_at: '2026-11-04T12:00:00.000Z', status: 'AVAILABLE' },
+      { id: 4, unit_code: 'U-A-EXPIRING', blood_group: 'A+', component: 'PRBC', volume_ml: 220, expires_at: '2026-11-05T12:00:00.000Z', status: 'AVAILABLE' },
+      { id: 1, unit_code: 'U-O-LATER', blood_group: 'O-', component: 'PRBC', volume_ml: 280, expires_at: '2026-12-03T12:00:00.000Z', status: 'AVAILABLE' },
+    ];
+    inventoryRepository.findAvailableForAllocation.mockResolvedValue(mockInventory);
+
+    const result = await inventoryService.suggestFefoAllocation({
+      patientBloodGroup: 'A+',
+      component: 'PRBC',
+      unitsRequested: 1,
+      now,
+    });
+
+    expect(result.patientBloodGroup).toBe('A+');
+    expect(result.component).toBe('PRBC');
+    expect(result.unitsRequested).toBe(1);
+    expect(result.totalCompatibleFound).toBe(2);
+
+    // B+ unit was rejected due to incompatibility
+    expect(result.allCompatibleUnits.some((u) => u.unitCode === 'U-B-EXPIRING')).toBe(false);
+
+    // Soonest-to-expire compatible unit is suggested first!
+    expect(result.suggestedUnits.length).toBe(1);
+    expect(result.suggestedUnits[0].unitCode).toBe('U-A-EXPIRING');
+    expect(result.suggestedUnits[0].rank).toBe(1);
+    expect(result.suggestedUnits[0].daysRemaining).toBe(2);
+
+    // Second compatible unit is O-
+    expect(result.allCompatibleUnits[1].unitCode).toBe('U-O-LATER');
+    expect(result.allCompatibleUnits[1].rank).toBe(2);
+  });
+
+  it('allocates requested number of units up to availability', async () => {
+    const mockInventory = [
+      { id: 4, unit_code: 'U-1', blood_group: 'O-', component: 'PRBC', volume_ml: 220, expires_at: '2026-11-05T12:00:00.000Z', status: 'AVAILABLE' },
+      { id: 1, unit_code: 'U-2', blood_group: 'O-', component: 'PRBC', volume_ml: 280, expires_at: '2026-12-03T12:00:00.000Z', status: 'AVAILABLE' },
+    ];
+    inventoryRepository.findAvailableForAllocation.mockResolvedValue(mockInventory);
+
+    const result = await inventoryService.suggestFefoAllocation({
+      patientBloodGroup: 'O-',
+      component: 'PRBC',
+      unitsRequested: 2,
+      now,
+    });
+
+    expect(result.suggestedUnits.length).toBe(2);
+    expect(result.suggestedUnits[0].unitCode).toBe('U-1');
+    expect(result.suggestedUnits[1].unitCode).toBe('U-2');
+  });
+
+  it('returns empty suggestions when no compatible units exist in inventory', async () => {
+    inventoryRepository.findAvailableForAllocation.mockResolvedValue([]);
+
+    const result = await inventoryService.suggestFefoAllocation({
+      patientBloodGroup: 'O-',
+      component: 'PRBC',
+      unitsRequested: 1,
+      now,
+    });
+
+    expect(result.totalCompatibleFound).toBe(0);
+    expect(result.suggestedUnits).toEqual([]);
+    expect(result.allCompatibleUnits).toEqual([]);
+  });
+});

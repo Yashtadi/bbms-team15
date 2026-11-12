@@ -1,5 +1,9 @@
 const inventoryRepository = require('./inventory.repository');
 const { formatUnitCode, normaliseUnitCode, buildUnitRecord } = require('../collection/collection.service');
+const { isBloodGroupCompatible } = require('../request/blood.compatibility');
+
+const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const VALID_COMPONENTS = ['WHOLE_BLOOD', 'PRBC', 'FFP', 'PLATELETS', 'CRYO'];
 
 // BBMS-F-030: real-time stock summary for the inventory dashboard.
 // Returns releasable stock per blood group and component, plus overall totals.
@@ -285,6 +289,95 @@ async function getExpiryAlerts({
   };
 }
 
+/**
+ * BBMS-F-033: Suggests soonest-to-expire compatible blood units for issuance following FEFO (First-Expiry-First-Out).
+ * @param {object} params
+ * @param {string} params.patientBloodGroup (e.g. 'A+')
+ * @param {string} params.component (e.g. 'PRBC')
+ * @param {number|string} [params.unitsRequested=1] (quantity to allocate)
+ * @param {number|string} [params.limit]
+ * @param {Date} [params.now=new Date()]
+ * @param {object} [params.repository=inventoryRepository]
+ * @returns {Promise<{ patientBloodGroup: string, component: string, unitsRequested: number, totalCompatibleFound: number, suggestedUnits: Array<object>, allCompatibleUnits: Array<object> }>}
+ */
+async function suggestFefoAllocation({
+  patientBloodGroup,
+  component,
+  unitsRequested = 1,
+  limit,
+  now = new Date(),
+  repository = inventoryRepository,
+} = {}) {
+  // 1. Validate patientBloodGroup
+  const rawGroup = typeof patientBloodGroup === 'string' ? patientBloodGroup.trim().toUpperCase() : '';
+  if (!rawGroup || !VALID_BLOOD_GROUPS.includes(rawGroup)) {
+    throw httpError(400, `Valid patient blood group is required (${VALID_BLOOD_GROUPS.join(', ')})`, {
+      code: 'INVALID_BLOOD_GROUP',
+      errors: { patientBloodGroup: `Valid patient blood group is required (${VALID_BLOOD_GROUPS.join(', ')})` },
+    });
+  }
+
+  // 2. Validate component
+  const rawComp = typeof component === 'string' ? component.trim().toUpperCase() : '';
+  if (!rawComp || !VALID_COMPONENTS.includes(rawComp)) {
+    throw httpError(400, `Valid component is required (${VALID_COMPONENTS.join(', ')})`, {
+      code: 'INVALID_COMPONENT',
+      errors: { component: `Valid component is required (${VALID_COMPONENTS.join(', ')})` },
+    });
+  }
+
+  // 3. Validate unitsRequested / limit
+  const countToAllocate = limit !== undefined ? Number(limit) : Number(unitsRequested);
+  if (!Number.isInteger(countToAllocate) || countToAllocate < 1 || countToAllocate > 20) {
+    throw httpError(400, 'Units requested must be a whole number between 1 and 20', {
+      code: 'INVALID_QUANTITY',
+      errors: { unitsRequested: 'Units requested must be a whole number between 1 and 20' },
+    });
+  }
+
+  // 4. Query releasable units matching component, pre-sorted by expires_at ASC (FEFO)
+  const rows = await repository.findAvailableForAllocation({ component: rawComp });
+
+  // 5. Filter by clinical compatibility
+  const compatibleRows = rows.filter((unit) =>
+    isBloodGroupCompatible(rawGroup, unit.blood_group, rawComp)
+  );
+
+  // 6. Map to detailed allocation suggestions with rank and shelf-life metrics
+  const allCompatibleUnits = compatibleRows.map((unit, index) => {
+    const expiresAt = new Date(unit.expires_at);
+    const msRemaining = expiresAt.getTime() - now.getTime();
+    const daysRemaining = Math.max(0, Math.ceil(msRemaining / DAY_MS));
+    const hoursRemaining = Math.max(0, Math.round(msRemaining / (1000 * 60 * 60)));
+
+    return {
+      rank: index + 1,
+      id: unit.id,
+      unitCode: unit.unit_code,
+      bloodGroup: unit.blood_group,
+      component: unit.component,
+      volumeMl: unit.volume_ml,
+      collectedAt: unit.collected_at,
+      expiresAt: unit.expires_at,
+      daysRemaining,
+      hoursRemaining,
+      isExactMatch: unit.blood_group === rawGroup,
+      status: unit.status,
+    };
+  });
+
+  const suggestedUnits = allCompatibleUnits.slice(0, countToAllocate);
+
+  return {
+    patientBloodGroup: rawGroup,
+    component: rawComp,
+    unitsRequested: countToAllocate,
+    totalCompatibleFound: allCompatibleUnits.length,
+    suggestedUnits,
+    allCompatibleUnits,
+  };
+}
+
 module.exports = {
   getStockSummary,
   COMPONENT_SPECS,
@@ -295,4 +388,5 @@ module.exports = {
   separateUnit,
   getLineage,
   getExpiryAlerts,
+  suggestFefoAllocation,
 };
