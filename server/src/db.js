@@ -11,6 +11,13 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   connectionLimit: 10,
+  // BBMS-NF-002: queue requests when all connections are busy instead of failing them,
+  // fail fast if MySQL can't be reached, and keep idle connections alive so a quiet
+  // period does not leave the pool holding dead sockets.
+  waitForConnections: true,
+  connectTimeout: 10000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
 });
 
 module.exports = pool;

@@ -14,13 +14,12 @@ app.use(cors());
 app.use(enforceTlsAndHttps);
 app.use(express.json());
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
 // BBMS-SR-001 / TC-Sec-01: TLS Policy & Status introspection
 app.get('/api/security/tls-policy', getTlsPolicy);
 app.get('/api/health/tls', getTlsPolicy);
+
+// BBMS-NF-002: /api/health, /api/health/live and /api/health/ready (public, for uptime monitors)
+app.use('/api/health', require('./modules/health/health.routes'));
 
 app.use('/api/auth', require('./modules/auth/auth.routes'));
 app.use('/api/donors', require('./modules/donor/donor.routes'));

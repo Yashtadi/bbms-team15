@@ -80,6 +80,19 @@ All pre-seeded demo accounts use the default password: `Password@123` (populated
 
 ---
 
+## Health checks and availability (NF-002)
+
+| Path | Purpose |
+|---|---|
+| `GET /api/health` | Simple "is the server alive?" check: `{ "status": "ok" }` |
+| `GET /api/health/live` | Liveness: the process is up, with `uptimeSeconds` |
+| `GET /api/health/ready` | Readiness: 200 when the database answers within 2 s, **503** when it is down or the server is shutting down |
+
+These are public so uptime monitors can call them. The hosting, monitoring and maintenance plan for the
+99.5% availability target is in [docs/OPERATIONS.md](docs/OPERATIONS.md).
+
+---
+
 ## Running tests
 
 ### Server (Jest + Supertest)
