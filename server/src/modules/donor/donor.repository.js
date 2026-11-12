@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const db = require('../../db');
+const { encrypt, decryptDonorRow } = require('../../utils/encryption');
 
 /**
  * Derives default password in DDMMYYYY format from Date of Birth.
@@ -33,7 +34,7 @@ async function findByIdProof(idProof) {
     'SELECT id, donor_code, id_proof, full_name, eligibility_status, consent_given, consent_at FROM donors WHERE id_proof = ?',
     [idProof]
   );
-  return rows[0] || null;
+  return rows[0] ? decryptDonorRow(rows[0]) : null;
 }
 
 /**
@@ -43,7 +44,7 @@ async function findByIdProof(idProof) {
  */
 async function findById(id) {
   const [rows] = await db.query('SELECT * FROM donors WHERE id = ?', [id]);
-  return rows[0] || null;
+  return rows[0] ? decryptDonorRow(rows[0]) : null;
 }
 
 /**
@@ -57,7 +58,7 @@ async function findByIdOrCode(idOrCode) {
     ? 'SELECT * FROM donors WHERE id = ?'
     : 'SELECT * FROM donors WHERE donor_code = ?';
   const [rows] = await db.query(query, [idOrCode]);
-  return rows[0] || null;
+  return rows[0] ? decryptDonorRow(rows[0]) : null;
 }
 
 /**
@@ -72,7 +73,7 @@ async function findByIdOrCodeOrPhone(queryVal) {
     ? 'SELECT * FROM donors WHERE id = ? OR phone = ? OR donor_code = ? LIMIT 1'
     : 'SELECT * FROM donors WHERE donor_code = ? OR phone = ? LIMIT 1';
   const [rows] = await db.query(query, isNumeric ? [Number(trimmed), trimmed, trimmed] : [trimmed, trimmed]);
-  return rows[0] || null;
+  return rows[0] ? decryptDonorRow(rows[0]) : null;
 }
 
 /**
@@ -82,7 +83,7 @@ async function findByIdOrCodeOrPhone(queryVal) {
  */
 async function findByUserId(userId) {
   const [rows] = await db.query('SELECT * FROM donors WHERE user_id = ?', [userId]);
-  return rows[0] || null;
+  return rows[0] ? decryptDonorRow(rows[0]) : null;
 }
 
 /**
@@ -126,11 +127,12 @@ async function findLastDonation(donorId) {
  * @returns {Promise<void>}
  */
 async function updateEligibility(id, { status, deferralReason = null, deferredUntil = null }) {
+  const storedDeferralReason = deferralReason ? encrypt(deferralReason) : null;
   await db.query(
     `UPDATE donors
      SET eligibility_status = ?, deferral_reason = ?, deferred_until = ?
      WHERE id = ?`,
-    [status, deferralReason, deferredUntil, id]
+    [status, storedDeferralReason, deferredUntil, id]
   );
 }
 
@@ -232,6 +234,9 @@ async function createDonor(donor) {
   try {
     await connection.beginTransaction();
 
+    const storedAddress = address ? encrypt(address) : null;
+    const storedMedicalHistory = medicalHistory ? encrypt(medicalHistory) : null;
+
     const [result] = await connection.query(
       `INSERT INTO donors (
         donor_code, full_name, date_of_birth, gender, blood_group, phone, email,
@@ -246,9 +251,9 @@ async function createDonor(donor) {
         sanitizedBloodGroup,
         phone,
         email,
-        address,
+        storedAddress,
         idProof,
-        medicalHistory,
+        storedMedicalHistory,
         eligibilityStatus,
         consentGiven,
         consentAt,

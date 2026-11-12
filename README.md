@@ -136,6 +136,21 @@ donation and creates confidential staff notifications.
 
 ---
 
+## Blood requests API
+
+Hospital staff and administrators submit and manage patient blood requests:
+
+| Method | Path | Allowed Roles | Purpose |
+|---|---|---|---|
+| `POST` | `/api/blood-requests` | `HOSPITAL`, `ADMIN` | Submit a new blood request with patient details, blood group, component, quantity, and priority (F-040) |
+| `GET` | `/api/blood-requests` | `HOSPITAL`, `MANAGER`, `ADMIN`, `LAB_TECH` | List blood requests (scoped to logged-in hospital for `HOSPITAL` role) |
+| `GET` | `/api/blood-requests/:idOrCode` | `HOSPITAL`, `MANAGER`, `ADMIN`, `LAB_TECH` | Get detailed status of a blood request by ID or code (`R-XXXXXX`) |
+| `POST` | `/api/blood-requests/:idOrCode/crossmatch` | `LAB_TECH`, `MANAGER`, `ADMIN` | Record cross-match test result (`COMPATIBLE` / `INCOMPATIBLE`) for a blood unit (F-041) |
+| `GET` | `/api/blood-requests/:idOrCode/crossmatches` | `HOSPITAL`, `LAB_TECH`, `MANAGER`, `ADMIN` | List all cross-match test records for a blood request |
+| `GET` | `/api/blood-requests/:idOrCode/crossmatch/:unitCode/check` | `HOSPITAL`, `LAB_TECH`, `MANAGER`, `ADMIN` | Check whether a unit is verified compatible and ready for issuance (blocks un-crossmatched or incompatible units) |
+
+---
+
 ## Core UI Workflows
 
 ### 1. Frontline Blood Collection Desk (`HOSPITAL`, `ADMIN`)
@@ -148,3 +163,11 @@ A unified 3-step chair-side wizard replacing disconnected forms:
 * **FIFO Testing Queue:** Displays newly donated units awaiting screening sorted strictly **First In First Out** (`collected_at ASC, id ASC`) so older units are tested before expiring. Paginates to a maximum of **6 cards per page**.
 * **Clean Search-Driven Entry:** Below the queue, only the Donation ID / Unit Code search bar is visible by default. Clicking a queue ticket or entering an ID smoothly reveals the active unit banner and fill-in-the-blank options (**ABO/Rh Blood Grouping** and **5-TTI Infection Screening**).
 * **Quarantine Lock:** Completed and non-reactive units automatically transition from `QUARANTINE` to `AVAILABLE` in inventory.
+
+### 3. Hospital Blood Request & Cross-match Desk (`HOSPITAL`, `LAB_TECH`, `MANAGER`, `ADMIN`)
+* **Request Submission (F-040):** Hospital staff submit patient transfusion requests specifying recipient name, blood group, component, units requested (1–20), priority (`ROUTINE`, `URGENT`, `EMERGENCY`), and optional required-by time. Each request is assigned a sequential ID (`R-XXXXXX`, status `PENDING`).
+* **Cross-matching & Issuance Readiness (F-041):** Laboratory technicians test candidate blood units against patient requests. Units in quarantine, discarded, or expired states cannot be cross-matched. Enforces clinical ABO/Rh compatibility rules for red blood cells (PRBC, WHOLE_BLOOD) and plasma (FFP). A unit is strictly blocked from issuance until a cross-match result is recorded as `COMPATIBLE`.
+
+### 4. Security & Encryption at Rest (SR-003)
+* **AES-256-GCM Encryption:** Sensitive personally identifiable information (PII) and medical records (`medical_history`, `address`, `deferral_reason`, `follow_up_reason`) are encrypted at rest in MySQL using authenticated AES-256-GCM with unique 96-bit IVs and 128-bit authentication tags (`enc:v1:<iv>:<tag>:<ciphertext>`).
+* **Transparent Decryption:** Authorized application services, portal views, and REST endpoints transparently decrypt records for clinical use. Legacy unencrypted rows are seamlessly read without errors.

@@ -61,6 +61,37 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Inventory Dashboard' })).toBeInTheDocument();
   });
 
+  it('TC-Req-01: shows Blood Requests tab to hospital@bbms.test and lands on it by default', () => {
+    logInAs('HOSPITAL', 'hospital@bbms.test', 'City Hospital Desk');
+    render(<App />);
+
+    expect(screen.getByRole('tab', { name: /Blood Requests/i })).toBeInTheDocument();
+    expect(screen.getByText('HOSPITAL DESK')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Submit Blood Request/i })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Collection Desk/i })).not.toBeInTheDocument();
+  });
+
+  it.each(['MANAGER', 'ADMIN'])('TC-Req-01: shows Blood Requests tab to %s', (role) => {
+    logInAs(role);
+    render(<App />);
+
+    expect(screen.getByRole('tab', { name: /Blood Requests/i })).toBeInTheDocument();
+  });
+
+  it('TC-Req-02: shows Blood Requests tab to central lab tech for cross-matching', () => {
+    logInAs('LAB_TECH', 'labtech@bbms.test', 'Labtech 1');
+    render(<App />);
+
+    expect(screen.getByRole('tab', { name: /Blood Requests/i })).toBeInTheDocument();
+  });
+
+  it.each(['DONOR'])('TC-Req-01: hides Blood Requests tab from %s', (role) => {
+    logInAs(role);
+    render(<App />);
+
+    expect(screen.queryByRole('tab', { name: /Blood Requests/i })).not.toBeInTheDocument();
+  });
+
   it('hides the collection desk and inventory tabs from DONOR, showing My Donor Card instead', () => {
     logInAs('DONOR');
     render(<App />);
