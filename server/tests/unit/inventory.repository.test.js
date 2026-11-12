@@ -63,3 +63,75 @@ describe('TC-Inv-01 (BBMS-F-030) stock summary query', () => {
     expect(result).toBe(rows);
   });
 });
+
+describe('TC-Inv-03 (BBMS-F-032) expiry alerts repository query', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('queries blood units expiring between now and threshold date with status in active bank inventory', async () => {
+    const fakeRows = [
+      { id: 4, unit_code: 'U-2026-000004', blood_group: 'A+', component: 'PRBC', expires_at: '2026-11-05T00:00:00.000Z' },
+    ];
+    db.query.mockResolvedValue([fakeRows]);
+
+    const now = new Date('2026-11-03T00:00:00.000Z');
+    const result = await inventoryRepository.findExpiringUnits({
+      thresholdDays: 3,
+      statuses: ['AVAILABLE', 'QUARANTINE', 'RESERVED'],
+      now,
+    });
+
+    const [sql, values] = db.query.mock.calls[0];
+    expect(sql).toContain('bu.status IN (?)');
+    expect(sql).toContain('bu.expires_at > ?');
+    expect(sql).toContain('bu.expires_at <= ?');
+    expect(sql).toContain('ORDER BY bu.expires_at ASC, bu.id ASC');
+    expect(values[0]).toEqual(['AVAILABLE', 'QUARANTINE', 'RESERVED']);
+    expect(values[1]).toEqual(now);
+    expect(values[2]).toEqual(new Date('2026-11-06T00:00:00.000Z'));
+    expect(result).toBe(fakeRows);
+  });
+});
+
+describe('TC-Inv-04 (BBMS-F-033) FEFO allocation repository query', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('queries releasable stock matching component and orders strictly FEFO (expires_at ASC, id ASC)', async () => {
+    const fakeRows = [
+      { id: 4, unit_code: 'U-2026-000004', blood_group: 'A+', component: 'PRBC', expires_at: '2026-11-05T00:00:00.000Z' },
+      { id: 1, unit_code: 'U-2026-000001', blood_group: 'O-', component: 'PRBC', expires_at: '2026-12-05T00:00:00.000Z' },
+    ];
+    db.query.mockResolvedValue([fakeRows]);
+
+    const result = await inventoryRepository.findAvailableForAllocation({ component: 'PRBC' });
+
+    const [sql, values] = db.query.mock.calls[0];
+    expect(sql).toContain("bu.status = 'AVAILABLE'");
+    expect(sql).toContain('bu.expires_at > NOW()');
+    expect(sql).toContain('bu.component = ?');
+    expect(sql).toContain('ORDER BY bu.expires_at ASC, bu.id ASC');
+    expect(values).toEqual(['PRBC']);
+    expect(result).toBe(fakeRows);
+  });
+});
+
+describe('TC-Inv-05 (BBMS-F-034) low-stock repository query', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('aggregates available stock grouped by blood group', async () => {
+    const fakeRows = [
+      { blood_group: 'A+', units: 2, volume_ml: '440' },
+      { blood_group: 'O-', units: 2, volume_ml: '480' },
+    ];
+    db.query.mockResolvedValue([fakeRows]);
+
+    const result = await inventoryRepository.summarizeStockByBloodGroup();
+
+    const [sql] = db.query.mock.calls[0];
+    expect(sql).toContain("bu.status = 'AVAILABLE'");
+    expect(sql).toContain('bu.expires_at > NOW()');
+    expect(sql).toContain('GROUP BY bu.blood_group');
+    expect(sql).toContain('COUNT(*) AS units');
+    expect(sql).toContain('SUM(bu.volume_ml) AS volume_ml');
+    expect(result).toBe(fakeRows);
+  });
+});

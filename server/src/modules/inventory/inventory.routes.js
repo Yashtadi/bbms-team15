@@ -32,6 +32,66 @@ function sendServiceError(res, error, fallbackMessage) {
 }
 
 /**
+ * BBMS-F-032: Expiry alerts for units nearing expiry (configurable threshold, default 3 days)
+ * GET /api/inventory/alerts/expiry?thresholdDays=3
+ * GET /api/inventory/expiry-alerts?thresholdDays=3
+ * Authorized roles: LAB_TECH, MANAGER, ADMIN
+ */
+async function handleExpiryAlerts(req, res) {
+  try {
+    const rawThreshold = req.query.thresholdDays !== undefined ? req.query.thresholdDays : req.query.days;
+    const thresholdDays = rawThreshold !== undefined ? rawThreshold : 3;
+    const result = await inventoryService.getExpiryAlerts({ thresholdDays });
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendServiceError(res, error, 'Failed to load expiry alerts');
+  }
+}
+
+router.get('/alerts/expiry', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), handleExpiryAlerts);
+router.get('/expiry-alerts', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), handleExpiryAlerts);
+
+/**
+ * BBMS-F-034: Low-stock alerts for blood groups falling below safety threshold
+ * GET /api/inventory/alerts/low-stock?threshold=3
+ * GET /api/inventory/low-stock-alerts?threshold=3
+ * Allowed roles: LAB_TECH, MANAGER, ADMIN
+ */
+async function handleLowStockAlerts(req, res) {
+  try {
+    const rawThreshold = req.query.threshold !== undefined ? req.query.threshold : req.query.minUnits;
+    const threshold = rawThreshold !== undefined ? rawThreshold : 3;
+    const { bloodGroup } = req.query;
+    const result = await inventoryService.getLowStockAlerts({ threshold, bloodGroup });
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendServiceError(res, error, 'Failed to load low-stock alerts');
+  }
+}
+
+router.get('/alerts/low-stock', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), handleLowStockAlerts);
+router.get('/low-stock-alerts', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), handleLowStockAlerts);
+
+/**
+ * BBMS-F-033: FEFO allocation suggestion for issuance
+ * GET /api/inventory/fefo?patientBloodGroup=A+&component=PRBC&unitsRequested=1
+ * Allowed roles: LAB_TECH, MANAGER, ADMIN, HOSPITAL
+ */
+router.get('/fefo', requireRole('LAB_TECH', 'MANAGER', 'ADMIN', 'HOSPITAL'), async (req, res) => {
+  try {
+    const { patientBloodGroup, bloodGroup, component, unitsRequested, quantity, limit } = req.query;
+    const result = await inventoryService.suggestFefoAllocation({
+      patientBloodGroup: patientBloodGroup || bloodGroup,
+      component,
+      unitsRequested: unitsRequested || quantity || limit || 1,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendServiceError(res, error, 'Failed to suggest FEFO allocation');
+  }
+});
+
+/**
  * BBMS-F-031: Separate a whole-blood unit into components
  * POST /api/inventory/units/:unitCode/separate { components: ['PRBC','FFP','PLATELETS'], volumes? }
  *   -> 201 { parent, children }

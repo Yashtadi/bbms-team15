@@ -161,3 +161,214 @@ describe('TC-Inv-02: component separation and lineage routes (unit)', () => {
     expect(res.body.unit.unitId).toBe('U-2026-000007');
   });
 });
+
+describe('TC-Inv-03 (BBMS-F-032) expiry alerts routes', () => {
+  let app;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/inventory', inventoryRouter);
+    jest.clearAllMocks();
+  });
+
+  it('requires a login token (401)', async () => {
+    const response = await request(app).get('/api/inventory/alerts/expiry');
+
+    expect(response.status).toBe(401);
+    expect(inventoryService.getExpiryAlerts).not.toHaveBeenCalled();
+  });
+
+  it.each(['HOSPITAL', 'DONOR'])('blocks %s from viewing expiry alerts (403)', async (role) => {
+    const response = await request(app).get('/api/inventory/alerts/expiry').set(authHeader(role));
+
+    expect(response.status).toBe(403);
+    expect(inventoryService.getExpiryAlerts).not.toHaveBeenCalled();
+  });
+
+  it.each(['LAB_TECH', 'MANAGER', 'ADMIN'])('returns expiry alerts to %s with default threshold of 3 days', async (role) => {
+    const fakeAlerts = {
+      generatedAt: '2026-11-03T12:00:00.000Z',
+      thresholdDays: 3,
+      alertCount: 1,
+      alerts: [{ unitCode: 'U-2026-000004', daysRemaining: 2, urgency: 'WARNING' }],
+    };
+    inventoryService.getExpiryAlerts.mockResolvedValue(fakeAlerts);
+
+    const response = await request(app).get('/api/inventory/alerts/expiry').set(authHeader(role));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(fakeAlerts);
+    expect(inventoryService.getExpiryAlerts).toHaveBeenCalledWith({ thresholdDays: 3 });
+  });
+
+  it('supports configurable threshold query parameters (thresholdDays and days alias)', async () => {
+    inventoryService.getExpiryAlerts.mockResolvedValue({ alertCount: 0, alerts: [] });
+
+    await request(app).get('/api/inventory/alerts/expiry?thresholdDays=7').set(authHeader('MANAGER'));
+    expect(inventoryService.getExpiryAlerts).toHaveBeenCalledWith({ thresholdDays: '7' });
+
+    await request(app).get('/api/inventory/expiry-alerts?days=14').set(authHeader('MANAGER'));
+    expect(inventoryService.getExpiryAlerts).toHaveBeenCalledWith({ thresholdDays: '14' });
+  });
+
+  it('returns 400 when service throws an invalid threshold validation error', async () => {
+    const err = Object.assign(new Error('Threshold days must be an integer between 1 and 60'), {
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+    inventoryService.getExpiryAlerts.mockRejectedValue(err);
+
+    const response = await request(app).get('/api/inventory/alerts/expiry?thresholdDays=-1').set(authHeader('MANAGER'));
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('INVALID_THRESHOLD');
+  });
+
+  it('returns 500 when database/service fails unexpectedly', async () => {
+    inventoryService.getExpiryAlerts.mockRejectedValue(new Error('Database error'));
+
+    const response = await request(app).get('/api/inventory/alerts/expiry').set(authHeader('MANAGER'));
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ message: 'Failed to load expiry alerts' });
+  });
+});
+
+describe('TC-Inv-04 (BBMS-F-033) FEFO allocation routes', () => {
+  let app;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/inventory', inventoryRouter);
+    jest.clearAllMocks();
+  });
+
+  it('requires a login token (401)', async () => {
+    const response = await request(app).get('/api/inventory/fefo?bloodGroup=A+&component=PRBC');
+    expect(response.status).toBe(401);
+  });
+
+  it('blocks DONOR from accessing FEFO allocation (403)', async () => {
+    const response = await request(app)
+      .get('/api/inventory/fefo?bloodGroup=A+&component=PRBC')
+      .set(authHeader('DONOR'));
+
+    expect(response.status).toBe(403);
+    expect(inventoryService.suggestFefoAllocation).not.toHaveBeenCalled();
+  });
+
+  it.each(['HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'])(
+    'returns FEFO allocation suggestions to %s (200)',
+    async (role) => {
+      const mockResult = {
+        patientBloodGroup: 'A+',
+        component: 'PRBC',
+        unitsRequested: 1,
+        totalCompatibleFound: 1,
+        suggestedUnits: [{ rank: 1, unitCode: 'U-2026-000004', bloodGroup: 'A+' }],
+      };
+      inventoryService.suggestFefoAllocation.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .get('/api/inventory/fefo?patientBloodGroup=A%2B&component=PRBC&unitsRequested=1')
+        .set(authHeader(role));
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(mockResult);
+      expect(inventoryService.suggestFefoAllocation).toHaveBeenCalledWith({
+        patientBloodGroup: 'A+',
+        component: 'PRBC',
+        unitsRequested: '1',
+      });
+    }
+  );
+
+  it('returns 400 when validation fails in service', async () => {
+    const err = Object.assign(new Error('Valid patient blood group is required'), {
+      status: 400,
+      code: 'INVALID_BLOOD_GROUP',
+    });
+    inventoryService.suggestFefoAllocation.mockRejectedValue(err);
+
+    const response = await request(app)
+      .get('/api/inventory/fefo?bloodGroup=INVALID&component=PRBC')
+      .set(authHeader('MANAGER'));
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('INVALID_BLOOD_GROUP');
+  });
+});
+
+describe('TC-Inv-05 (BBMS-F-034) low-stock alerts routes', () => {
+  let app;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/inventory', inventoryRouter);
+    jest.clearAllMocks();
+  });
+
+  it('requires authentication (401)', async () => {
+    const response = await request(app).get('/api/inventory/alerts/low-stock');
+    expect(response.status).toBe(401);
+  });
+
+  it.each(['HOSPITAL', 'DONOR'])('blocks %s from low-stock alerts (403)', async (role) => {
+    const response = await request(app)
+      .get('/api/inventory/alerts/low-stock')
+      .set(authHeader(role));
+    expect(response.status).toBe(403);
+  });
+
+  it.each(['LAB_TECH', 'MANAGER', 'ADMIN'])(
+    'returns low-stock alerts to %s with default threshold of 3 (200)',
+    async (role) => {
+      const mockAlerts = {
+        threshold: 3,
+        alertCount: 1,
+        alerts: [{ bloodGroup: 'B+', availableUnits: 0, urgency: 'OUT_OF_STOCK' }],
+      };
+      inventoryService.getLowStockAlerts.mockResolvedValue(mockAlerts);
+
+      const response = await request(app)
+        .get('/api/inventory/alerts/low-stock')
+        .set(authHeader(role));
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(mockAlerts);
+      expect(inventoryService.getLowStockAlerts).toHaveBeenCalledWith({ threshold: 3, bloodGroup: undefined });
+    }
+  );
+
+  it('supports configurable threshold query parameters (threshold and minUnits)', async () => {
+    inventoryService.getLowStockAlerts.mockResolvedValue({ alertCount: 0, alerts: [] });
+
+    await request(app)
+      .get('/api/inventory/alerts/low-stock?threshold=5&bloodGroup=O-')
+      .set(authHeader('MANAGER'));
+    expect(inventoryService.getLowStockAlerts).toHaveBeenCalledWith({ threshold: '5', bloodGroup: 'O-' });
+
+    await request(app)
+      .get('/api/inventory/low-stock-alerts?minUnits=2')
+      .set(authHeader('MANAGER'));
+    expect(inventoryService.getLowStockAlerts).toHaveBeenCalledWith({ threshold: '2', bloodGroup: undefined });
+  });
+
+  it('returns 400 when service rejects an invalid threshold', async () => {
+    const err = Object.assign(new Error('Safety threshold must be a whole number between 1 and 100'), {
+      status: 400,
+      code: 'INVALID_THRESHOLD',
+    });
+    inventoryService.getLowStockAlerts.mockRejectedValue(err);
+
+    const response = await request(app)
+      .get('/api/inventory/alerts/low-stock?threshold=-1')
+      .set(authHeader('MANAGER'));
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('INVALID_THRESHOLD');
+  });
+});

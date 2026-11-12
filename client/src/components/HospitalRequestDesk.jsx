@@ -54,6 +54,27 @@ export default function HospitalRequestDesk() {
   const [crossmatchError, setCrossmatchError] = useState(null);
   const [crossmatchSuccess, setCrossmatchSuccess] = useState(null);
 
+  // BBMS-F-033: FEFO suggested units state
+  const [fefoSuggestions, setFefoSuggestions] = useState([]);
+  const [loadingFefo, setLoadingFefo] = useState(false);
+
+  const loadFefoSuggestions = useCallback(async (reqCode) => {
+    setLoadingFefo(true);
+    try {
+      const res = await apiFetch(`/api/blood-requests/${reqCode}/fefo-suggestions`);
+      if (res.ok) {
+        const data = await res.json();
+        setFefoSuggestions(data.suggestedUnits || []);
+      } else {
+        setFefoSuggestions([]);
+      }
+    } catch {
+      setFefoSuggestions([]);
+    } finally {
+      setLoadingFefo(false);
+    }
+  }, []);
+
   const loadCrossmatches = useCallback(async (reqCode) => {
     setLoadingCrossmatches(true);
     setCrossmatchError(null);
@@ -79,11 +100,13 @@ export default function HospitalRequestDesk() {
     setCrossmatchUnitCode('');
     setCrossmatchResult('COMPATIBLE');
     loadCrossmatches(req.requestCode);
+    loadFefoSuggestions(req.requestCode);
   };
 
   const handleCloseDetails = () => {
     setSelectedRequest(null);
     setCrossmatches([]);
+    setFefoSuggestions([]);
     setCrossmatchError(null);
     setCrossmatchSuccess(null);
   };
@@ -746,6 +769,81 @@ export default function HospitalRequestDesk() {
                               </td>
                               <td>{cm.performedBy?.fullName || 'Technician'}</td>
                               <td>{cm.performedAt ? new Date(cm.performedAt).toLocaleString() : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* BBMS-F-033: Suggested Units for Allocation (FEFO - First Expiry First Out) */}
+                <div className="fefo-suggestions-section" data-testid="fefo-suggestions-section">
+                  <div className="fefo-header">
+                    <h4>Suggested Units for Allocation (FEFO)</h4>
+                    <p className="section-desc">
+                      BBMS-F-033 · Soonest-to-expire compatible unit suggested first to minimize inventory wastage.
+                    </p>
+                  </div>
+
+                  {loadingFefo ? (
+                    <p className="loading-text">Loading FEFO unit suggestions...</p>
+                  ) : fefoSuggestions.length === 0 ? (
+                    <p className="empty-subtext" data-testid="no-fefo-units">
+                      No compatible available units currently in inventory for patient group {selectedRequest.patientBloodGroup} ({selectedRequest.component}).
+                    </p>
+                  ) : (
+                    <div className="requests-table-container">
+                      <table className="requests-table fefo-table" aria-label="FEFO Suggested Units">
+                        <thead>
+                          <tr>
+                            <th scope="col">Priority Rank</th>
+                            <th scope="col">Unit Code</th>
+                            <th scope="col">Blood Group</th>
+                            <th scope="col">Component</th>
+                            <th scope="col">Volume</th>
+                            <th scope="col">Expires</th>
+                            <th scope="col">Shelf Life Remaining</th>
+                            {isLabStaff && <th scope="col">Allocation</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {fefoSuggestions.map((unit) => (
+                            <tr key={unit.unitCode} data-testid={`fefo-row-${unit.unitCode}`}>
+                              <td>
+                                <span className={`rank-badge ${unit.rank === 1 ? 'rank-top' : ''}`}>
+                                  #{unit.rank} {unit.rank === 1 ? '(Soonest Expiry)' : ''}
+                                </span>
+                              </td>
+                              <td className="code-cell font-mono">
+                                <strong>{unit.unitCode}</strong>
+                              </td>
+                              <td>
+                                <span className="badge-group">{unit.bloodGroup}</span>
+                              </td>
+                              <td>{unit.component}</td>
+                              <td>{unit.volumeMl} ml</td>
+                              <td>{new Date(unit.expiresAt).toLocaleDateString()}</td>
+                              <td>
+                                <span className="urgency-pill urgency-warning">
+                                  {unit.daysRemaining <= 1 ? `${unit.hoursRemaining}h remaining` : `${unit.daysRemaining} days left`}
+                                </span>
+                              </td>
+                              {isLabStaff && (
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="btn-select-fefo"
+                                    data-testid={`btn-select-fefo-${unit.unitCode}`}
+                                    onClick={() => {
+                                      setCrossmatchUnitCode(unit.unitCode);
+                                      setCrossmatchError(null);
+                                    }}
+                                  >
+                                    Select for Cross-match
+                                  </button>
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </tbody>

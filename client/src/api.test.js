@@ -44,4 +44,16 @@ describe('TC-Sec-02: apiFetch', () => {
       'Database connection failed'
     );
   });
+
+  it('TC-Sec-01 (BBMS-SR-001): rejects plaintext HTTP URLs for remote traffic', () => {
+    expect(() => apiFetch('http://remote-blood-bank.test/api/donors')).toThrow(
+      'Insecure plaintext HTTP channel is not accepted. HTTPS / TLS 1.2+ is required (BBMS-SR-001).'
+    );
+  });
+
+  it('TC-Sec-01 (BBMS-SR-001): allows secure HTTPS URLs and local relative endpoints', async () => {
+    global.fetch = vi.fn().mockResolvedValue({});
+    await expect(apiFetch('https://secure-blood-bank.test/api/donors')).resolves.toBeDefined();
+    await expect(apiFetch('/api/donors')).resolves.toBeDefined();
+  });
 });

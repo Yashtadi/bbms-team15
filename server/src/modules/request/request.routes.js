@@ -1,6 +1,7 @@
 const express = require('express');
 const { requireRole } = require('../../middleware/auth');
 const requestService = require('./request.service');
+const inventoryService = require('../inventory/inventory.service');
 
 const router = express.Router();
 
@@ -125,6 +126,33 @@ router.get('/:idOrCode/crossmatches', requireRole('HOSPITAL', 'LAB_TECH', 'MANAG
       message: 'Failed to retrieve cross-matches',
       error: error.message,
     });
+  }
+});
+
+/**
+ * BBMS-F-033: Suggest soonest-to-expire compatible units (FEFO) for a blood request.
+ * GET /api/blood-requests/:idOrCode/fefo-suggestions -> 200 { requestCode, suggestedUnits, ... }
+ * Roles: HOSPITAL, LAB_TECH, MANAGER, ADMIN
+ */
+router.get('/:idOrCode/fefo-suggestions', requireRole('HOSPITAL', 'LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const request = await requestService.getBloodRequestById(req.params.idOrCode, req.user);
+    const fefo = await inventoryService.suggestFefoAllocation({
+      patientBloodGroup: request.patientBloodGroup,
+      component: request.component,
+      unitsRequested: request.unitsRequested,
+    });
+    return res.status(200).json({
+      requestId: request.id,
+      requestCode: request.requestCode,
+      patientName: request.patientName,
+      ...fefo,
+    });
+  } catch (error) {
+    if (error.status === 404 || error.status === 403 || error.status === 400) {
+      return res.status(error.status).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Failed to retrieve FEFO suggestions' });
   }
 });
 

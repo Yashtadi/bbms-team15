@@ -211,10 +211,80 @@ async function separateUnit(unitCode, planChildren, { userId, buildUnitCode }) {
   }
 }
 
+/**
+ * BBMS-F-032: Finds units nearing expiry within a given threshold (default 3 days).
+ * Only unexpired units in physical bank inventory (AVAILABLE, QUARANTINE, RESERVED) are included.
+ * @param {object} options
+ * @param {number} [options.thresholdDays=3]
+ * @param {string[]} [options.statuses=['AVAILABLE', 'QUARANTINE', 'RESERVED']]
+ * @param {Date} [options.now=new Date()]
+ * @returns {Promise<Array<object>>}
+ */
+async function findExpiringUnits({
+  thresholdDays = 3,
+  statuses = ['AVAILABLE', 'QUARANTINE', 'RESERVED'],
+  now = new Date(),
+} = {}) {
+  const targetDate = new Date(now.getTime() + thresholdDays * 24 * 60 * 60 * 1000);
+  const [rows] = await db.query(
+    `SELECT bu.id, bu.unit_code, bu.donation_id, bu.component, bu.blood_group,
+            bu.volume_ml, bu.collected_at, bu.expires_at, bu.status, bu.discard_reason
+     FROM blood_units bu
+     WHERE bu.status IN (?)
+       AND bu.expires_at > ?
+       AND bu.expires_at <= ?
+     ORDER BY bu.expires_at ASC, bu.id ASC`,
+    [statuses, now, targetDate]
+  );
+  return rows;
+}
+
+/**
+ * BBMS-F-033: Finds all releasable units available for allocation, ordered strictly FEFO (soonest-to-expire first).
+ * Uses releasableStockFilter to ensure only verified, safe, available units are selected.
+ * @param {object} options
+ * @param {string} [options.component]
+ * @returns {Promise<Array<object>>}
+ */
+async function findAvailableForAllocation({ component = null } = {}) {
+  const { where, values } = releasableStockFilter({ component });
+  const [rows] = await db.query(
+    `SELECT bu.id, bu.unit_code, bu.donation_id, bu.component, bu.blood_group,
+            bu.volume_ml, bu.collected_at, bu.expires_at, bu.status
+     FROM blood_units bu
+     WHERE ${where}
+     ORDER BY bu.expires_at ASC, bu.id ASC`,
+    values
+  );
+  return rows;
+}
+
+/**
+ * BBMS-F-034: Aggregates total releasable stock units per blood group.
+ * @returns {Promise<Array<{ blood_group: string, units: number, volume_ml: number }>>}
+ */
+async function summarizeStockByBloodGroup() {
+  const { where, values } = releasableStockFilter();
+  const [rows] = await db.query(
+    `SELECT bu.blood_group,
+            COUNT(*) AS units,
+            SUM(bu.volume_ml) AS volume_ml
+     FROM blood_units bu
+     WHERE ${where}
+     GROUP BY bu.blood_group
+     ORDER BY bu.blood_group`,
+    values
+  );
+  return rows;
+}
+
 module.exports = {
   listAvailable,
   summarizeAvailable,
   findUnitByCode,
   findLineage,
   separateUnit,
+  findExpiringUnits,
+  findAvailableForAllocation,
+  summarizeStockByBloodGroup,
 };

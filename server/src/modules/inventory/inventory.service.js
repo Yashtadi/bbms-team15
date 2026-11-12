@@ -1,5 +1,10 @@
 const inventoryRepository = require('./inventory.repository');
+const defaultNotificationGateway = require('./notification.gateway');
 const { formatUnitCode, normaliseUnitCode, buildUnitRecord } = require('../collection/collection.service');
+const { isBloodGroupCompatible } = require('../request/blood.compatibility');
+
+const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const VALID_COMPONENTS = ['WHOLE_BLOOD', 'PRBC', 'FFP', 'PLATELETS', 'CRYO'];
 
 // BBMS-F-030: real-time stock summary for the inventory dashboard.
 // Returns releasable stock per blood group and component, plus overall totals.
@@ -225,6 +230,271 @@ async function getLineage(rawCode, { repository = inventoryRepository } = {}) {
   };
 }
 
+/**
+ * BBMS-F-032: Generates near-expiry alerts for units expiring within the given threshold (default 3 days).
+ * @param {object} options
+ * @param {number|string} [options.thresholdDays=3]
+ * @param {string[]} [options.statuses]
+ * @param {Date} [options.now=new Date()]
+ * @param {object} [options.repository=inventoryRepository]
+ * @returns {Promise<{ generatedAt: string, thresholdDays: number, alertCount: number, alerts: Array<object> }>}
+ */
+async function getExpiryAlerts({
+  thresholdDays = 3,
+  statuses = ['AVAILABLE', 'QUARANTINE', 'RESERVED'],
+  now = new Date(),
+  repository = inventoryRepository,
+} = {}) {
+  const parsedDays = Number(thresholdDays);
+  if (!Number.isInteger(parsedDays) || parsedDays < 1 || parsedDays > 60) {
+    throw httpError(400, 'Threshold days must be an integer between 1 and 60', {
+      code: 'INVALID_THRESHOLD',
+      errors: { thresholdDays: 'Threshold days must be an integer between 1 and 60' },
+    });
+  }
+
+  const rows = await repository.findExpiringUnits({
+    thresholdDays: parsedDays,
+    statuses,
+    now,
+  });
+
+  const alerts = rows.map((unit) => {
+    const expiresAt = new Date(unit.expires_at);
+    const msRemaining = expiresAt.getTime() - now.getTime();
+    const hoursRemaining = Math.max(0, Math.round(msRemaining / (1000 * 60 * 60)));
+    const daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+    const urgency = hoursRemaining <= 24 ? 'CRITICAL' : daysRemaining <= 3 ? 'WARNING' : 'INFO';
+
+    return {
+      id: unit.id,
+      unitCode: unit.unit_code,
+      donationId: unit.donation_id,
+      component: unit.component,
+      bloodGroup: unit.blood_group,
+      volumeMl: unit.volume_ml,
+      status: unit.status,
+      collectedAt: unit.collected_at,
+      expiresAt: unit.expires_at,
+      hoursRemaining,
+      daysRemaining,
+      urgency,
+    };
+  });
+
+  return {
+    generatedAt: now.toISOString(),
+    thresholdDays: parsedDays,
+    alertCount: alerts.length,
+    alerts,
+  };
+}
+
+/**
+ * BBMS-F-033: Suggests soonest-to-expire compatible blood units for issuance following FEFO (First-Expiry-First-Out).
+ * @param {object} params
+ * @param {string} params.patientBloodGroup (e.g. 'A+')
+ * @param {string} params.component (e.g. 'PRBC')
+ * @param {number|string} [params.unitsRequested=1] (quantity to allocate)
+ * @param {number|string} [params.limit]
+ * @param {Date} [params.now=new Date()]
+ * @param {object} [params.repository=inventoryRepository]
+ * @returns {Promise<{ patientBloodGroup: string, component: string, unitsRequested: number, totalCompatibleFound: number, suggestedUnits: Array<object>, allCompatibleUnits: Array<object> }>}
+ */
+async function suggestFefoAllocation({
+  patientBloodGroup,
+  component,
+  unitsRequested = 1,
+  limit,
+  now = new Date(),
+  repository = inventoryRepository,
+} = {}) {
+  // 1. Validate patientBloodGroup
+  const rawGroup = typeof patientBloodGroup === 'string' ? patientBloodGroup.trim().toUpperCase() : '';
+  if (!rawGroup || !VALID_BLOOD_GROUPS.includes(rawGroup)) {
+    throw httpError(400, `Valid patient blood group is required (${VALID_BLOOD_GROUPS.join(', ')})`, {
+      code: 'INVALID_BLOOD_GROUP',
+      errors: { patientBloodGroup: `Valid patient blood group is required (${VALID_BLOOD_GROUPS.join(', ')})` },
+    });
+  }
+
+  // 2. Validate component
+  const rawComp = typeof component === 'string' ? component.trim().toUpperCase() : '';
+  if (!rawComp || !VALID_COMPONENTS.includes(rawComp)) {
+    throw httpError(400, `Valid component is required (${VALID_COMPONENTS.join(', ')})`, {
+      code: 'INVALID_COMPONENT',
+      errors: { component: `Valid component is required (${VALID_COMPONENTS.join(', ')})` },
+    });
+  }
+
+  // 3. Validate unitsRequested / limit
+  const countToAllocate = limit !== undefined ? Number(limit) : Number(unitsRequested);
+  if (!Number.isInteger(countToAllocate) || countToAllocate < 1 || countToAllocate > 20) {
+    throw httpError(400, 'Units requested must be a whole number between 1 and 20', {
+      code: 'INVALID_QUANTITY',
+      errors: { unitsRequested: 'Units requested must be a whole number between 1 and 20' },
+    });
+  }
+
+  // 4. Query releasable units matching component, pre-sorted by expires_at ASC (FEFO)
+  const rows = await repository.findAvailableForAllocation({ component: rawComp });
+
+  // 5. Filter by clinical compatibility
+  const compatibleRows = rows.filter((unit) =>
+    isBloodGroupCompatible(rawGroup, unit.blood_group, rawComp)
+  );
+
+  // 6. Map to detailed allocation suggestions with rank and shelf-life metrics
+  const allCompatibleUnits = compatibleRows.map((unit, index) => {
+    const expiresAt = new Date(unit.expires_at);
+    const msRemaining = expiresAt.getTime() - now.getTime();
+    const daysRemaining = Math.max(0, Math.ceil(msRemaining / DAY_MS));
+    const hoursRemaining = Math.max(0, Math.round(msRemaining / (1000 * 60 * 60)));
+
+    return {
+      rank: index + 1,
+      id: unit.id,
+      unitCode: unit.unit_code,
+      bloodGroup: unit.blood_group,
+      component: unit.component,
+      volumeMl: unit.volume_ml,
+      collectedAt: unit.collected_at,
+      expiresAt: unit.expires_at,
+      daysRemaining,
+      hoursRemaining,
+      isExactMatch: unit.blood_group === rawGroup,
+      status: unit.status,
+    };
+  });
+
+  const suggestedUnits = allCompatibleUnits.slice(0, countToAllocate);
+
+  return {
+    patientBloodGroup: rawGroup,
+    component: rawComp,
+    unitsRequested: countToAllocate,
+    totalCompatibleFound: allCompatibleUnits.length,
+    suggestedUnits,
+    allCompatibleUnits,
+  };
+}
+
+/**
+ * BBMS-F-034: Generates alerts when available units of a blood group fall below a configurable safety threshold.
+ * Invokes the notification gateway (mocked) and returns in-app alerts for the manager dashboard.
+ * @param {object} options
+ * @param {number|string} [options.threshold=3] (configurable safety threshold, default 3)
+ * @param {string} [options.bloodGroup] (optional specific blood group filter)
+ * @param {Date} [options.now=new Date()]
+ * @param {object} [options.repository=inventoryRepository]
+ * @param {object} [options.gateway=defaultNotificationGateway]
+ * @returns {Promise<{ generatedAt: string, threshold: number, alertCount: number, alerts: Array<object>, stockByGroup: Array<object> }>}
+ */
+async function getLowStockAlerts({
+  threshold = 3,
+  bloodGroup = null,
+  now = new Date(),
+  repository = inventoryRepository,
+  gateway = defaultNotificationGateway,
+} = {}) {
+  const parsedThreshold = Number(threshold);
+  if (!Number.isInteger(parsedThreshold) || parsedThreshold < 1 || parsedThreshold > 100) {
+    throw httpError(400, 'Safety threshold must be a whole number between 1 and 100', {
+      code: 'INVALID_THRESHOLD',
+      errors: { threshold: 'Safety threshold must be a whole number between 1 and 100' },
+    });
+  }
+
+  if (bloodGroup !== null && bloodGroup !== undefined && bloodGroup !== '') {
+    const rawGroup = String(bloodGroup).trim().toUpperCase();
+    if (!VALID_BLOOD_GROUPS.includes(rawGroup)) {
+      throw httpError(400, `Blood group must be one of: ${VALID_BLOOD_GROUPS.join(', ')}`, {
+        code: 'INVALID_BLOOD_GROUP',
+        errors: { bloodGroup: `Blood group must be one of: ${VALID_BLOOD_GROUPS.join(', ')}` },
+      });
+    }
+  }
+
+  const rows = await repository.summarizeStockByBloodGroup();
+  const countsMap = new Map();
+  rows.forEach((row) => {
+    countsMap.set(row.blood_group, {
+      units: Number(row.units),
+      volumeMl: Number(row.volume_ml),
+    });
+  });
+
+  const targetGroups = bloodGroup
+    ? [String(bloodGroup).trim().toUpperCase()]
+    : VALID_BLOOD_GROUPS;
+
+  const stockByGroup = targetGroups.map((group) => {
+    const data = countsMap.get(group) || { units: 0, volumeMl: 0 };
+    return {
+      bloodGroup: group,
+      availableUnits: data.units,
+      volumeMl: data.volumeMl,
+      threshold: parsedThreshold,
+      isLow: data.units < parsedThreshold,
+      deficit: Math.max(0, parsedThreshold - data.units),
+    };
+  });
+
+  const alerts = [];
+  for (const item of stockByGroup) {
+    if (item.availableUnits < parsedThreshold) {
+      const urgency = item.availableUnits === 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK';
+      const alert = {
+        bloodGroup: item.bloodGroup,
+        availableUnits: item.availableUnits,
+        volumeMl: item.volumeMl,
+        threshold: parsedThreshold,
+        deficit: item.deficit,
+        urgency,
+        message:
+          urgency === 'OUT_OF_STOCK'
+            ? `Critical shortage: Blood group ${item.bloodGroup} is OUT OF STOCK (0 units available, safety threshold is ${parsedThreshold})`
+            : `Low stock alert: Blood group ${item.bloodGroup} has ${item.availableUnits} unit${item.availableUnits === 1 ? '' : 's'} available (below safety threshold of ${parsedThreshold})`,
+      };
+
+      alerts.push(alert);
+
+      // Trigger the notification gateway (mocked per SRS/issue notes)
+      if (gateway && typeof gateway.sendLowStockAlert === 'function') {
+        try {
+          await gateway.sendLowStockAlert({
+            bloodGroup: alert.bloodGroup,
+            availableUnits: alert.availableUnits,
+            threshold: parsedThreshold,
+          });
+        } catch {
+          // Non-fatal gateway notification error
+        }
+      }
+    }
+  }
+
+  // Sort: OUT_OF_STOCK first, then availableUnits ASC, then bloodGroup
+  alerts.sort((a, b) => {
+    if (a.urgency !== b.urgency) {
+      return a.urgency === 'OUT_OF_STOCK' ? -1 : 1;
+    }
+    if (a.availableUnits !== b.availableUnits) {
+      return a.availableUnits - b.availableUnits;
+    }
+    return a.bloodGroup.localeCompare(b.bloodGroup);
+  });
+
+  return {
+    generatedAt: now.toISOString(),
+    threshold: parsedThreshold,
+    totalGroupsMonitored: targetGroups.length,
+    alertCount: alerts.length,
+    alerts,
+    stockByGroup,
+  };
+}
+
 module.exports = {
   getStockSummary,
   COMPONENT_SPECS,
@@ -234,4 +504,7 @@ module.exports = {
   planComponents,
   separateUnit,
   getLineage,
+  getExpiryAlerts,
+  suggestFefoAllocation,
+  getLowStockAlerts,
 };
