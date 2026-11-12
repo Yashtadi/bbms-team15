@@ -58,7 +58,7 @@ function validateBloodRequestInput(input = {}) {
   const rawBloodGroup = typeof input.patientBloodGroup === 'string' ? input.patientBloodGroup.trim().toUpperCase() : '';
   if (!rawBloodGroup) {
     errors.patientBloodGroup = 'Patient blood group is required';
-  } else if (!VALID_BLOOD_GROUPS.includes(rawBloodGroup)) {
+  } else if (rawBloodGroup !== 'UNKNOWN' && !VALID_BLOOD_GROUPS.includes(rawBloodGroup)) {
     errors.patientBloodGroup = `Valid patient blood group is required (${VALID_BLOOD_GROUPS.join(', ')})`;
   }
 
@@ -112,7 +112,7 @@ function validateBloodRequestInput(input = {}) {
     errors,
     data: {
       patientName: rawPatientName,
-      patientBloodGroup: rawBloodGroup,
+      patientBloodGroup: rawBloodGroup === 'UNKNOWN' ? null : rawBloodGroup,
       component: rawComponent,
       unitsRequested: parsedUnits,
       priority,
@@ -449,6 +449,83 @@ async function getCrossmatchesForRequest(idOrCode, user, repository = defaultRep
   };
 }
 
+function planIssuance({ request, unit, isReleasable, crossmatch, issuedCount }) {
+  if (request.status === 'CANCELLED' || request.status === 'REJECTED') {
+    throw httpError(422, `Cannot issue units for a ${request.status.toLowerCase()} blood request`);
+  }
+  if (issuedCount >= request.units_requested) {
+    throw httpError(409, `Request ${request.request_code} has already been fulfilled`, {
+      code: 'REQUEST_ALREADY_FULFILLED',
+    });
+  }
+  if (unit.status === 'ISSUED') {
+    throw httpError(409, `Unit ${unit.unit_code} has already been issued`, { code: 'UNIT_ALREADY_ISSUED' });
+  }
+  if (isHeldForAnotherRequest(unit, request.id)) {
+    throw httpError(409, `Unit ${unit.unit_code} is reserved for another blood request`, {
+      code: 'RESERVED_FOR_OTHER_REQUEST',
+    });
+  }
+  if (unit.component !== request.component) {
+    throw httpError(422, `Unit ${unit.unit_code} is ${unit.component}, but the request is for ${request.component}`, {
+      code: 'COMPONENT_MISMATCH',
+    });
+  }
+  if (!isReleasable) {
+    throw httpError(422, `Unit ${unit.unit_code} is not available, has expired, or has not passed lab screening`, {
+      code: 'UNIT_NOT_AVAILABLE',
+    });
+  }
+  if (!crossmatch) {
+    throw httpError(422, `No cross-match recorded for unit ${unit.unit_code}`, { code: 'NO_CROSSMATCH' });
+  }
+  if (crossmatch.result !== 'COMPATIBLE') {
+    throw httpError(422, `The latest cross-match for unit ${unit.unit_code} is ${crossmatch.result}`, {
+      code: 'INCOMPATIBLE_CROSSMATCH',
+    });
+  }
+  if (!isBloodGroupCompatible(request.patient_blood_group, unit.blood_group, request.component)) {
+    throw httpError(422, `Unit ${unit.unit_code} is not ABO/Rh compatible with this request`, {
+      code: 'INCOMPATIBLE_BLOOD_GROUP',
+    });
+  }
+}
+
+async function issueUnitForRequest({ idOrCode, body = {}, user } = {}, repository = defaultRepository) {
+  const unitCode = typeof body.unitCode === 'string' ? body.unitCode.trim().toUpperCase() : '';
+  const receivedBy = typeof body.receivedBy === 'string' ? body.receivedBy.trim() : '';
+  const errors = {};
+  if (!unitCode) errors.unitCode = 'Unit code is required';
+  if (!receivedBy) errors.receivedBy = 'Recipient name is required';
+  else if (receivedBy.length > 100) errors.receivedBy = 'Recipient name must not exceed 100 characters';
+  if (Object.keys(errors).length > 0) throw httpError(400, 'Validation failed', { errors });
+
+  const request = await repository.findByIdOrCode(idOrCode);
+  if (!request) throw httpError(404, `Blood request '${idOrCode}' not found`);
+
+  const result = await repository.issueUnit(
+    { requestId: request.id, unitCode, userId: user.id, receivedBy },
+    planIssuance
+  );
+  if (result.requestNotFound) throw httpError(404, `Blood request '${idOrCode}' not found`);
+  if (result.unitNotFound) throw httpError(404, `Blood unit '${unitCode}' not found`);
+
+  return {
+    request: {
+      id: request.id,
+      requestCode: request.requestCode,
+      status: result.requestStatus,
+    },
+    issuance: result.issuance,
+  };
+}
+
+async function getIssuancesForRequest(idOrCode, user, repository = defaultRepository) {
+  const request = await getBloodRequestById(idOrCode, user, repository);
+  const issuances = await repository.listIssuancesForRequest(request.id);
+  return { request, issuances };
+}
+
 /**
  * BBMS-F-042: True when the unit is on an active hold for a request other than requestId.
  * A hold whose window has run out (reservation_active false) no longer blocks anyone.
@@ -701,4 +778,6 @@ module.exports = {
   recordCrossmatch,
   checkIssuanceReadiness,
   getCrossmatchesForRequest,
+  issueUnitForRequest,
+  getIssuancesForRequest,
 };

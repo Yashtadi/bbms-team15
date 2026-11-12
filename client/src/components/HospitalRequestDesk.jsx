@@ -75,6 +75,7 @@ export default function HospitalRequestDesk() {
 
   // BBMS-F-033: FEFO suggested units state
   const [fefoSuggestions, setFefoSuggestions] = useState([]);
+  const [fefoEmergencyFallback, setFefoEmergencyFallback] = useState(false);
   const [loadingFefo, setLoadingFefo] = useState(false);
 
   const loadFefoSuggestions = useCallback(async (reqCode) => {
@@ -84,13 +85,45 @@ export default function HospitalRequestDesk() {
       if (res.ok) {
         const data = await res.json();
         setFefoSuggestions(data.suggestedUnits || []);
+        setFefoEmergencyFallback(Boolean(data.emergencyFallback));
       } else {
         setFefoSuggestions([]);
+        setFefoEmergencyFallback(false);
       }
     } catch {
       setFefoSuggestions([]);
+      setFefoEmergencyFallback(false);
     } finally {
       setLoadingFefo(false);
+    }
+  }, []);
+
+  const [issuances, setIssuances] = useState([]);
+  const [loadingIssuances, setLoadingIssuances] = useState(false);
+  const [issuanceError, setIssuanceError] = useState(null);
+  const [issuanceSuccess, setIssuanceSuccess] = useState(null);
+  const [issuanceUnitCode, setIssuanceUnitCode] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [issuingUnit, setIssuingUnit] = useState(false);
+
+  const loadIssuances = useCallback(async (reqCode) => {
+    setLoadingIssuances(true);
+    setIssuanceError(null);
+    try {
+      const res = await apiFetch(`/api/blood-requests/${reqCode}/issuances`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Failed to load issuance records');
+      setIssuances(data.issuances || []);
+      if (data.request?.status) {
+        setSelectedRequest((prev) =>
+          prev && prev.requestCode === reqCode ? { ...prev, status: data.request.status } : prev
+        );
+      }
+    } catch (err) {
+      setIssuances([]);
+      setIssuanceError(err.message || 'Error loading issuance records');
+    } finally {
+      setLoadingIssuances(false);
     }
   }, []);
 
@@ -151,7 +184,11 @@ export default function HospitalRequestDesk() {
     setSelectedRequest(req);
     setCrossmatchSuccess(null);
     setCrossmatchError(null);
+    setIssuanceError(null);
+    setIssuanceSuccess(null);
     setCrossmatchUnitCode('');
+    setIssuanceUnitCode('');
+    setRecipientName('');
     setCrossmatchResult('COMPATIBLE');
     setReservations([]);
     setReservationError(null);
@@ -160,6 +197,7 @@ export default function HospitalRequestDesk() {
     loadCrossmatches(req.requestCode);
     loadFefoSuggestions(req.requestCode);
     loadReservations(req.requestCode);
+    loadIssuances(req.requestCode);
   };
 
   const handleCloseDetails = () => {
@@ -167,10 +205,14 @@ export default function HospitalRequestDesk() {
     setCrossmatches([]);
     setFefoSuggestions([]);
     setReservations([]);
+    setIssuances([]);
     setCrossmatchError(null);
     setCrossmatchSuccess(null);
     setReservationError(null);
     setReservationSuccess(null);
+    setIssuanceError(null);
+    setIssuanceSuccess(null);
+    setFefoEmergencyFallback(false);
   };
 
   // BBMS-F-042: seconds left on a hold, counted down from what the server reported
@@ -269,7 +311,43 @@ export default function HospitalRequestDesk() {
     }
   };
 
+  const handleIssueUnit = async (e) => {
+    e.preventDefault();
+    setIssuanceError(null);
+    setIssuanceSuccess(null);
+    setIssuingUnit(true);
+    try {
+      const res = await apiFetch(`/api/blood-requests/${selectedRequest.requestCode}/issuances`, {
+        method: 'POST',
+        body: JSON.stringify({ unitCode: issuanceUnitCode.trim(), receivedBy: recipientName.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const fieldMessage = data.errors ? Object.values(data.errors)[0] : null;
+        throw new Error(fieldMessage || data.message || 'Failed to issue blood unit');
+      }
+      setIssuanceSuccess(`Unit ${data.issuance.unitCode} issued to ${data.issuance.receivedBy}.`);
+      setIssuanceUnitCode('');
+      setRecipientName('');
+      await Promise.all([
+        loadIssuances(selectedRequest.requestCode),
+        loadCrossmatches(selectedRequest.requestCode),
+        loadReservations(selectedRequest.requestCode),
+        loadFefoSuggestions(selectedRequest.requestCode),
+        fetchRequests(),
+      ]);
+    } catch (err) {
+      setIssuanceError(err.message || 'Error issuing blood unit');
+    } finally {
+      setIssuingUnit(false);
+    }
+  };
+
   const reservedUnitCodes = new Set(reservations.map((r) => r.unitCode));
+  const issuedUnitCodes = new Set(issuances.map((issuance) => issuance.unitCode));
+  const compatibleUnissuedCrossmatches = crossmatches.filter(
+    (crossmatch) => crossmatch.result === 'COMPATIBLE' && !issuedUnitCodes.has(crossmatch.unitCode)
+  );
 
   const handleRecordCrossmatch = async (e) => {
     e.preventDefault();
@@ -404,10 +482,13 @@ export default function HospitalRequestDesk() {
     }
   };
 
-  const filteredRequests = requests.filter((r) => {
-    if (filterStatus === 'ALL') return true;
-    return r.status === filterStatus;
-  });
+  const priorityRank = { EMERGENCY: 0, URGENT: 1, ROUTINE: 2 };
+  const filteredRequests = requests
+    .filter((r) => filterStatus === 'ALL' || r.status === filterStatus)
+    .sort((a, b) => (
+      (priorityRank[a.priority] ?? 3) - (priorityRank[b.priority] ?? 3)
+      || new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    ));
 
   return (
     <div className="hospital-desk-container">
@@ -480,7 +561,7 @@ export default function HospitalRequestDesk() {
                   </div>
                   <div>
                     <span className="detail-lbl">Blood Group:</span>
-                    <strong className="badge-group">{lastCreated.patientBloodGroup}</strong>
+                    <strong className="badge-group">{lastCreated.patientBloodGroup || 'Unknown'}</strong>
                   </div>
                   <div>
                     <span className="detail-lbl">Product:</span>
@@ -553,6 +634,7 @@ export default function HospitalRequestDesk() {
                     value={formData.patientBloodGroup}
                     onChange={handleInputChange('patientBloodGroup')}
                   >
+                    <option value="UNKNOWN">Unknown — emergency fallback may apply</option>
                     {BLOOD_GROUPS.map((bg) => (
                       <option key={bg} value={bg}>
                         {bg}
@@ -767,7 +849,7 @@ export default function HospitalRequestDesk() {
                         </td>
                         <td className="patient-cell">{req.patientName}</td>
                         <td className="group-cell">
-                          <span className="badge-group">{req.patientBloodGroup}</span>
+                          <span className="badge-group">{req.patientBloodGroup || 'Unknown'}</span>
                         </td>
                         <td>{req.component}</td>
                         <td className="units-cell">{req.unitsRequested}</td>
@@ -824,7 +906,7 @@ export default function HospitalRequestDesk() {
                   </div>
                   <div>
                     <span className="summary-label">Blood Group:</span>
-                    <strong className="badge-group">{selectedRequest.patientBloodGroup}</strong>
+                    <strong className="badge-group">{selectedRequest.patientBloodGroup || 'Unknown'}</strong>
                   </div>
                   <div>
                     <span className="summary-label">Component:</span>
@@ -850,26 +932,33 @@ export default function HospitalRequestDesk() {
 
                 <div
                   className={`issuance-status-banner ${
-                    crossmatches.some((c) => c.result === 'COMPATIBLE')
+                    compatibleUnissuedCrossmatches.length > 0
                       ? 'banner-ready'
+                      : issuances.length > 0
+                      ? 'banner-issued'
                       : crossmatches.length > 0
                       ? 'banner-blocked'
                       : 'banner-awaiting'
                   }`}
                   data-testid="issuance-banner"
                 >
-                  {crossmatches.some((c) => c.result === 'COMPATIBLE') ? (
+                  {compatibleUnissuedCrossmatches.length > 0 ? (
                     <div>
                       <h4 className="banner-title">Ready for Issuance</h4>
                       <p className="banner-desc">
                         Compatible cross-match verified for unit(s):{' '}
                         <strong>
-                          {crossmatches
-                            .filter((c) => c.result === 'COMPATIBLE')
-                            .map((c) => c.unitCode)
-                            .join(', ')}
+                          {compatibleUnissuedCrossmatches.map((c) => c.unitCode).join(', ')}
                         </strong>.
                         This unit is cleared for patient issuance.
+                      </p>
+                    </div>
+                  ) : issuances.length > 0 ? (
+                    <div>
+                      <h4 className="banner-title">Unit(s) Issued</h4>
+                      <p className="banner-desc">
+                        Issued unit(s): <strong>{issuances.map((issuance) => issuance.unitCode).join(', ')}</strong>.
+                        See the chain-of-custody records below.
                       </p>
                     </div>
                   ) : crossmatches.length > 0 ? (
@@ -949,6 +1038,86 @@ export default function HospitalRequestDesk() {
                                   )}
                                 </td>
                               )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                <div className="issuances-section" data-testid="issuances-section">
+                  <div className="fefo-header">
+                    <h4>Chain of Custody</h4>
+                    <p className="section-desc">
+                      BBMS-F-043 · Issuance records are append-only and include the issuing staff member, server timestamp, unit, request, and recipient.
+                    </p>
+                  </div>
+                  {isLabStaff && (
+                    <form onSubmit={handleIssueUnit} className="issuance-form" noValidate>
+                      <div className="form-row align-end">
+                        <div className="form-group flex-1">
+                          <label htmlFor="issuanceUnitCode">Cross-matched Unit Code</label>
+                          <input
+                            id="issuanceUnitCode"
+                            data-testid="issuance-unit-input"
+                            type="text"
+                            className="form-input"
+                            value={issuanceUnitCode}
+                            onChange={(e) => setIssuanceUnitCode(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-group flex-1">
+                          <label htmlFor="recipientName">Received By</label>
+                          <input
+                            id="recipientName"
+                            data-testid="issuance-recipient-input"
+                            type="text"
+                            className="form-input"
+                            maxLength={100}
+                            value={recipientName}
+                            onChange={(e) => setRecipientName(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <button
+                            type="submit"
+                            className="btn-primary"
+                            data-testid="btn-issue-unit"
+                            disabled={issuingUnit || !issuanceUnitCode.trim() || !recipientName.trim()}
+                          >
+                            {issuingUnit ? 'Issuing...' : 'Issue Unit'}
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  )}
+                  {issuanceSuccess && <div className="alert-box alert-success" role="status">{issuanceSuccess}</div>}
+                  {issuanceError && <div className="alert-box alert-error" role="alert">{issuanceError}</div>}
+                  {loadingIssuances ? (
+                    <p className="loading-text">Loading issuance records...</p>
+                  ) : issuances.length === 0 ? (
+                    <p className="empty-subtext" data-testid="no-issuances-msg">No units have been issued for this request.</p>
+                  ) : (
+                    <div className="requests-table-container">
+                      <table className="requests-table" aria-label="Chain of Custody Records">
+                        <thead>
+                          <tr>
+                            <th scope="col">Unit</th>
+                            <th scope="col">Recipient</th>
+                            <th scope="col">Issued By</th>
+                            <th scope="col">Issued At</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {issuances.map((issuance) => (
+                            <tr key={issuance.id} data-testid={`issuance-row-${issuance.unitCode}`}>
+                              <td className="code-cell font-mono">{issuance.unitCode}</td>
+                              <td>{issuance.receivedBy}</td>
+                              <td>{issuance.issuerName}</td>
+                              <td>{issuance.issuedAt ? new Date(issuance.issuedAt).toLocaleString() : '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1079,10 +1248,16 @@ export default function HospitalRequestDesk() {
                     <p className="loading-text">Loading FEFO unit suggestions...</p>
                   ) : fefoSuggestions.length === 0 ? (
                     <p className="empty-subtext" data-testid="no-fefo-units">
-                      No compatible available units currently in inventory for patient group {selectedRequest.patientBloodGroup} ({selectedRequest.component}).
+                      No compatible available units currently in inventory for patient group {selectedRequest.patientBloodGroup || 'Unknown'} ({selectedRequest.component}).
                     </p>
                   ) : (
                     <div className="requests-table-container">
+                      {fefoEmergencyFallback && (
+                        <p className="emergency-fallback-note" role="status" data-testid="o-negative-fallback-note">
+                          Emergency fallback: O-negative PRBCs are suggested because the patient blood group is unknown.
+                          A compatible cross-match is still required before issuance.
+                        </p>
+                      )}
                       <table className="requests-table fefo-table" aria-label="FEFO Suggested Units">
                         <thead>
                           <tr>

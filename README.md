@@ -16,6 +16,11 @@ A screen recording demonstrating the complete end-to-end clinical workflow imple
 
 - 📹 **Watch Video:** [docs/Sprint-1_Demo.mp4](docs/Sprint-1_Demo.mp4)
 
+## Sprint 2 Demo Video
+
+The required approximately 2-minute Sprint 2 product recording has not yet been added.
+Issue #38 remains open until the recording is committed and reviewed.
+
 ---
 
 ## Quick Start (Running Locally)
@@ -170,10 +175,17 @@ Hospital staff and administrators submit and manage patient blood requests:
 | `POST` | `/api/blood-requests/:idOrCode/reservations` | `LAB_TECH`, `MANAGER`, `ADMIN` | Reserve a cross-matched unit for the request: `{ unitCode, holdMinutes? }` (15–1440, default `RESERVATION_HOLD_MINUTES` = 120) (F-042) |
 | `GET` | `/api/blood-requests/:idOrCode/reservations` | `HOSPITAL`, `LAB_TECH`, `MANAGER`, `ADMIN` | Units currently held for the request, with `reservedUntil` and `secondsRemaining` |
 | `DELETE` | `/api/blood-requests/:idOrCode/reservations/:unitCode` | `LAB_TECH`, `MANAGER`, `ADMIN` | Release a hold early; the unit goes back to `AVAILABLE` |
+| `POST` | `/api/blood-requests/:idOrCode/issuances` | `LAB_TECH`, `MANAGER`, `ADMIN` | Issue one compatible unit with `{ unitCode, receivedBy }` and create an immutable custody record (F-043) |
+| `GET` | `/api/blood-requests/:idOrCode/issuances` | `HOSPITAL`, `LAB_TECH`, `MANAGER`, `ADMIN` | Read issuance and custody history for the request |
 
 A reserved unit is left out of stock counts, FEFO suggestions and every other request until it is
 released or its hold time runs out. Lapsed holds are returned to stock automatically (a sweep runs
 every minute, and again before any reservation is placed or listed).
+
+Emergency requests sort ahead of other priorities. For an emergency PRBC request with an unknown
+patient blood group, the FEFO suggestions may include O-negative units; a compatible cross-match
+is still mandatory before issuance. Unknown-group requests do not receive this fallback for other
+components or priorities (F-044).
 
 ---
 
@@ -194,7 +206,10 @@ A unified 3-step chair-side wizard replacing disconnected forms:
 * **Request Submission (F-040):** Hospital staff submit patient transfusion requests specifying recipient name, blood group, component, units requested (1–20), priority (`ROUTINE`, `URGENT`, `EMERGENCY`), and optional required-by time. Each request is assigned a sequential ID (`R-XXXXXX`, status `PENDING`).
 * **Cross-matching & Issuance Readiness (F-041):** Laboratory technicians test candidate blood units against patient requests. Units in quarantine, discarded, or expired states cannot be cross-matched. Enforces clinical ABO/Rh compatibility rules for red blood cells (PRBC, WHOLE_BLOOD) and plasma (FFP). A unit is strictly blocked from issuance until a cross-match result is recorded as `COMPATIBLE`.
 * **Unit Reservation (F-042):** From the cross-match history, lab staff reserve a compatible unit for the request for a chosen hold time (15–1440 minutes, default 120). The **Reserved Units** panel shows a live countdown and a **Release** button; hospital users see the same panel read-only. The request becomes `RESERVED` once all its units are held and returns to `PENDING` if a hold is released or runs out.
+* **Chain of Custody (F-043):** Issuing a compatible unit records the staff member, issue timestamp, recipient, unit ID, request ID, and cross-match ID in one transaction. Issuance history is visible with the request.
+* **Emergency Allocation (F-044):** Emergency requests appear first in the request queue. Unknown-group emergency PRBC requests can be suggested O-negative units, subject to the same required cross-match and issuance checks.
 
-### 4. Security & Encryption at Rest (SR-003)
+### 4. Security & Encryption at Rest (SR-003, SR-005)
 * **AES-256-GCM Encryption:** Sensitive personally identifiable information (PII) and medical records (`medical_history`, `address`, `deferral_reason`, `follow_up_reason`) are encrypted at rest in MySQL using authenticated AES-256-GCM with unique 96-bit IVs and 128-bit authentication tags (`enc:v1:<iv>:<tag>:<ciphertext>`).
 * **Transparent Decryption:** Authorized application services, portal views, and REST endpoints transparently decrypt records for clinical use. Legacy unencrypted rows are seamlessly read without errors.
+* **Privileged-Role MFA (SR-005):** Administrator and Blood Bank Manager users must enroll an authenticator app and provide a time-based one-time password (TOTP) at login. MFA secrets are encrypted at rest; a first-factor login alone does not grant an application access token.

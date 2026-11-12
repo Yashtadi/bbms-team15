@@ -34,10 +34,11 @@ const PLASMA_COMPATIBILITY = {
  * @returns {boolean}
  */
 function isBloodGroupCompatible(patientGroup, donorGroup, component = 'PRBC') {
-  if (!patientGroup || !donorGroup) return false;
-  const p = String(patientGroup).trim().toUpperCase();
+  if (!donorGroup) return false;
   const d = String(donorGroup).trim().toUpperCase();
   const comp = String(component || 'PRBC').trim().toUpperCase();
+  if (!patientGroup) return comp === 'PRBC' && d === 'O-';
+  const p = String(patientGroup).trim().toUpperCase();
 
   if (comp === 'FFP') {
     return PLASMA_COMPATIBILITY[p]?.includes(d) ?? false;

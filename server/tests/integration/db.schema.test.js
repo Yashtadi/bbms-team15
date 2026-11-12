@@ -45,6 +45,22 @@ describe('Database schema v1', () => {
     );
   });
 
+  it('requires explicit MFA enrollment for privileged users and allows unknown request blood groups', async () => {
+    const [mfa] = await db.query(
+      `SELECT IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'mfa_enabled'`
+    );
+    expect(mfa).toHaveLength(1);
+    expect(mfa[0].IS_NULLABLE).toBe('NO');
+    expect(Number(mfa[0].COLUMN_DEFAULT)).toBe(0);
+
+    const [bloodGroup] = await db.query(
+      `SELECT IS_NULLABLE FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'blood_requests' AND COLUMN_NAME = 'patient_blood_group'`
+    );
+    expect(bloodGroup[0].IS_NULLABLE).toBe('YES');
+  });
+
   it('rejects a donation for a donor that does not exist', async () => {
     await expect(
       db.query('INSERT INTO donations (donor_id) VALUES (?)', [999999])

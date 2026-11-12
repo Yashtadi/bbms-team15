@@ -7,7 +7,7 @@ const { deriveDobPassword } = require('../donor/donor.repository');
  */
 async function findUserByEmail(email) {
   const [rows] = await db.query(
-    'SELECT id, email, password_hash, full_name, role, is_active FROM users WHERE email = ?',
+    'SELECT id, email, password_hash, full_name, role, is_active, mfa_secret, mfa_enabled FROM users WHERE email = ?',
     [email]
   );
   return rows[0] || null;
@@ -22,7 +22,7 @@ async function findUserByDonorCodeOrPhone(identifier) {
   const trimmed = String(identifier).trim();
   // 1. Try finding linked user via donor_code, phone, or email
   const [rows] = await db.query(
-    `SELECT u.id, u.email, u.password_hash, u.full_name, u.role, u.is_active
+    `SELECT u.id, u.email, u.password_hash, u.full_name, u.role, u.is_active, u.mfa_secret, u.mfa_enabled
      FROM users u
      JOIN donors d ON d.user_id = u.id
      WHERE UPPER(d.donor_code) = UPPER(?) OR d.phone = ? OR UPPER(u.email) = UPPER(?)
@@ -42,7 +42,7 @@ async function findUserByDonorCodeOrPhone(identifier) {
   // If donor has user_id but join didn't find active user
   if (donor.user_id) {
     const [userRows] = await db.query(
-      'SELECT id, email, password_hash, full_name, role, is_active FROM users WHERE id = ?',
+      'SELECT id, email, password_hash, full_name, role, is_active, mfa_secret, mfa_enabled FROM users WHERE id = ?',
       [donor.user_id]
     );
     if (userRows[0]) return userRows[0];
@@ -56,7 +56,7 @@ async function findUserByDonorCodeOrPhone(identifier) {
 
   // Check if a user with this email already exists
   const [existingUserRows] = await db.query(
-    'SELECT id, email, password_hash, full_name, role, is_active FROM users WHERE email = ?',
+    'SELECT id, email, password_hash, full_name, role, is_active, mfa_secret, mfa_enabled FROM users WHERE email = ?',
     [userEmail]
   );
   let user;
@@ -74,6 +74,8 @@ async function findUserByDonorCodeOrPhone(identifier) {
       full_name: donor.full_name,
       role: 'DONOR',
       is_active: true,
+      mfa_secret: null,
+      mfa_enabled: false,
     };
   }
 
@@ -86,7 +88,7 @@ async function findUserByDonorCodeOrPhone(identifier) {
  */
 async function findUserById(id) {
   const [rows] = await db.query(
-    'SELECT id, email, password_hash, full_name, role, is_active FROM users WHERE id = ?',
+    'SELECT id, email, password_hash, full_name, role, is_active, mfa_secret, mfa_enabled FROM users WHERE id = ?',
     [id]
   );
   return rows[0] || null;
@@ -100,9 +102,27 @@ async function updatePassword(id, passwordHash) {
   return result.affectedRows > 0;
 }
 
+async function updateMfaSecret(id, encryptedSecret) {
+  const [result] = await db.query('UPDATE users SET mfa_secret = ?, mfa_enabled = FALSE WHERE id = ?', [
+    encryptedSecret,
+    id,
+  ]);
+  return result.affectedRows > 0;
+}
+
+async function enableMfa(id) {
+  const [result] = await db.query(
+    'UPDATE users SET mfa_enabled = TRUE WHERE id = ? AND mfa_secret IS NOT NULL',
+    [id]
+  );
+  return result.affectedRows > 0;
+}
+
 module.exports = {
   findUserByEmail,
   findUserByDonorCodeOrPhone,
   findUserById,
   updatePassword,
+  updateMfaSecret,
+  enableMfa,
 };

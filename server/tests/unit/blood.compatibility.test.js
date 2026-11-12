@@ -6,6 +6,12 @@ const {
 
 describe('TC-Req-02: Clinical Blood Group Compatibility (Unit)', () => {
   describe('Red Cells & Whole Blood (PRBC / WHOLE_BLOOD)', () => {
+    it('allows only O-negative PRBC for an unknown patient group', () => {
+      expect(isBloodGroupCompatible(null, 'O-', 'PRBC')).toBe(true);
+      expect(isBloodGroupCompatible(null, 'A+', 'PRBC')).toBe(false);
+      expect(isBloodGroupCompatible(null, 'O-', 'WHOLE_BLOOD')).toBe(false);
+    });
+
     it('O- is universal red cell donor to all ABO/Rh groups', () => {
       const allGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
       allGroups.forEach((patientGroup) => {

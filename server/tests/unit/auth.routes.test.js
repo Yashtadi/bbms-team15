@@ -59,4 +59,34 @@ describe('auth.routes: POST /api/auth/login error handling', () => {
     expect(res.body.message).toContain('Server error during login');
     expect(consoleErrorSpy).toHaveBeenCalledWith('Login error (500):', error);
   });
+
+  it('starts MFA enrollment without returning an access token', async () => {
+    authService.beginMfaSetup.mockResolvedValue({
+      secret: 'JBSWY3DPEHPK3PXP',
+      otpauthUrl: 'otpauth://totp/BBMS',
+    });
+
+    const res = await request(app)
+      .post('/api/auth/mfa/setup')
+      .send({ setupToken: 'setup-token' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.secret).toBe('JBSWY3DPEHPK3PXP');
+    expect(res.body).not.toHaveProperty('token');
+  });
+
+  it('returns a full session only after MFA verification succeeds', async () => {
+    authService.verifyMfa.mockResolvedValue({
+      token: 'verified-session',
+      user: { id: 2, role: 'MANAGER' },
+    });
+
+    const res = await request(app)
+      .post('/api/auth/mfa/verify')
+      .send({ challengeToken: 'challenge-token', code: '123456' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBe('verified-session');
+    expect(authService.verifyMfa).toHaveBeenCalledWith({ challengeToken: 'challenge-token', code: '123456' });
+  });
 });

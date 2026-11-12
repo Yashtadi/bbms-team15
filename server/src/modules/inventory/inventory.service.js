@@ -306,12 +306,14 @@ async function suggestFefoAllocation({
   component,
   unitsRequested = 1,
   limit,
+  allowEmergencyFallback = false,
   now = new Date(),
   repository = inventoryRepository,
 } = {}) {
-  // 1. Validate patientBloodGroup
+  // 1. Validate patientBloodGroup. Unknown groups are only eligible for emergency O-negative PRBC.
   const rawGroup = typeof patientBloodGroup === 'string' ? patientBloodGroup.trim().toUpperCase() : '';
-  if (!rawGroup || !VALID_BLOOD_GROUPS.includes(rawGroup)) {
+  const normalizedGroup = rawGroup === 'UNKNOWN' ? '' : rawGroup;
+  if (normalizedGroup && !VALID_BLOOD_GROUPS.includes(normalizedGroup)) {
     throw httpError(400, `Valid patient blood group is required (${VALID_BLOOD_GROUPS.join(', ')})`, {
       code: 'INVALID_BLOOD_GROUP',
       errors: { patientBloodGroup: `Valid patient blood group is required (${VALID_BLOOD_GROUPS.join(', ')})` },
@@ -336,12 +338,24 @@ async function suggestFefoAllocation({
     });
   }
 
+  if (!normalizedGroup && (!allowEmergencyFallback || rawComp !== 'PRBC')) {
+    return {
+      patientBloodGroup: null,
+      component: rawComp,
+      unitsRequested: countToAllocate,
+      totalCompatibleFound: 0,
+      suggestedUnits: [],
+      allCompatibleUnits: [],
+      emergencyFallback: false,
+    };
+  }
+
   // 4. Query releasable units matching component, pre-sorted by expires_at ASC (FEFO)
   const rows = await repository.findAvailableForAllocation({ component: rawComp });
 
   // 5. Filter by clinical compatibility
   const compatibleRows = rows.filter((unit) =>
-    isBloodGroupCompatible(rawGroup, unit.blood_group, rawComp)
+    isBloodGroupCompatible(normalizedGroup, unit.blood_group, rawComp)
   );
 
   // 6. Map to detailed allocation suggestions with rank and shelf-life metrics
@@ -362,7 +376,7 @@ async function suggestFefoAllocation({
       expiresAt: unit.expires_at,
       daysRemaining,
       hoursRemaining,
-      isExactMatch: unit.blood_group === rawGroup,
+      isExactMatch: unit.blood_group === normalizedGroup,
       status: unit.status,
     };
   });
@@ -370,12 +384,13 @@ async function suggestFefoAllocation({
   const suggestedUnits = allCompatibleUnits.slice(0, countToAllocate);
 
   return {
-    patientBloodGroup: rawGroup,
+    patientBloodGroup: normalizedGroup || null,
     component: rawComp,
     unitsRequested: countToAllocate,
     totalCompatibleFound: allCompatibleUnits.length,
     suggestedUnits,
     allCompatibleUnits,
+    emergencyFallback: !normalizedGroup && rawComp === 'PRBC' && allCompatibleUnits.length > 0,
   };
 }
 

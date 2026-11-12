@@ -242,6 +242,39 @@ describe('TC-Inv-04 (BBMS-F-033) FEFO allocation service', () => {
     expect(result.suggestedUnits).toEqual([]);
     expect(result.allCompatibleUnits).toEqual([]);
   });
+
+  it('suggests O-negative PRBCs for an unknown emergency blood group and never uses that fallback for other products', async () => {
+    inventoryRepository.findAvailableForAllocation.mockResolvedValue([
+      { id: 1, unit_code: 'U-O-NEG', blood_group: 'O-', component: 'PRBC', volume_ml: 280, expires_at: '2026-12-03T12:00:00.000Z', status: 'AVAILABLE' },
+      { id: 2, unit_code: 'U-A-POS', blood_group: 'A+', component: 'PRBC', volume_ml: 280, expires_at: '2026-12-05T12:00:00.000Z', status: 'AVAILABLE' },
+    ]);
+
+    const result = await inventoryService.suggestFefoAllocation({
+      patientBloodGroup: null,
+      component: 'PRBC',
+      allowEmergencyFallback: true,
+      now,
+    });
+
+    expect(result.emergencyFallback).toBe(true);
+    expect(result.suggestedUnits.map((unit) => unit.unitCode)).toEqual(['U-O-NEG']);
+
+    const nonEmergency = await inventoryService.suggestFefoAllocation({
+      patientBloodGroup: null,
+      component: 'PRBC',
+      allowEmergencyFallback: false,
+      now,
+    });
+    expect(nonEmergency.suggestedUnits).toEqual([]);
+
+    const plasma = await inventoryService.suggestFefoAllocation({
+      patientBloodGroup: null,
+      component: 'FFP',
+      allowEmergencyFallback: true,
+      now,
+    });
+    expect(plasma.suggestedUnits).toEqual([]);
+  });
 });
 
 describe('TC-Inv-05 (BBMS-F-034) low-stock alerts service', () => {
