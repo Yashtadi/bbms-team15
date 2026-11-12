@@ -12,7 +12,7 @@
 
 ## Integration and remaining deliverable
 
-- The latest PR CI run, [GitHub Actions run 78](https://github.com/Yashtadi/bbms-team15/actions/runs/43261483473), passed on commit `1f09312`: server unit tests, MySQL-backed integration tests, client tests, and client production build. Coverage includes multi-unit issuance/reservation limits and privileged-role MFA lockout.
+- The MySQL-backed server unit and integration suites passed in [GitHub Actions run 75](https://github.com/Yashtadi/bbms-team15/actions/runs/43261102071) for code commit `b5d6fd9`. Coverage includes multi-unit issuance/reservation limits and privileged-role MFA lockout.
 - The Sprint 2 demo video is still pending; see [README](../README.md) for product setup and workflows.
 
 The lint failure is in the existing client tree and does not affect the passing client test/build commands.
