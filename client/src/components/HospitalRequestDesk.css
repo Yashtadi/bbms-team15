@@ -769,3 +769,63 @@
   background: var(--accent-color, #e11d48);
   color: #ffffff;
 }
+
+/* BBMS-F-042: reserved units for a request */
+.reservations-section {
+  background: var(--card-inner-bg);
+  border: 1px solid var(--card-inner-border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.reservation-hold-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  margin: 0.75rem 0 1rem;
+}
+
+.reservation-hold-row .form-group {
+  max-width: 260px;
+}
+
+.reservation-hold-row .section-desc {
+  flex: 1 1 240px;
+  margin: 0;
+}
+
+.reservations-table .urgency-pill {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.reservations-table .urgency-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+}
+
+.reservations-table .urgency-critical {
+  background: rgba(225, 29, 72, 0.14);
+  color: #be123c;
+}
+
+[data-theme="dark"] .reservations-table .urgency-warning {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .reservations-table .urgency-critical {
+  color: #fb7185;
+}
+
+.btn-select-fefo:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

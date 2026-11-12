@@ -234,6 +234,11 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ suggestedUnits: [] }),
+        })
+        // Reserved units (F-042), loaded after FEFO
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ reservations: [] }),
         });
 
       render(<HospitalRequestDesk />);
@@ -278,6 +283,11 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ suggestedUnits: [] }),
+        })
+        // Reserved units (F-042), loaded after FEFO
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ reservations: [] }),
         })
         // 4. POST record crossmatch
         .mockResolvedValueOnce({
@@ -368,6 +378,11 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
           ok: true,
           json: async () => ({ suggestedUnits: [] }),
         })
+        // Reserved units (F-042), loaded after FEFO
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ reservations: [] }),
+        })
         .mockResolvedValueOnce({
           ok: false,
           status: 422,
@@ -429,6 +444,10 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
               },
             ],
           }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ reservations: [] }),
         });
 
       render(<HospitalRequestDesk />);
@@ -445,6 +464,177 @@ describe('TC-Req-01: HospitalRequestDesk (client)', () => {
       await user.click(selectBtn);
 
       expect(screen.getByTestId('crossmatch-unit-input')).toHaveValue('U-2026-000004');
+    });
+  });
+
+  describe('TC-Req-03: reserve a matched unit for a request (client)', () => {
+    const mockRequest = {
+      id: 1,
+      requestCode: 'R-000001',
+      patientName: 'Patient One',
+      patientBloodGroup: 'A+',
+      component: 'PRBC',
+      unitsRequested: 1,
+      priority: 'ROUTINE',
+      status: 'PENDING',
+      createdAt: '2026-11-01T10:00:00.000Z',
+    };
+    const compatibleCrossmatch = {
+      id: 10,
+      unitCode: 'U-2026-000001',
+      unitBloodGroup: 'O-',
+      component: 'PRBC',
+      result: 'COMPATIBLE',
+      readyForIssuance: true,
+      performedBy: { fullName: 'Labtech 1' },
+      performedAt: '2026-11-12T09:00:00.000Z',
+    };
+    const heldUnit = {
+      unitCode: 'U-2026-000001',
+      bloodGroup: 'O-',
+      component: 'PRBC',
+      reservedUntil: '2026-11-12T11:00:00.000Z',
+      secondsRemaining: 1800,
+      reservedBy: { id: 3, fullName: 'Labtech 1' },
+    };
+    const ok = (body) => ({ ok: true, json: async () => body });
+
+    const loginAs = (user) => {
+      sessionStorage.clear();
+      api.saveSession({ token: 'fake-jwt-token', user });
+    };
+    const labTech = { id: 3, email: 'labtech@bbms.test', fullName: 'Labtech 1', role: 'LAB_TECH' };
+
+    it('reserves a compatible unit with a chosen hold time and shows it with a countdown', async () => {
+      loginAs(labTech);
+      const user = userEvent.setup();
+      const fetchSpy = vi.spyOn(api, 'apiFetch')
+        .mockResolvedValueOnce(ok({ requests: [mockRequest] }))
+        .mockResolvedValueOnce(ok({ crossmatches: [compatibleCrossmatch] }))
+        .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
+        .mockResolvedValueOnce(ok({ request: mockRequest, reservations: [] }))
+        // POST reservation
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            reservation: {
+              unitCode: 'U-2026-000001',
+              holdMinutes: 30,
+              reservedUntil: heldUnit.reservedUntil,
+              requestStatus: 'RESERVED',
+            },
+          }),
+        })
+        // Refresh: reservations, FEFO, request list
+        .mockResolvedValueOnce(ok({ request: { ...mockRequest, status: 'RESERVED' }, reservations: [heldUnit] }))
+        .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
+        .mockResolvedValueOnce(ok({ requests: [{ ...mockRequest, status: 'RESERVED' }] }));
+
+      render(<HospitalRequestDesk />);
+      await user.click(await screen.findByTestId('btn-view-R-000001'));
+      expect(await screen.findByTestId('no-reservations-msg')).toBeInTheDocument();
+
+      await user.type(screen.getByTestId('hold-minutes-input'), '30');
+      await user.click(screen.getByTestId('btn-reserve-U-2026-000001'));
+
+      expect(await screen.findByText(/Unit U-2026-000001 reserved for 30 minutes/i)).toBeInTheDocument();
+      expect(fetchSpy).toHaveBeenCalledWith('/api/blood-requests/R-000001/reservations', {
+        method: 'POST',
+        body: JSON.stringify({ unitCode: 'U-2026-000001', holdMinutes: 30 }),
+      });
+      expect(screen.getByTestId('reservation-row-U-2026-000001')).toBeInTheDocument();
+      expect(screen.getByTestId('reservation-countdown-U-2026-000001')).toHaveTextContent(/^(30m 00s|29m \d\ds)$/);
+      // The cross-match row now shows the unit as reserved instead of offering the button
+      expect(screen.queryByTestId('btn-reserve-U-2026-000001')).not.toBeInTheDocument();
+      expect(screen.getAllByText('RESERVED').length).toBeGreaterThan(0);
+    });
+
+    it('checks the hold time range before calling the API', async () => {
+      loginAs(labTech);
+      const user = userEvent.setup();
+      const fetchSpy = vi.spyOn(api, 'apiFetch')
+        .mockResolvedValueOnce(ok({ requests: [mockRequest] }))
+        .mockResolvedValueOnce(ok({ crossmatches: [compatibleCrossmatch] }))
+        .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
+        .mockResolvedValueOnce(ok({ request: mockRequest, reservations: [] }));
+
+      render(<HospitalRequestDesk />);
+      await user.click(await screen.findByTestId('btn-view-R-000001'));
+      await screen.findByTestId('no-reservations-msg');
+
+      await user.type(screen.getByTestId('hold-minutes-input'), '14');
+      await user.click(screen.getByTestId('btn-reserve-U-2026-000001'));
+
+      expect(screen.getByText(/between 15 and 1440/i)).toBeInTheDocument();
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
+    });
+
+    it('shows the server message when the unit is held for another request', async () => {
+      loginAs(labTech);
+      const user = userEvent.setup();
+      vi.spyOn(api, 'apiFetch')
+        .mockResolvedValueOnce(ok({ requests: [mockRequest] }))
+        .mockResolvedValueOnce(ok({ crossmatches: [compatibleCrossmatch] }))
+        .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
+        .mockResolvedValueOnce(ok({ request: mockRequest, reservations: [] }))
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 409,
+          json: async () => ({
+            message: 'Unit U-2026-000001 is reserved for another blood request',
+            code: 'RESERVED_FOR_OTHER_REQUEST',
+          }),
+        });
+
+      render(<HospitalRequestDesk />);
+      await user.click(await screen.findByTestId('btn-view-R-000001'));
+      await screen.findByTestId('no-reservations-msg');
+      await user.click(screen.getByTestId('btn-reserve-U-2026-000001'));
+
+      expect(await screen.findByText(/reserved for another blood request/i)).toBeInTheDocument();
+    });
+
+    it('releases a held unit back to stock', async () => {
+      loginAs(labTech);
+      const user = userEvent.setup();
+      const fetchSpy = vi.spyOn(api, 'apiFetch')
+        .mockResolvedValueOnce(ok({ requests: [mockRequest] }))
+        .mockResolvedValueOnce(ok({ crossmatches: [compatibleCrossmatch] }))
+        .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
+        .mockResolvedValueOnce(ok({ request: { ...mockRequest, status: 'RESERVED' }, reservations: [heldUnit] }))
+        .mockResolvedValueOnce(ok({ released: { unitCode: 'U-2026-000001', unitStatus: 'AVAILABLE' } }))
+        .mockResolvedValueOnce(ok({ request: mockRequest, reservations: [] }))
+        .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
+        .mockResolvedValueOnce(ok({ requests: [mockRequest] }));
+
+      render(<HospitalRequestDesk />);
+      await user.click(await screen.findByTestId('btn-view-R-000001'));
+      await user.click(await screen.findByTestId('btn-release-U-2026-000001'));
+
+      expect(await screen.findByText(/released back to available stock/i)).toBeInTheDocument();
+      expect(fetchSpy).toHaveBeenCalledWith('/api/blood-requests/R-000001/reservations/U-2026-000001', {
+        method: 'DELETE',
+      });
+      expect(screen.getByTestId('no-reservations-msg')).toBeInTheDocument();
+    });
+
+    it('shows hospital users their held units read-only (no reserve or release buttons)', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(api, 'apiFetch')
+        .mockResolvedValueOnce(ok({ requests: [mockRequest] }))
+        .mockResolvedValueOnce(ok({ crossmatches: [compatibleCrossmatch] }))
+        .mockResolvedValueOnce(ok({ suggestedUnits: [] }))
+        .mockResolvedValueOnce(ok({ request: { ...mockRequest, status: 'RESERVED' }, reservations: [heldUnit] }));
+
+      render(<HospitalRequestDesk />);
+      await user.click(screen.getByRole('tab', { name: /Active Requests/i }));
+      await user.click(await screen.findByTestId('btn-view-R-000001'));
+
+      expect(await screen.findByTestId('reservation-row-U-2026-000001')).toBeInTheDocument();
+      expect(screen.queryByTestId('btn-release-U-2026-000001')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('btn-reserve-U-2026-000001')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('hold-minutes-input')).not.toBeInTheDocument();
     });
   });
 });

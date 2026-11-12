@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch, getSession } from '../api';
 import './HospitalRequestDesk.css';
 
@@ -24,6 +24,25 @@ const INITIAL_FORM = {
   priority: 'ROUTINE',
   requiredBy: '',
 };
+
+// BBMS-F-042: limits for a staff-chosen hold window (the server enforces the same range)
+const MIN_HOLD_MINUTES = 15;
+const MAX_HOLD_MINUTES = 1440;
+
+function formatTime(iso) {
+  return iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+}
+
+// e.g. 7265 s -> "2h 01m 05s", 65 s -> "1m 05s"
+function formatCountdown(totalSeconds) {
+  if (totalSeconds === null) return 'No time limit';
+  if (totalSeconds <= 0) return 'Expired';
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}h ${pad(m)}m ${pad(s)}s` : `${m}m ${pad(s)}s`;
+}
 
 export default function HospitalRequestDesk() {
   const session = getSession();
@@ -75,6 +94,41 @@ export default function HospitalRequestDesk() {
     }
   }, []);
 
+  // BBMS-F-042: units held for the selected request, with a live countdown to each hold's end
+  const [reservations, setReservations] = useState([]);
+  const [reservationsFetchedAt, setReservationsFetchedAt] = useState(() => Date.now());
+  const [loadingReservations, setLoadingReservations] = useState(false);
+  const [reservationError, setReservationError] = useState(null);
+  const [reservationSuccess, setReservationSuccess] = useState(null);
+  const [holdMinutes, setHoldMinutes] = useState('');
+  const [reservationBusyUnit, setReservationBusyUnit] = useState(null);
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  const autoRefreshedRef = useRef(false);
+
+  const loadReservations = useCallback(async (reqCode) => {
+    setLoadingReservations(true);
+    try {
+      const res = await apiFetch(`/api/blood-requests/${reqCode}/reservations`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to load reservations');
+      }
+      setReservations(data.reservations || []);
+      setReservationsFetchedAt(Date.now());
+      setClockNow(Date.now());
+      autoRefreshedRef.current = false;
+      if (data.request?.status) {
+        setSelectedRequest((prev) =>
+          prev && prev.requestCode === reqCode ? { ...prev, status: data.request.status } : prev
+        );
+      }
+    } catch {
+      setReservations([]);
+    } finally {
+      setLoadingReservations(false);
+    }
+  }, []);
+
   const loadCrossmatches = useCallback(async (reqCode) => {
     setLoadingCrossmatches(true);
     setCrossmatchError(null);
@@ -99,17 +153,123 @@ export default function HospitalRequestDesk() {
     setCrossmatchError(null);
     setCrossmatchUnitCode('');
     setCrossmatchResult('COMPATIBLE');
+    setReservations([]);
+    setReservationError(null);
+    setReservationSuccess(null);
+    setHoldMinutes('');
     loadCrossmatches(req.requestCode);
     loadFefoSuggestions(req.requestCode);
+    loadReservations(req.requestCode);
   };
 
   const handleCloseDetails = () => {
     setSelectedRequest(null);
     setCrossmatches([]);
     setFefoSuggestions([]);
+    setReservations([]);
     setCrossmatchError(null);
     setCrossmatchSuccess(null);
+    setReservationError(null);
+    setReservationSuccess(null);
   };
+
+  // BBMS-F-042: seconds left on a hold, counted down from what the server reported
+  const secondsLeft = (reservation) => {
+    if (reservation.secondsRemaining === null || reservation.secondsRemaining === undefined) return null;
+    const elapsed = Math.floor((clockNow - reservationsFetchedAt) / 1000);
+    return Math.max(0, reservation.secondsRemaining - elapsed);
+  };
+
+  // Tick the countdown every second. When a hold runs out, reload once so the unit drops off
+  // the list and shows up in the FEFO suggestions again.
+  const selectedRequestCode = selectedRequest?.requestCode;
+  useEffect(() => {
+    if (reservations.length === 0 || !selectedRequestCode) return undefined;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setClockNow(now);
+      const elapsed = Math.floor((now - reservationsFetchedAt) / 1000);
+      const anyLapsed = reservations.some(
+        (r) => typeof r.secondsRemaining === 'number' && r.secondsRemaining - elapsed <= 0
+      );
+      if (anyLapsed && !autoRefreshedRef.current) {
+        autoRefreshedRef.current = true;
+        loadReservations(selectedRequestCode);
+        loadFefoSuggestions(selectedRequestCode);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [reservations, reservationsFetchedAt, selectedRequestCode, loadReservations, loadFefoSuggestions]);
+
+  const refreshAfterReservationChange = async (reqCode) => {
+    await loadReservations(reqCode);
+    await loadFefoSuggestions(reqCode);
+    await fetchRequests();
+  };
+
+  const handleReserveUnit = async (unitCode) => {
+    setReservationError(null);
+    setReservationSuccess(null);
+
+    const body = { unitCode };
+    if (holdMinutes.trim() !== '') {
+      const minutes = Number(holdMinutes);
+      if (!Number.isInteger(minutes) || minutes < MIN_HOLD_MINUTES || minutes > MAX_HOLD_MINUTES) {
+        setReservationError(
+          `Hold time must be a whole number of minutes between ${MIN_HOLD_MINUTES} and ${MAX_HOLD_MINUTES}`
+        );
+        return;
+      }
+      body.holdMinutes = minutes;
+    }
+
+    setReservationBusyUnit(unitCode);
+    try {
+      const res = await apiFetch(`/api/blood-requests/${selectedRequest.requestCode}/reservations`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const fieldMessage = data.errors ? Object.values(data.errors)[0] : null;
+        throw new Error(fieldMessage || data.message || 'Failed to reserve unit');
+      }
+      const r = data.reservation;
+      setReservationSuccess(
+        `Unit ${r.unitCode} reserved for ${r.holdMinutes} minutes (until ${formatTime(r.reservedUntil)}). ` +
+          `Request is now ${r.requestStatus}.`
+      );
+      await refreshAfterReservationChange(selectedRequest.requestCode);
+    } catch (err) {
+      setReservationError(err.message || 'Error reserving unit');
+    } finally {
+      setReservationBusyUnit(null);
+    }
+  };
+
+  const handleReleaseUnit = async (unitCode) => {
+    setReservationError(null);
+    setReservationSuccess(null);
+    setReservationBusyUnit(unitCode);
+    try {
+      const res = await apiFetch(
+        `/api/blood-requests/${selectedRequest.requestCode}/reservations/${encodeURIComponent(unitCode)}`,
+        { method: 'DELETE' }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to release reservation');
+      }
+      setReservationSuccess(`Unit ${unitCode} released back to available stock.`);
+      await refreshAfterReservationChange(selectedRequest.requestCode);
+    } catch (err) {
+      setReservationError(err.message || 'Error releasing reservation');
+    } finally {
+      setReservationBusyUnit(null);
+    }
+  };
+
+  const reservedUnitCodes = new Set(reservations.map((r) => r.unitCode));
 
   const handleRecordCrossmatch = async (e) => {
     e.preventDefault();
@@ -749,6 +909,7 @@ export default function HospitalRequestDesk() {
                             <th scope="col">Issuance Readiness</th>
                             <th scope="col">Performed By</th>
                             <th scope="col">Date</th>
+                            {isLabStaff && <th scope="col">Reservation</th>}
                           </tr>
                         </thead>
                         <tbody>
@@ -769,8 +930,136 @@ export default function HospitalRequestDesk() {
                               </td>
                               <td>{cm.performedBy?.fullName || 'Technician'}</td>
                               <td>{cm.performedAt ? new Date(cm.performedAt).toLocaleString() : '—'}</td>
+                              {isLabStaff && (
+                                <td>
+                                  {cm.result !== 'COMPATIBLE' ? (
+                                    <span className="empty-subtext">Not reservable</span>
+                                  ) : reservedUnitCodes.has(cm.unitCode) ? (
+                                    <span className="readiness-pill pill-ready">Reserved</span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="btn-select-fefo"
+                                      data-testid={`btn-reserve-${cm.unitCode}`}
+                                      disabled={reservationBusyUnit !== null}
+                                      onClick={() => handleReserveUnit(cm.unitCode)}
+                                    >
+                                      {reservationBusyUnit === cm.unitCode ? 'Reserving...' : 'Reserve Unit'}
+                                    </button>
+                                  )}
+                                </td>
+                              )}
                             </tr>
                           ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* BBMS-F-042: units held for this request, excluded from every other allocation */}
+                <div className="reservations-section" data-testid="reservations-section">
+                  <div className="fefo-header">
+                    <h4>Reserved Units</h4>
+                    <p className="section-desc">
+                      BBMS-F-042 · A reserved unit is held for this request only. It goes back to available stock when
+                      released or when its hold time runs out.
+                    </p>
+                  </div>
+
+                  {isLabStaff && (
+                    <div className="form-row align-end reservation-hold-row">
+                      <div className="form-group">
+                        <label htmlFor="holdMinutes">Hold time for new reservations (minutes)</label>
+                        <input
+                          id="holdMinutes"
+                          data-testid="hold-minutes-input"
+                          type="number"
+                          min={MIN_HOLD_MINUTES}
+                          max={MAX_HOLD_MINUTES}
+                          step="1"
+                          className="form-input"
+                          placeholder="Default (120)"
+                          value={holdMinutes}
+                          onChange={(e) => setHoldMinutes(e.target.value)}
+                        />
+                      </div>
+                      <p className="section-desc">
+                        Reserve a unit from the cross-match history once it is recorded as compatible.
+                        Allowed range: {MIN_HOLD_MINUTES} to {MAX_HOLD_MINUTES} minutes.
+                      </p>
+                    </div>
+                  )}
+
+                  {reservationSuccess && (
+                    <div className="alert-box alert-success" role="alert">
+                      {reservationSuccess}
+                    </div>
+                  )}
+                  {reservationError && (
+                    <div className="alert-box alert-error" role="alert">
+                      {reservationError}
+                    </div>
+                  )}
+
+                  {loadingReservations && reservations.length === 0 ? (
+                    <p className="loading-text">Loading reservations...</p>
+                  ) : reservations.length === 0 ? (
+                    <p className="empty-subtext" data-testid="no-reservations-msg">
+                      No units are reserved for this request.
+                    </p>
+                  ) : (
+                    <div className="requests-table-container">
+                      <table className="requests-table reservations-table" aria-label="Reserved Units">
+                        <thead>
+                          <tr>
+                            <th scope="col">Unit Code</th>
+                            <th scope="col">Blood Group</th>
+                            <th scope="col">Component</th>
+                            <th scope="col">Held Until</th>
+                            <th scope="col">Time Left</th>
+                            <th scope="col">Reserved By</th>
+                            {isLabStaff && <th scope="col">Action</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reservations.map((r) => {
+                            const left = secondsLeft(r);
+                            return (
+                              <tr key={r.unitCode} data-testid={`reservation-row-${r.unitCode}`}>
+                                <td className="code-cell font-mono">
+                                  <strong>{r.unitCode}</strong>
+                                </td>
+                                <td>
+                                  <span className="badge-group">{r.bloodGroup || '—'}</span>
+                                </td>
+                                <td>{r.component}</td>
+                                <td>{formatTime(r.reservedUntil)}</td>
+                                <td>
+                                  <span
+                                    className={`urgency-pill ${left !== null && left < 600 ? 'urgency-critical' : 'urgency-warning'}`}
+                                    data-testid={`reservation-countdown-${r.unitCode}`}
+                                  >
+                                    {formatCountdown(left)}
+                                  </span>
+                                </td>
+                                <td>{r.reservedBy?.fullName || '—'}</td>
+                                {isLabStaff && (
+                                  <td>
+                                    <button
+                                      type="button"
+                                      className="btn-secondary btn-sm"
+                                      data-testid={`btn-release-${r.unitCode}`}
+                                      disabled={reservationBusyUnit !== null}
+                                      onClick={() => handleReleaseUnit(r.unitCode)}
+                                    >
+                                      {reservationBusyUnit === r.unitCode ? 'Releasing...' : 'Release'}
+                                    </button>
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

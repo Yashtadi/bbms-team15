@@ -107,9 +107,12 @@ CREATE TABLE blood_units (
                            NOT NULL DEFAULT 'QUARANTINE',  -- SEPARATED: split into components (F-031), never issued
   discard_reason           VARCHAR(255) NULL,
   reserved_for_request_id  INT NULL,
+  reserved_until           DATETIME NULL,                 -- F-042: hold expires at this time, then the unit is back in stock
+  reserved_by              INT NULL,                      -- F-042: staff member who placed the hold
   created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (donation_id) REFERENCES donations(id),
   FOREIGN KEY (reserved_for_request_id) REFERENCES blood_requests(id),
+  FOREIGN KEY (reserved_by) REFERENCES users(id),
   FOREIGN KEY (parent_unit_id) REFERENCES blood_units(id),
   INDEX idx_units_parent (parent_unit_id),
   INDEX idx_units_stock (status, blood_group, component, expires_at)  -- fast stock + FEFO queries (NF-001)

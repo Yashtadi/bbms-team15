@@ -1,11 +1,17 @@
 const crypto = require('crypto');
 const db = require('../../db');
 
+// BBMS-F-042: a RESERVED unit whose hold has run out counts as AVAILABLE again straight away,
+// even before the expiry sweep has reset the row.
+const EXPIRED_RESERVATION_SQL =
+  "(bu.status = 'RESERVED' AND bu.reserved_until IS NOT NULL AND bu.reserved_until <= NOW())";
+
 // BBMS-F-022: the single definition of "releasable stock". Both the unit list and the
 // F-030 dashboard summary use it, so the dashboard can never count a unit the list hides.
+// F-042: units on an active reservation are excluded, so they can't be allocated twice.
 function releasableStockFilter({ bloodGroup = null, component = null } = {}) {
   const conditions = [
-    "bu.status = 'AVAILABLE'",
+    `(bu.status = 'AVAILABLE' OR ${EXPIRED_RESERVATION_SQL})`,
     'bu.expires_at > NOW()',
     `EXISTS (
       SELECT 1 FROM lab_results abo
@@ -36,7 +42,8 @@ async function listAvailable({ bloodGroup = null, component = null } = {}) {
   const { where, values } = releasableStockFilter({ bloodGroup, component });
   const [rows] = await db.query(
     `SELECT bu.id, bu.unit_code, bu.component, bu.blood_group, bu.volume_ml,
-            bu.collected_at, bu.expires_at, bu.status
+            bu.collected_at, bu.expires_at,
+            IF(bu.status = 'RESERVED', 'AVAILABLE', bu.status) AS status
      FROM blood_units bu
      WHERE ${where}
      ORDER BY bu.expires_at ASC, bu.id ASC`,
@@ -250,7 +257,8 @@ async function findAvailableForAllocation({ component = null } = {}) {
   const { where, values } = releasableStockFilter({ component });
   const [rows] = await db.query(
     `SELECT bu.id, bu.unit_code, bu.donation_id, bu.component, bu.blood_group,
-            bu.volume_ml, bu.collected_at, bu.expires_at, bu.status
+            bu.volume_ml, bu.collected_at, bu.expires_at,
+            IF(bu.status = 'RESERVED', 'AVAILABLE', bu.status) AS status
      FROM blood_units bu
      WHERE ${where}
      ORDER BY bu.expires_at ASC, bu.id ASC`,
@@ -279,6 +287,7 @@ async function summarizeStockByBloodGroup() {
 }
 
 module.exports = {
+  releasableStockFilter,
   listAvailable,
   summarizeAvailable,
   findUnitByCode,

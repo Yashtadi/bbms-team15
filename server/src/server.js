@@ -46,6 +46,8 @@ function startServer() {
 
 if (require.main === module) {
   startServer();
+  // BBMS-F-042: put lapsed reservations back in stock every minute
+  require('./modules/request/request.service').startReservationExpirySweep();
 }
 
 module.exports = {

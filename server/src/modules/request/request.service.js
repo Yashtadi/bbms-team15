@@ -9,6 +9,35 @@ const VALID_CROSSMATCH_RESULTS = ['COMPATIBLE', 'INCOMPATIBLE'];
 const MIN_UNITS = 1;
 const MAX_UNITS = 20;
 
+// BBMS-F-042: reservation hold window in minutes (team assumption, see DEVIATIONS.md).
+// The default can be changed with RESERVATION_HOLD_MINUTES; staff can override it per hold.
+const DEFAULT_HOLD_MINUTES = 120;
+const MIN_HOLD_MINUTES = 15;
+const MAX_HOLD_MINUTES = 1440;
+const RESERVABLE_REQUEST_STATUSES = ['PENDING', 'RESERVED'];
+const RESERVATION_SWEEP_INTERVAL_MS = 60 * 1000;
+
+function httpError(status, message, extra = {}) {
+  return Object.assign(new Error(message), { status }, extra);
+}
+
+function isWholeNumberInRange(value, min, max) {
+  return Number.isInteger(value) && value >= min && value <= max;
+}
+
+/**
+ * BBMS-F-042: Default hold window. An invalid or out-of-range RESERVATION_HOLD_MINUTES falls back
+ * to 120 minutes, so a typo in .env can never create a zero-length or week-long hold.
+ * @param {object} [env]
+ * @returns {number}
+ */
+function getDefaultHoldMinutes(env = process.env) {
+  const raw = env.RESERVATION_HOLD_MINUTES;
+  if (raw === undefined || raw === null || String(raw).trim() === '') return DEFAULT_HOLD_MINUTES;
+  const parsed = Number(raw);
+  return isWholeNumberInRange(parsed, MIN_HOLD_MINUTES, MAX_HOLD_MINUTES) ? parsed : DEFAULT_HOLD_MINUTES;
+}
+
 /**
  * Normalizes and validates blood request payload.
  * @param {object} input
@@ -235,6 +264,13 @@ async function recordCrossmatch({ idOrCode, unitCode, result, performedBy }, rep
     throw error;
   }
 
+  // BBMS-F-042: a unit held for another request is excluded from other allocations
+  if (isHeldForAnotherRequest(unit, request.id)) {
+    throw httpError(409, `Unit ${unit.unit_code} is reserved for another blood request`, {
+      code: 'RESERVED_FOR_OTHER_REQUEST',
+    });
+  }
+
   // Unit eligibility checks
   if (unit.status === 'DISCARDED') {
     const error = new Error(`Unit ${unit.unit_code} has been discarded and cannot be cross-matched`);
@@ -346,6 +382,19 @@ async function checkIssuanceReadiness({ idOrCode, unitCode }, repository = defau
     };
   }
 
+  // BBMS-F-042: a unit held for another request can't be issued against this one
+  if (isHeldForAnotherRequest(unit, request.id)) {
+    return {
+      readyForIssuance: false,
+      error: 'RESERVED_FOR_OTHER_REQUEST',
+      requestCode: request.requestCode,
+      unitCode: unit.unit_code,
+      crossmatchId: crossmatch.id,
+      result: 'COMPATIBLE',
+      message: `Unit ${unit.unit_code} is reserved for another blood request. Issuance is blocked.`,
+    };
+  }
+
   // Check unit availability
   if (unit.status === 'DISCARDED' || unit.status === 'QUARANTINE') {
     return {
@@ -400,7 +449,244 @@ async function getCrossmatchesForRequest(idOrCode, user, repository = defaultRep
   };
 }
 
+/**
+ * BBMS-F-042: True when the unit is on an active hold for a request other than requestId.
+ * A hold whose window has run out (reservation_active false) no longer blocks anyone.
+ * @param {object} unit blood_units row
+ * @param {number} requestId
+ * @returns {boolean}
+ */
+function isHeldForAnotherRequest(unit, requestId) {
+  if (!unit || unit.status !== 'RESERVED' || !unit.reserved_for_request_id) return false;
+  if (unit.reserved_for_request_id === requestId) return false;
+  if (unit.reservation_active === undefined || unit.reservation_active === null) return true;
+  return Boolean(Number(unit.reservation_active));
+}
+
+/**
+ * BBMS-F-042: Validates a reservation payload { unitCode, holdMinutes? }.
+ * holdMinutes is optional; when given it must be a whole number of minutes from 15 to 1440.
+ * @param {object} body
+ * @param {object} [env]
+ * @returns {{ isValid: boolean, errors: object, data: { unitCode: string, holdMinutes: number } }}
+ */
+function validateReservationInput(body = {}, env = process.env) {
+  const errors = {};
+
+  const unitCode = typeof body.unitCode === 'string' ? body.unitCode.trim().toUpperCase() : '';
+  if (!unitCode) {
+    errors.unitCode = 'Unit code is required';
+  }
+
+  let holdMinutes = getDefaultHoldMinutes(env);
+  const rawHold = body.holdMinutes;
+  if (rawHold !== undefined && rawHold !== null && rawHold !== '') {
+    const parsed = typeof rawHold === 'string' ? Number(rawHold.trim()) : rawHold;
+    if (typeof parsed !== 'number' || !isWholeNumberInRange(parsed, MIN_HOLD_MINUTES, MAX_HOLD_MINUTES)) {
+      errors.holdMinutes = `Hold time must be a whole number of minutes between ${MIN_HOLD_MINUTES} and ${MAX_HOLD_MINUTES}`;
+    } else {
+      holdMinutes = parsed;
+    }
+  }
+
+  return { isValid: Object.keys(errors).length === 0, errors, data: { unitCode, holdMinutes } };
+}
+
+/**
+ * BBMS-F-042: Business rules for placing a hold, applied to the locked request and unit rows.
+ * Throws an error with an HTTP status and a code when the hold is refused.
+ * @param {object} context
+ * @param {object} context.request locked blood_requests row
+ * @param {object} context.unit locked blood_units row (reservation_active as boolean)
+ * @param {boolean} context.isReleasable unit passes the F-022 release gate
+ * @param {object|null} context.crossmatch latest cross-match for this request and unit
+ * @param {number} context.activeCount active holds already on this request
+ */
+function planReservation({ request, unit, isReleasable, crossmatch, activeCount }) {
+  if (!RESERVABLE_REQUEST_STATUSES.includes(request.status)) {
+    throw httpError(409, `Units can't be reserved for a request that is ${request.status}`, {
+      code: 'REQUEST_NOT_RESERVABLE',
+    });
+  }
+
+  if (unit.status === 'RESERVED' && unit.reservation_active) {
+    if (unit.reserved_for_request_id === request.id) {
+      throw httpError(409, `Unit ${unit.unit_code} is already reserved for this request`, {
+        code: 'ALREADY_RESERVED',
+      });
+    }
+    throw httpError(409, `Unit ${unit.unit_code} is reserved for another blood request`, {
+      code: 'RESERVED_FOR_OTHER_REQUEST',
+    });
+  }
+
+  if (activeCount >= request.units_requested) {
+    throw httpError(
+      409,
+      `Request ${request.request_code} already has ${activeCount} of ${request.units_requested} unit(s) reserved`,
+      { code: 'RESERVATION_LIMIT_REACHED' }
+    );
+  }
+
+  if (unit.component !== request.component) {
+    throw httpError(422, `Unit ${unit.unit_code} is ${unit.component}, but the request is for ${request.component}`, {
+      code: 'COMPONENT_MISMATCH',
+    });
+  }
+
+  if (!isReleasable) {
+    throw httpError(
+      409,
+      `Unit ${unit.unit_code} is not available stock (status ${unit.status}, or expired, or lab release incomplete)`,
+      { code: 'UNIT_NOT_AVAILABLE' }
+    );
+  }
+
+  if (!crossmatch) {
+    throw httpError(422, `No cross-match recorded for unit ${unit.unit_code} on request ${request.request_code}`, {
+      code: 'NO_CROSSMATCH',
+    });
+  }
+
+  if (crossmatch.result !== 'COMPATIBLE') {
+    throw httpError(422, `The latest cross-match for unit ${unit.unit_code} is ${crossmatch.result}`, {
+      code: 'INCOMPATIBLE_CROSSMATCH',
+    });
+  }
+
+  if (!isBloodGroupCompatible(request.patient_blood_group, unit.blood_group, request.component)) {
+    throw httpError(
+      422,
+      `Unit blood group (${unit.blood_group}) is clinically incompatible with patient blood group (${request.patient_blood_group})`,
+      { code: 'INCOMPATIBLE_BLOOD_GROUP' }
+    );
+  }
+}
+
+/**
+ * BBMS-F-042: Reserves a cross-matched unit for a pending request for a limited time.
+ * While held, the unit is excluded from stock counts, FEFO suggestions and other requests.
+ * @param {object} params
+ * @param {number|string} params.idOrCode
+ * @param {object} params.body { unitCode, holdMinutes? }
+ * @param {object} params.user req.user
+ * @param {object} [repository]
+ * @returns {Promise<object>}
+ */
+async function reserveUnitForRequest({ idOrCode, body, user }, repository = defaultRepository) {
+  const validation = validateReservationInput(body);
+  if (!validation.isValid) {
+    throw httpError(400, 'Validation failed', { errors: validation.errors });
+  }
+  const { unitCode, holdMinutes } = validation.data;
+
+  const request = await repository.findByIdOrCode(idOrCode);
+  if (!request) throw httpError(404, `Blood request '${idOrCode}' not found`);
+
+  await repository.releaseExpiredReservations();
+
+  const result = await repository.reserveUnit(
+    { requestId: request.id, unitCode, holdMinutes, userId: user.id },
+    planReservation
+  );
+  if (result.requestNotFound) throw httpError(404, `Blood request '${idOrCode}' not found`);
+  if (result.unitNotFound) throw httpError(404, `Blood unit '${unitCode}' not found`);
+
+  return {
+    requestId: request.id,
+    requestCode: request.requestCode,
+    requestStatus: result.request.status,
+    unitsRequested: request.unitsRequested,
+    activeReservations: result.activeReservations,
+    unitId: result.unit.id,
+    unitCode: result.unit.unit_code,
+    component: result.unit.component,
+    bloodGroup: result.unit.blood_group,
+    crossmatchId: result.crossmatchId,
+    holdMinutes,
+    reservedUntil: result.reservedUntil ? new Date(result.reservedUntil).toISOString() : null,
+    secondsRemaining: result.secondsRemaining,
+    reservedBy: user.id,
+  };
+}
+
+/**
+ * BBMS-F-042: Releases a hold before its window ends; the unit goes back to AVAILABLE.
+ * @returns {Promise<object>}
+ */
+async function releaseUnitReservation({ idOrCode, unitCode, user }, repository = defaultRepository) {
+  const code = typeof unitCode === 'string' ? unitCode.trim().toUpperCase() : '';
+  if (!code) throw httpError(400, 'Unit code is required');
+
+  const request = await repository.findByIdOrCode(idOrCode);
+  if (!request) throw httpError(404, `Blood request '${idOrCode}' not found`);
+
+  const result = await repository.releaseReservation({ requestId: request.id, unitCode: code, userId: user.id });
+  if (result.requestNotFound) throw httpError(404, `Blood request '${idOrCode}' not found`);
+  if (result.unitNotFound) throw httpError(404, `Blood unit '${code}' not found`);
+  if (result.notReserved) {
+    throw httpError(409, `Unit ${code} is not reserved for request ${request.requestCode}`, {
+      code: 'NOT_RESERVED',
+    });
+  }
+
+  return {
+    requestId: request.id,
+    requestCode: request.requestCode,
+    requestStatus: result.request.status,
+    unitCode: result.unit.unit_code,
+    unitStatus: 'AVAILABLE',
+  };
+}
+
+/**
+ * BBMS-F-042: Active holds on a request. Hospital users only see their own requests.
+ * Lapsed holds are swept first, so the list never shows a hold that has run out.
+ */
+async function getReservationsForRequest(idOrCode, user, repository = defaultRepository) {
+  const request = await getBloodRequestById(idOrCode, user, repository);
+  await repository.releaseExpiredReservations();
+  const reservations = await repository.listReservationsForRequest(request.id);
+  const refreshed = (await repository.findByIdOrCode(request.id)) || request;
+  return { request: refreshed, reservations };
+}
+
+/**
+ * BBMS-F-042: Runs the lapsed-hold sweep on a timer (server only, never in tests).
+ * The timer is unref'd, so it never keeps the process alive on shutdown.
+ * @returns {NodeJS.Timeout}
+ */
+function startReservationExpirySweep({
+  intervalMs = RESERVATION_SWEEP_INTERVAL_MS,
+  repository = defaultRepository,
+  logger = console,
+} = {}) {
+  const timer = setInterval(async () => {
+    try {
+      const released = await repository.releaseExpiredReservations();
+      if (released.length > 0) {
+        logger.log(`[F-042] Released ${released.length} lapsed reservation(s): ${released.map((r) => r.unitCode).join(', ')}`);
+      }
+    } catch (error) {
+      logger.error('[F-042] Reservation expiry sweep failed:', error.message);
+    }
+  }, intervalMs);
+  if (typeof timer.unref === 'function') timer.unref();
+  return timer;
+}
+
 module.exports = {
+  DEFAULT_HOLD_MINUTES,
+  MIN_HOLD_MINUTES,
+  MAX_HOLD_MINUTES,
+  getDefaultHoldMinutes,
+  isHeldForAnotherRequest,
+  validateReservationInput,
+  planReservation,
+  reserveUnitForRequest,
+  releaseUnitReservation,
+  getReservationsForRequest,
+  startReservationExpirySweep,
   VALID_BLOOD_GROUPS,
   VALID_COMPONENTS,
   VALID_PRIORITIES,
