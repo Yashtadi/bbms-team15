@@ -47,12 +47,17 @@ describe('Database schema v1', () => {
 
   it('requires explicit MFA enrollment for privileged users and allows unknown request blood groups', async () => {
     const [mfa] = await db.query(
-      `SELECT IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'mfa_enabled'`
+      `SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+         AND COLUMN_NAME IN ('mfa_enabled', 'mfa_failed_attempts', 'mfa_locked_until')`
     );
-    expect(mfa).toHaveLength(1);
-    expect(mfa[0].IS_NULLABLE).toBe('NO');
-    expect(Number(mfa[0].COLUMN_DEFAULT)).toBe(0);
+    expect(mfa).toHaveLength(3);
+    const mfaColumns = Object.fromEntries(mfa.map((column) => [column.COLUMN_NAME, column]));
+    expect(mfaColumns.mfa_enabled.IS_NULLABLE).toBe('NO');
+    expect(Number(mfaColumns.mfa_enabled.COLUMN_DEFAULT)).toBe(0);
+    expect(mfaColumns.mfa_failed_attempts.IS_NULLABLE).toBe('NO');
+    expect(Number(mfaColumns.mfa_failed_attempts.COLUMN_DEFAULT)).toBe(0);
+    expect(mfaColumns.mfa_locked_until.IS_NULLABLE).toBe('YES');
 
     const [bloodGroup] = await db.query(
       `SELECT IS_NULLABLE FROM information_schema.COLUMNS

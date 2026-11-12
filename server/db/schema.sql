@@ -19,6 +19,8 @@ CREATE TABLE users (
   organisation   VARCHAR(150) NULL,              -- hospital name, for HOSPITAL users
   mfa_secret     VARCHAR(255) NULL,              -- SR-005, ADMIN and MANAGER only
   mfa_enabled    BOOLEAN NOT NULL DEFAULT FALSE, -- SR-005, enabled after TOTP verification
+  mfa_failed_attempts INT NOT NULL DEFAULT 0,
+  mfa_locked_until DATETIME NULL,
   is_active      BOOLEAN NOT NULL DEFAULT TRUE,
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

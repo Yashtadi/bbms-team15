@@ -112,7 +112,66 @@ async function updateMfaSecret(id, encryptedSecret) {
 
 async function enableMfa(id) {
   const [result] = await db.query(
-    'UPDATE users SET mfa_enabled = TRUE WHERE id = ? AND mfa_secret IS NOT NULL',
+    `UPDATE users
+     SET mfa_enabled = TRUE, mfa_failed_attempts = 0, mfa_locked_until = NULL
+     WHERE id = ? AND mfa_secret IS NOT NULL`,
+    [id]
+  );
+  return result.affectedRows > 0;
+}
+
+async function isMfaLocked(id) {
+  const [rows] = await db.query(
+    'SELECT mfa_locked_until > NOW() AS is_locked FROM users WHERE id = ?',
+    [id]
+  );
+  return Boolean(Number(rows[0]?.is_locked || 0));
+}
+
+async function recordMfaFailure(id) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
+      `SELECT mfa_failed_attempts, mfa_locked_until > NOW() AS is_locked,
+              mfa_locked_until IS NOT NULL AND mfa_locked_until <= NOW() AS lock_expired
+       FROM users WHERE id = ? FOR UPDATE`,
+      [id]
+    );
+    const user = rows[0];
+    if (!user) {
+      await conn.commit();
+      return false;
+    }
+
+    if (Number(user.is_locked)) {
+      await conn.commit();
+      return true;
+    }
+
+    const attempts = Number(user.lock_expired)
+      ? 1
+      : Number(user.mfa_failed_attempts) + 1;
+    await conn.query(
+      `UPDATE users
+       SET mfa_failed_attempts = ?,
+           mfa_locked_until = IF(? >= 5, DATE_ADD(NOW(), INTERVAL 15 MINUTE), NULL)
+       WHERE id = ?`,
+      [attempts, attempts, id]
+    );
+    await conn.commit();
+    return attempts >= 5;
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+async function clearMfaFailures(id) {
+  const [result] = await db.query(
+    'UPDATE users SET mfa_failed_attempts = 0, mfa_locked_until = NULL WHERE id = ?',
     [id]
   );
   return result.affectedRows > 0;
@@ -125,4 +184,7 @@ module.exports = {
   updatePassword,
   updateMfaSecret,
   enableMfa,
+  isMfaLocked,
+  recordMfaFailure,
+  clearMfaFailures,
 };

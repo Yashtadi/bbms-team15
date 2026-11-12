@@ -7,6 +7,9 @@ const TTI_TESTS = ['HIV', 'HBV', 'HCV', 'SYPHILIS', 'MALARIA'];
 const suffix = Date.now().toString().slice(-6);
 const requestCode = `R-99${suffix}`;
 const unitCode = `U-2026-99${suffix}`;
+const secondUnitCode = `U-2026-98${suffix}`;
+const thirdUnitCode = `U-2026-97${suffix}`;
+const unitCodes = [unitCode, secondUnitCode, thirdUnitCode];
 
 describe('TC-Req-04: BBMS-F-043 chain of custody (integration)', () => {
   let requestId;
@@ -15,7 +18,7 @@ describe('TC-Req-04: BBMS-F-043 chain of custody (integration)', () => {
 
   async function cleanUp() {
     const [requests] = await db.query('SELECT id FROM blood_requests WHERE request_code = ?', [requestCode]);
-    const [units] = await db.query('SELECT id, donation_id FROM blood_units WHERE unit_code = ?', [unitCode]);
+    const [units] = await db.query('SELECT id, donation_id FROM blood_units WHERE unit_code IN (?)', [unitCodes]);
     const requestIds = requests.map((row) => row.id);
     const unitIds = units.map((row) => row.id);
     if (requestIds.length) {
@@ -33,7 +36,10 @@ describe('TC-Req-04: BBMS-F-043 chain of custody (integration)', () => {
       await db.query('DELETE FROM blood_requests WHERE id IN (?)', [requestIds]);
     }
     if (unitIds.length) {
-      await db.query('DELETE FROM audit_log WHERE entity_type = ? AND entity_id = ?', ['blood_unit', unitCode]);
+      await db.query(
+        'DELETE FROM audit_log WHERE entity_type = ? AND entity_id IN (?)',
+        ['blood_unit', unitCodes]
+      );
       await db.query('DELETE FROM blood_units WHERE id IN (?)', [unitIds]);
     }
     const donationIds = [...new Set(units.map((row) => row.donation_id))];
@@ -70,10 +76,18 @@ describe('TC-Req-04: BBMS-F-043 chain of custody (integration)', () => {
       [unitCode, donationId]
     );
     unitId = unit.insertId;
+    for (const code of [secondUnitCode, thirdUnitCode]) {
+      await db.query(
+        `INSERT INTO blood_units
+         (unit_code, donation_id, component, blood_group, volume_ml, collected_at, expires_at, status)
+         VALUES (?, ?, 'PRBC', 'O-', 280, NOW() - INTERVAL 1 DAY, NOW() + INTERVAL 30 DAY, 'AVAILABLE')`,
+        [code, donationId]
+      );
+    }
     const [createdRequest] = await db.query(
       `INSERT INTO blood_requests
        (request_code, hospital_user_id, patient_name, patient_blood_group, component, units_requested, priority, status)
-       VALUES (?, 5, 'Custody Test Patient', 'A+', 'PRBC', 1, 'EMERGENCY', 'PENDING')`,
+       VALUES (?, 5, 'Custody Test Patient', 'A+', 'PRBC', 2, 'EMERGENCY', 'PENDING')`,
       [requestCode]
     );
     requestId = createdRequest.insertId;
@@ -95,11 +109,19 @@ describe('TC-Req-04: BBMS-F-043 chain of custody (integration)', () => {
     expect(blocked.status).toBe(422);
     expect(blocked.body.code).toBe('NO_CROSSMATCH');
 
-    const crossmatch = await request(app)
-      .post(`/api/blood-requests/${requestCode}/crossmatch`)
+    for (const code of [unitCode, secondUnitCode]) {
+      const crossmatch = await request(app)
+        .post(`/api/blood-requests/${requestCode}/crossmatch`)
+        .set(authHeader('LAB_TECH'))
+        .send({ unitCode: code, result: 'COMPATIBLE' });
+      expect(crossmatch.status).toBe(201);
+    }
+
+    const held = await request(app)
+      .post(`/api/blood-requests/${requestCode}/reservations`)
       .set(authHeader('LAB_TECH'))
-      .send({ unitCode, result: 'COMPATIBLE' });
-    expect(crossmatch.status).toBe(201);
+      .send({ unitCode: secondUnitCode });
+    expect(held.status).toBe(201);
 
     const issued = await request(app)
       .post(`/api/blood-requests/${requestCode}/issuances`)
@@ -107,7 +129,7 @@ describe('TC-Req-04: BBMS-F-043 chain of custody (integration)', () => {
       .send({ unitCode, receivedBy: 'City General Hospital Ward 4' });
 
     expect(issued.status).toBe(201);
-    expect(issued.body.request).toMatchObject({ id: requestId, requestCode, status: 'ISSUED' });
+    expect(issued.body.request).toMatchObject({ id: requestId, requestCode, status: 'RESERVED' });
     expect(issued.body.issuance).toMatchObject({
       requestId,
       requestCode,
@@ -121,7 +143,7 @@ describe('TC-Req-04: BBMS-F-043 chain of custody (integration)', () => {
     const [unitRows] = await db.query('SELECT status FROM blood_units WHERE id = ?', [unitId]);
     expect(unitRows[0].status).toBe('ISSUED');
     const [requestRows] = await db.query('SELECT status FROM blood_requests WHERE id = ?', [requestId]);
-    expect(requestRows[0].status).toBe('ISSUED');
+    expect(requestRows[0].status).toBe('RESERVED');
     const [auditRows] = await db.query(
       "SELECT user_id, details FROM audit_log WHERE action = 'UNIT_ISSUED' AND entity_id = ?",
       [unitCode]
@@ -136,6 +158,32 @@ describe('TC-Req-04: BBMS-F-043 chain of custody (integration)', () => {
       crossmatchId: issued.body.issuance.crossmatchId,
       receivedBy: 'City General Hospital Ward 4',
     });
+
+    const thirdCrossmatch = await request(app)
+      .post(`/api/blood-requests/${requestCode}/crossmatch`)
+      .set(authHeader('LAB_TECH'))
+      .send({ unitCode: thirdUnitCode, result: 'COMPATIBLE' });
+    expect(thirdCrossmatch.status).toBe(201);
+    const extraHold = await request(app)
+      .post(`/api/blood-requests/${requestCode}/reservations`)
+      .set(authHeader('LAB_TECH'))
+      .send({ unitCode: thirdUnitCode });
+    expect(extraHold.status).toBe(409);
+    expect(extraHold.body.code).toBe('RESERVATION_LIMIT_REACHED');
+
+    const overIssue = await request(app)
+      .post(`/api/blood-requests/${requestCode}/issuances`)
+      .set(authHeader('MANAGER'))
+      .send({ unitCode: thirdUnitCode, receivedBy: 'City General Hospital Ward 4' });
+    expect(overIssue.status).toBe(409);
+    expect(overIssue.body.code).toBe('REQUEST_ALLOCATION_FULL');
+
+    const secondIssue = await request(app)
+      .post(`/api/blood-requests/${requestCode}/issuances`)
+      .set(authHeader('MANAGER'))
+      .send({ unitCode: secondUnitCode, receivedBy: 'City General Hospital Ward 4' });
+    expect(secondIssue.status).toBe(201);
+    expect(secondIssue.body.request.status).toBe('ISSUED');
   });
 
   it('prevents a unit from being issued twice and lets the hospital read custody history', async () => {
@@ -149,7 +197,9 @@ describe('TC-Req-04: BBMS-F-043 chain of custody (integration)', () => {
       .get(`/api/blood-requests/${requestCode}/issuances`)
       .set(authHeader('HOSPITAL'));
     expect(history.status).toBe(200);
-    expect(history.body.issuances).toHaveLength(1);
-    expect(history.body.issuances[0].receivedBy).toBe('City General Hospital Ward 4');
+    expect(history.body.issuances).toHaveLength(2);
+    expect(history.body.issuances.every((issuance) => (
+      issuance.receivedBy === 'City General Hospital Ward 4'
+    ))).toBe(true);
   });
 });

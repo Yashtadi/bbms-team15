@@ -416,7 +416,7 @@ const RESERVATION_UNIT_COLUMNS = `id, unit_code, component, blood_group, volume_
 
 async function lockRequest(conn, requestId) {
   const [rows] = await conn.query(
-    `SELECT id, request_code, patient_blood_group, component, units_requested, status
+    `SELECT id, request_code, patient_blood_group, component, units_requested, priority, status
      FROM blood_requests WHERE id = ? FOR UPDATE`,
     [requestId]
   );
@@ -431,12 +431,14 @@ async function lockUnit(conn, unitCode) {
   return rows[0] || null;
 }
 
-async function countActiveReservations(requestId, connection = null) {
+async function countActiveReservations(requestId, connection = null, excludeUnitId = null) {
   const runner = connection || db;
+  const excludeClause = excludeUnitId === null ? '' : ' AND id <> ?';
+  const values = excludeUnitId === null ? [requestId] : [requestId, excludeUnitId];
   const [rows] = await runner.query(
     `SELECT COUNT(*) AS active FROM blood_units
-     WHERE reserved_for_request_id = ? AND ${RESERVATION_ACTIVE_SQL}`,
-    [requestId]
+     WHERE reserved_for_request_id = ? AND ${RESERVATION_ACTIVE_SQL}${excludeClause}`,
+    values
   );
   return Number(rows[0]?.active || 0);
 }
@@ -450,7 +452,8 @@ async function syncRequestStatus(conn, requestId) {
     `UPDATE blood_requests br
      SET br.status = IF(
        (SELECT COUNT(*) FROM blood_units
-        WHERE reserved_for_request_id = br.id AND ${RESERVATION_ACTIVE_SQL}) >= br.units_requested,
+        WHERE reserved_for_request_id = br.id AND ${RESERVATION_ACTIVE_SQL})
+       + (SELECT COUNT(*) FROM issuances WHERE request_id = br.id) >= br.units_requested,
        'RESERVED', 'PENDING')
      WHERE br.id = ? AND br.status IN ('PENDING', 'RESERVED')`,
     [requestId]
@@ -494,6 +497,11 @@ async function reserveUnit({ requestId, unitCode, holdMinutes, userId }, planRes
     );
     const crossmatch = await findLatestCrossmatch(request.id, unit.id, conn);
     const activeCount = await countActiveReservations(request.id, conn);
+    const [issuedRows] = await conn.query(
+      'SELECT COUNT(*) AS issued FROM issuances WHERE request_id = ?',
+      [request.id]
+    );
+    const issuedCount = Number(issuedRows[0]?.issued || 0);
 
     planReservation({
       request,
@@ -501,6 +509,7 @@ async function reserveUnit({ requestId, unitCode, holdMinutes, userId }, planRes
       isReleasable: releasableRows.length > 0,
       crossmatch,
       activeCount,
+      issuedCount,
     });
 
     await conn.query(
@@ -713,6 +722,7 @@ async function issueUnit({ requestId, unitCode, userId, receivedBy }, planIssuan
       'SELECT COUNT(*) AS issued FROM issuances WHERE request_id = ?',
       [request.id]
     );
+    const otherActiveReservationCount = await countActiveReservations(request.id, conn, unit.id);
 
     planIssuance({
       request,
@@ -720,6 +730,7 @@ async function issueUnit({ requestId, unitCode, userId, receivedBy }, planIssuan
       isReleasable: releasableRows.length > 0,
       crossmatch,
       issuedCount: Number(issuedRows[0]?.issued || 0),
+      otherActiveReservationCount,
     });
 
     const [insertResult] = await conn.query(

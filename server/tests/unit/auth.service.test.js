@@ -118,6 +118,8 @@ describe('SR-005 MFA service flow (unit)', () => {
     repository.findUserById.mockResolvedValue(admin);
     repository.updateMfaSecret.mockResolvedValue(true);
     repository.enableMfa.mockResolvedValue(true);
+    repository.isMfaLocked.mockResolvedValue(false);
+    repository.recordMfaFailure.mockResolvedValue(false);
 
     const setupToken = jwt.sign(
       { sub: admin.id, role: admin.role, purpose: 'mfa_setup' },
@@ -136,6 +138,34 @@ describe('SR-005 MFA service flow (unit)', () => {
     expect(repository.enableMfa).toHaveBeenCalledWith(admin.id);
     expect(session.token).toEqual(expect.any(String));
     expect(session.user.role).toBe('ADMIN');
+  });
+
+  it('locks MFA verification after five invalid codes', async () => {
+    const { verifyMfa } = require('../../src/modules/auth/auth.service');
+    const secret = 'JBSWY3DPEHPK3PXP';
+    const challengeToken = jwt.sign(
+      { sub: admin.id, role: admin.role, purpose: 'mfa_challenge' },
+      process.env.JWT_SECRET,
+      { expiresIn: '5m' }
+    );
+    repository.findUserById.mockResolvedValue({
+      ...admin,
+      mfa_enabled: 1,
+      mfa_secret: require('../../src/utils/encryption').encrypt(secret),
+    });
+    repository.isMfaLocked.mockResolvedValue(false);
+    repository.recordMfaFailure
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expect(verifyMfa({ challengeToken, code: 'not-a-code' }))
+        .rejects.toMatchObject({ status: attempt === 4 ? 429 : 401 });
+    }
+    expect(repository.recordMfaFailure).toHaveBeenCalledTimes(5);
   });
 });
 

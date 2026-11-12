@@ -89,4 +89,17 @@ describe('auth.routes: POST /api/auth/login error handling', () => {
     expect(res.body.token).toBe('verified-session');
     expect(authService.verifyMfa).toHaveBeenCalledWith({ challengeToken: 'challenge-token', code: '123456' });
   });
+
+  it('returns 429 when MFA verification is temporarily locked', async () => {
+    authService.verifyMfa.mockRejectedValue(Object.assign(new Error('Too many invalid authenticator codes'), {
+      status: 429,
+    }));
+
+    const res = await request(app)
+      .post('/api/auth/mfa/verify')
+      .send({ challengeToken: 'challenge-token', code: '123456' });
+
+    expect(res.status).toBe(429);
+    expect(res.body.message).toMatch(/too many invalid authenticator codes/i);
+  });
 });

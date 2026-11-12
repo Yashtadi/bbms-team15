@@ -292,11 +292,17 @@ async function recordCrossmatch({ idOrCode, unitCode, result, performedBy }, rep
 
   // Clinical ABO/Rh compatibility rule check
   const isCompatibleByGroup = isBloodGroupCompatible(request.patientBloodGroup, unit.blood_group, request.component);
-  if (normalizedResult === 'COMPATIBLE' && !isCompatibleByGroup) {
+  const isEmergencyUnknownGroupFallback =
+    Boolean(request.patientBloodGroup) ||
+    (request.priority === 'EMERGENCY' && request.component === 'PRBC');
+  if (normalizedResult === 'COMPATIBLE' && (!isCompatibleByGroup || !isEmergencyUnknownGroupFallback)) {
     const error = new Error(
-      `Unit blood group (${unit.blood_group}) is clinically incompatible with patient blood group (${request.patientBloodGroup}) for component ${request.component}; cannot record as COMPATIBLE`
+      request.patientBloodGroup
+        ? `Unit blood group (${unit.blood_group}) is clinically incompatible with patient blood group (${request.patientBloodGroup}) for component ${request.component}; cannot record as COMPATIBLE`
+        : 'An unknown blood group can only be cross-matched with O-negative PRBC for an emergency request'
     );
     error.status = 422;
+    if (!request.patientBloodGroup) error.code = 'EMERGENCY_FALLBACK_REQUIRED';
     throw error;
   }
 
@@ -449,13 +455,30 @@ async function getCrossmatchesForRequest(idOrCode, user, repository = defaultRep
   };
 }
 
-function planIssuance({ request, unit, isReleasable, crossmatch, issuedCount }) {
+function planIssuance({
+  request,
+  unit,
+  isReleasable,
+  crossmatch,
+  issuedCount,
+  otherActiveReservationCount = 0,
+}) {
   if (request.status === 'CANCELLED' || request.status === 'REJECTED') {
     throw httpError(422, `Cannot issue units for a ${request.status.toLowerCase()} blood request`);
+  }
+  if (!request.patient_blood_group && (request.priority !== 'EMERGENCY' || request.component !== 'PRBC')) {
+    throw httpError(422, 'An unknown blood group can only be issued O-negative PRBC for an emergency request', {
+      code: 'EMERGENCY_FALLBACK_REQUIRED',
+    });
   }
   if (issuedCount >= request.units_requested) {
     throw httpError(409, `Request ${request.request_code} has already been fulfilled`, {
       code: 'REQUEST_ALREADY_FULFILLED',
+    });
+  }
+  if (issuedCount + otherActiveReservationCount >= request.units_requested) {
+    throw httpError(409, `Request ${request.request_code} already has enough units reserved or issued`, {
+      code: 'REQUEST_ALLOCATION_FULL',
     });
   }
   if (unit.status === 'ISSUED') {
@@ -578,11 +601,18 @@ function validateReservationInput(body = {}, env = process.env) {
  * @param {boolean} context.isReleasable unit passes the F-022 release gate
  * @param {object|null} context.crossmatch latest cross-match for this request and unit
  * @param {number} context.activeCount active holds already on this request
+ * @param {number} context.issuedCount units already issued for this request
  */
-function planReservation({ request, unit, isReleasable, crossmatch, activeCount }) {
+function planReservation({ request, unit, isReleasable, crossmatch, activeCount, issuedCount = 0 }) {
   if (!RESERVABLE_REQUEST_STATUSES.includes(request.status)) {
     throw httpError(409, `Units can't be reserved for a request that is ${request.status}`, {
       code: 'REQUEST_NOT_RESERVABLE',
+    });
+  }
+
+  if (!request.patient_blood_group && (request.priority !== 'EMERGENCY' || request.component !== 'PRBC')) {
+    throw httpError(422, 'An unknown blood group can only be reserved O-negative PRBC for an emergency request', {
+      code: 'EMERGENCY_FALLBACK_REQUIRED',
     });
   }
 
@@ -597,10 +627,10 @@ function planReservation({ request, unit, isReleasable, crossmatch, activeCount 
     });
   }
 
-  if (activeCount >= request.units_requested) {
+  if (activeCount + issuedCount >= request.units_requested) {
     throw httpError(
       409,
-      `Request ${request.request_code} already has ${activeCount} of ${request.units_requested} unit(s) reserved`,
+      `Request ${request.request_code} already has ${activeCount + issuedCount} of ${request.units_requested} unit(s) reserved or issued`,
       { code: 'RESERVATION_LIMIT_REACHED' }
     );
   }

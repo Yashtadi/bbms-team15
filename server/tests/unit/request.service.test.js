@@ -8,6 +8,7 @@ const {
   getCrossmatchesForRequest,
   issueUnitForRequest,
   getIssuancesForRequest,
+  planReservation,
 } = require('../../src/modules/request/request.service');
 
 describe('TC-Req-01: BBMS-F-040 Blood Request Service (Unit)', () => {
@@ -127,6 +128,73 @@ describe('TC-Req-01: BBMS-F-040 Blood Request Service (Unit)', () => {
             user: { id: 3 },
           }, repository)
         ).rejects.toMatchObject({ status: 422, code: 'NO_CROSSMATCH' });
+      });
+
+      it('does not issue unknown-group fallback units for non-emergency requests', async () => {
+        const repository = {
+          findByIdOrCode: jest.fn().mockResolvedValue(request),
+          issueUnit: jest.fn((params, plan) => plan({
+            request: { ...lockedRequest, patient_blood_group: null, priority: 'ROUTINE' },
+            unit,
+            isReleasable: true,
+            crossmatch: { id: 12, result: 'COMPATIBLE' },
+            issuedCount: 0,
+          })),
+        };
+        await expect(
+          issueUnitForRequest({
+            idOrCode: request.requestCode,
+            body: { unitCode: unit.unit_code, receivedBy: 'City Hospital Desk' },
+            user: { id: 3 },
+          }, repository)
+        ).rejects.toMatchObject({ status: 422, code: 'EMERGENCY_FALLBACK_REQUIRED' });
+      });
+
+      it('allows unknown-group O-negative PRBC issuance for an emergency after cross-match', async () => {
+        const repository = {
+          findByIdOrCode: jest.fn().mockResolvedValue(request),
+          issueUnit: jest.fn((params, plan) => {
+            plan({
+              request: { ...lockedRequest, patient_blood_group: null, priority: 'EMERGENCY' },
+              unit,
+              isReleasable: true,
+              crossmatch: { id: 12, result: 'COMPATIBLE' },
+              issuedCount: 0,
+            });
+            return { issuance: issued, requestStatus: 'ISSUED' };
+          }),
+        };
+        await expect(
+          issueUnitForRequest({
+            idOrCode: request.requestCode,
+            body: { unitCode: unit.unit_code, receivedBy: 'City Hospital Desk' },
+            user: { id: 3 },
+          }, repository)
+        ).resolves.toMatchObject({ request: { status: 'ISSUED' } });
+      });
+
+      it('counts issued units against future reservation capacity', () => {
+        const reserveAfterPartialIssue = () => planReservation({
+          request: {
+            id: 8,
+            request_code: request.requestCode,
+            status: 'PENDING',
+            units_requested: 2,
+            patient_blood_group: 'A+',
+            component: 'PRBC',
+          },
+          unit: { ...unit, reservation_active: false },
+          isReleasable: true,
+          crossmatch: { id: 12, result: 'COMPATIBLE' },
+          activeCount: 1,
+          issuedCount: 1,
+        });
+        try {
+          reserveAfterPartialIssue();
+          throw new Error('Expected reservation to be rejected');
+        } catch (error) {
+          expect(error).toMatchObject({ status: 409, code: 'RESERVATION_LIMIT_REACHED' });
+        }
       });
 
       it('returns issuance history only after applying request tenancy checks', async () => {
@@ -546,6 +614,25 @@ describe('TC-Req-01: BBMS-F-040 Blood Request Service (Unit)', () => {
           status: 422,
           message: /clinically incompatible/i,
         });
+      });
+
+      it('does not mark an unknown-group non-emergency request compatible with O-negative blood', async () => {
+        const mockRepo = {
+          findByIdOrCode: jest.fn().mockResolvedValue({
+            ...mockRequest,
+            patientBloodGroup: null,
+            priority: 'ROUTINE',
+          }),
+          findUnitByCode: jest.fn().mockResolvedValue(mockUnit),
+          createCrossmatch: jest.fn(),
+        };
+        await expect(
+          recordCrossmatch(
+            { idOrCode: 'R-000001', unitCode: 'U-000001', result: 'COMPATIBLE', performedBy: 3 },
+            mockRepo
+          )
+        ).rejects.toMatchObject({ status: 422, code: 'EMERGENCY_FALLBACK_REQUIRED' });
+        expect(mockRepo.createCrossmatch).not.toHaveBeenCalled();
       });
 
       it('allows recording INCOMPATIBLE even when ABO blood groups are clinically incompatible', async () => {

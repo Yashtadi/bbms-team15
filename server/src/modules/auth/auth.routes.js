@@ -7,7 +7,7 @@ const router = express.Router();
 // Auth module: login + roles (SR-002), MFA (SR-005)
 
 function sendMfaError(res, error, fallbackMessage) {
-  if ([400, 401, 404, 409].includes(error.status)) {
+  if ([400, 401, 404, 409, 429].includes(error.status)) {
     return res.status(error.status).json({ message: error.message });
   }
   console.error('MFA error (500):', error);

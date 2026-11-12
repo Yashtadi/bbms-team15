@@ -14,7 +14,11 @@ async function loginAs(email) {
 describe('TC-Sec-02: login and role-based access (integration)', () => {
   afterAll(async () => {
     try {
-      await db.query('UPDATE users SET mfa_secret = NULL, mfa_enabled = FALSE WHERE id IN (1, 2)');
+      await db.query(
+        `UPDATE users
+         SET mfa_secret = NULL, mfa_enabled = FALSE, mfa_failed_attempts = 0, mfa_locked_until = NULL
+         WHERE id IN (1, 2)`
+      );
     } finally {
       await db.end();
     }
@@ -48,7 +52,11 @@ describe('TC-Sec-02: login and role-based access (integration)', () => {
     });
 
     it('requires an authenticator code before Admin can receive an access token', async () => {
-      await db.query('UPDATE users SET mfa_secret = NULL, mfa_enabled = FALSE WHERE id = 1');
+      await db.query(
+        `UPDATE users
+         SET mfa_secret = NULL, mfa_enabled = FALSE, mfa_failed_attempts = 0, mfa_locked_until = NULL
+         WHERE id = 1`
+      );
       const firstFactor = await request(app)
         .post('/api/auth/login')
         .send({ email: 'admin@bbms.test', password: PASSWORD });
@@ -79,7 +87,7 @@ describe('TC-Sec-02: login and role-based access (integration)', () => {
 
       const denied = await request(app)
         .post('/api/auth/mfa/verify')
-        .send({ challengeToken: nextLogin.body.challengeToken, code: '000000' });
+        .send({ challengeToken: nextLogin.body.challengeToken, code: 'not-a-code' });
       expect(denied.status).toBe(401);
       expect(denied.body).not.toHaveProperty('token');
 
@@ -91,6 +99,22 @@ describe('TC-Sec-02: login and role-based access (integration)', () => {
         });
       expect(verified.status).toBe(200);
       expect(verified.body.token).toEqual(expect.any(String));
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const invalid = await request(app)
+          .post('/api/auth/mfa/verify')
+          .send({ challengeToken: nextLogin.body.challengeToken, code: 'not-a-code' });
+        expect(invalid.status).toBe(attempt === 4 ? 429 : 401);
+      }
+
+      const lockedOut = await request(app)
+        .post('/api/auth/mfa/verify')
+        .send({
+          challengeToken: nextLogin.body.challengeToken,
+          code: generateTotp(setup.body.secret),
+        });
+      expect(lockedOut.status).toBe(429);
+      expect(lockedOut.body).not.toHaveProperty('token');
     });
   });
 

@@ -160,6 +160,22 @@ describe('TC-Req-03: BBMS-F-042 reservation hold window (unit)', () => {
     it('refuses a clinically incompatible blood group with 422', () => {
       expectRefusal(planContext({ unit: lockedUnit({ blood_group: 'B+' }) }), 422, 'INCOMPATIBLE_BLOOD_GROUP');
     });
+
+    it('refuses unknown-group fallback for a non-emergency request', () => {
+      expectRefusal(
+        planContext({
+          request: lockedRequest({ patient_blood_group: null, priority: 'ROUTINE' }),
+        }),
+        422,
+        'EMERGENCY_FALLBACK_REQUIRED'
+      );
+    });
+
+    it('allows unknown-group O-negative PRBC reservation for an emergency request', () => {
+      expect(() => planReservation(planContext({
+        request: lockedRequest({ patient_blood_group: null, priority: 'EMERGENCY' }),
+      }))).not.toThrow();
+    });
   });
 
   describe('isHeldForAnotherRequest', () => {

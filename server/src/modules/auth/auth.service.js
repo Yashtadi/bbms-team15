@@ -103,6 +103,7 @@ async function login({ email, password } = {}) {
 
 async function beginMfaSetup({ setupToken } = {}) {
   const user = await findPrivilegedUser(setupToken, 'mfa_setup');
+  if (await repository.isMfaLocked(user.id)) throw httpError(429, 'Too many invalid authenticator codes; try again later');
   if (user.mfa_enabled === true || Number(user.mfa_enabled) === 1) {
     throw httpError(409, 'Multi-factor authentication is already enabled');
   }
@@ -114,8 +115,14 @@ async function beginMfaSetup({ setupToken } = {}) {
 
 async function verifyMfaSetup({ setupToken, code } = {}) {
   const user = await findPrivilegedUser(setupToken, 'mfa_setup');
+  if (await repository.isMfaLocked(user.id)) throw httpError(429, 'Too many invalid authenticator codes; try again later');
   if (!user.mfa_secret) throw httpError(409, 'Start multi-factor setup before verifying a code');
-  if (!verifyTotp(decrypt(user.mfa_secret), code)) throw httpError(401, 'Invalid authenticator code');
+  if (!verifyTotp(decrypt(user.mfa_secret), code)) {
+    const locked = await repository.recordMfaFailure(user.id);
+    throw httpError(locked ? 429 : 401, locked
+      ? 'Too many invalid authenticator codes; try again later'
+      : 'Invalid authenticator code');
+  }
   const enabled = await repository.enableMfa(user.id);
   if (!enabled) throw httpError(409, 'Could not enable multi-factor authentication');
   return issueSession(user);
@@ -123,12 +130,17 @@ async function verifyMfaSetup({ setupToken, code } = {}) {
 
 async function verifyMfa({ challengeToken, code } = {}) {
   const user = await findPrivilegedUser(challengeToken, 'mfa_challenge');
+  if (await repository.isMfaLocked(user.id)) throw httpError(429, 'Too many invalid authenticator codes; try again later');
   if (user.mfa_enabled !== true && Number(user.mfa_enabled) !== 1) {
     throw httpError(401, 'Multi-factor authentication is not enabled for this account');
   }
   if (!user.mfa_secret || !verifyTotp(decrypt(user.mfa_secret), code)) {
-    throw httpError(401, 'Invalid authenticator code');
+    const locked = await repository.recordMfaFailure(user.id);
+    throw httpError(locked ? 429 : 401, locked
+      ? 'Too many invalid authenticator codes; try again later'
+      : 'Invalid authenticator code');
   }
+  await repository.clearMfaFailures(user.id);
   return issueSession(user);
 }
 
