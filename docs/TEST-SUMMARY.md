@@ -12,7 +12,7 @@
 
 ## Integration and remaining deliverable
 
-- The final revision's MySQL-backed integration suite is being validated by GitHub Actions. The suite includes issuance allocation/custody and MFA lockout checks; consult the PR check before merging.
+- The MySQL-backed server unit and integration suites passed in [GitHub Actions run 75](https://github.com/Yashtadi/bbms-team15/actions/runs/43261102071) for code commit `b5d6fd9`. Coverage includes multi-unit issuance/reservation limits and privileged-role MFA lockout.
 - The Sprint 2 demo video is still pending; see [README](../README.md) for product setup and workflows.
 
 The lint failure is in the existing client tree and does not affect the passing client test/build commands.
