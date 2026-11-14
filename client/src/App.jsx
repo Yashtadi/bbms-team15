@@ -90,7 +90,7 @@ export default function App({ initialTab } = {}) {
             </div>
             <div className="brand-text">
               <h1>Blood Bank Management System</h1>
-              <p>Team 15 · Sprint 2</p>
+              <p>Team 15</p>
             </div>
           </div>
 
@@ -196,6 +196,7 @@ export default function App({ initialTab } = {}) {
         {effectiveTab === 'lab' && canSeeLab && (
           <LabWorkflow
             canEnterResults={role === 'LAB_TECH'}
+            maxQueueItems={5}
             onOpenStorage={() => setActiveTab('inventory')}
           />
         )}

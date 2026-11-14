@@ -144,7 +144,7 @@ export default function DonorRegistrationForm({ onSuccess }) {
         />
 
         <div className="alert-box alert-success no-print" style={{ margin: '1rem 0', fontSize: '0.85rem' }}>
-          <strong>Online Portal Account Generated:</strong> Username: <strong>{registrationResult.donorId}</strong> · Default Password Syntax: <strong>DDMMYYYY</strong> (Date of Birth). Instruct donor to log into <strong>bbms.pes.edu</strong> and change their password.
+          <strong>Online Portal Account Generated:</strong> Username: <strong>{registrationResult.donorId}</strong> · Default Password Syntax: <strong>DDMMYYYY</strong> (Date of Birth). Instruct donor to log into <strong>portal.pes.edu</strong> and change their password.
         </div>
 
         <div className="donor-card-meta no-print" style={{ display: 'flex', justifyContent: 'space-between', margin: '1rem 0' }}>
@@ -170,7 +170,7 @@ export default function DonorRegistrationForm({ onSuccess }) {
   return (
     <div className="registration-form-container">
       <h2>Donor Registration</h2>
-      <p className="subtitle">BBMS-F-001 · Enter donor personal details and medical history</p>
+      <p className="subtitle">Enter donor personal details and medical history</p>
 
       {generalError && (
         <div className="alert-box alert-error" role="alert" data-testid="general-error">
@@ -283,7 +283,7 @@ export default function DonorRegistrationForm({ onSuccess }) {
               checked={formData.consentGiven}
               onChange={handleChange}
             />
-            <span>I digitally provide consent for blood donation and health screening (BBMS-F-004)</span>
+            <span>I digitally provide consent for blood donation and health screening</span>
           </label>
         </div>
 

@@ -165,7 +165,7 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
         <div>
           <h2>Inventory Dashboard</h2>
           <p className="subtitle">
-            BBMS-F-030 · Released blood units by blood group, component and expiry
+            Released blood units by blood group, component and expiry
           </p>
         </div>
         <p className="inventory-live">
@@ -230,7 +230,7 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
               <div>
                 <h3 id="expiry-alerts-heading">Units Nearing Expiry · Alerts</h3>
                 <p className="subtitle">
-                  BBMS-F-032 · Configurable threshold alerts for perishable blood inventory
+                  Configurable threshold alerts for perishable blood inventory
                 </p>
               </div>
               <div className="expiry-threshold-control">
@@ -302,7 +302,7 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
               <div>
                 <h3 id="low-stock-alerts-heading">Low-Stock Blood Group Alerts</h3>
                 <p className="subtitle">
-                  BBMS-F-034 · Alert blood bank manager when blood group stock falls below safety threshold
+                  Alert blood bank manager when blood group stock falls below safety threshold
                 </p>
               </div>
               <div className="expiry-threshold-control">
@@ -370,7 +370,7 @@ export default function InventoryDashboard({ pollIntervalMs = POLL_INTERVAL_MS }
           <div className="inventory-card fefo-finder-card" data-testid="fefo-finder-card">
             <h3 id="fefo-heading">FEFO Unit Allocation (First-Expiry-First-Out)</h3>
             <p className="subtitle">
-              BBMS-F-033 · Suggests soonest-to-expire clinically compatible units for patient issuance
+              Suggests soonest-to-expire clinically compatible units for patient issuance
             </p>
 
             <div className="form-row align-end">
