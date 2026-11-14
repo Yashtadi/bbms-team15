@@ -5,8 +5,8 @@
 
 -- All demo users have the password: Password@123   (bcrypt hash below; never use this in production)
 INSERT INTO users (id, email, password_hash, full_name, role, organisation) VALUES
-  (1, 'admin@bbms.test',    '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Asha Admin',         'ADMIN',    NULL),
-  (2, 'manager@bbms.test',  '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Manoj Manager',      'MANAGER',  NULL),
+  (1, 'admin@bbms.test',    '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Admin',         'ADMIN',    NULL),
+  (2, 'manager@bbms.test',  '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Manager',       'MANAGER',  NULL),
   (3, 'labtech@bbms.test',  '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Labtech 1',          'LAB_TECH', NULL),
   (4, 'labtech2@bbms.test', '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'Labtech 2',          'LAB_TECH', NULL),
   (5, 'hospital@bbms.test', '$2b$10$ttaWToikhsKH4/1ysdq.kuuvoJ74/Y1YsmqgAu7aeuHQIlYeeCxi6', 'City Hospital Desk', 'HOSPITAL', 'City General Hospital'),

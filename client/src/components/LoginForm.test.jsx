@@ -93,7 +93,7 @@ describe('TC-Sec-02: LoginForm', () => {
 
   it('requires authenticator enrollment and code before Admin receives a session', async () => {
     const user = userEvent.setup();
-    const session = { token: 'admin-token', user: { id: 1, fullName: 'Asha Admin', role: 'ADMIN' } };
+    const session = { token: 'admin-token', user: { id: 1, fullName: 'Admin', role: 'ADMIN' } };
     global.fetch = vi.fn()
       .mockResolvedValueOnce({
         status: 200,
@@ -124,7 +124,7 @@ describe('TC-Sec-02: LoginForm', () => {
 
   it('requires a valid authenticator challenge code for an enrolled Manager', async () => {
     const user = userEvent.setup();
-    const session = { token: 'manager-token', user: { id: 2, fullName: 'Manoj Manager', role: 'MANAGER' } };
+    const session = { token: 'manager-token', user: { id: 2, fullName: 'Manager', role: 'MANAGER' } };
     global.fetch = vi.fn()
       .mockResolvedValueOnce({
         status: 200,
