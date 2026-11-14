@@ -9,6 +9,14 @@ import './DonorPortalDashboard.css';
 function formatHumanDate(dateStr) {
   if (!dateStr) return 'N/A';
   try {
+    const str = String(dateStr).trim();
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+    if (match) {
+      const [, year, month, day] = match;
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthIdx = parseInt(month, 10) - 1;
+      return `${day} ${monthNames[monthIdx] || month} ${year}`;
+    }
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return String(dateStr);
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });

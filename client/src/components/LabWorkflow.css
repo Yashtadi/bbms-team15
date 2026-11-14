@@ -1,5 +1,16 @@
 .lab-workflow {
-  max-width: 980px;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  --border-color: var(--card-inner-border, rgba(226, 232, 240, 0.9));
+  --surface-bg-card: var(--card-inner-bg, #ffffff);
+  --primary-accent: #0284c7;
+}
+
+[data-theme="dark"] .lab-workflow {
+  --border-color: rgba(56, 189, 248, 0.2);
+  --surface-bg-card: rgba(22, 34, 60, 0.95);
+  --primary-accent: #38bdf8;
 }
 
 .lab-header-row {
@@ -122,104 +133,151 @@
   color: var(--text-secondary);
 }
 
-/* Cards Grid - Compact Vertical Layout */
+/* Cards Grid - Modern Responsive Grid */
 .lab-queue-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(185px, 220px));
-  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1.1rem;
+  margin-bottom: 1.25rem;
 }
 
 .queue-card {
   display: flex;
   flex-direction: column;
-  padding: 0.75rem 0.85rem;
-  background: var(--surface-bg-card);
-  border: 1.5px solid var(--border-color);
-  border-radius: 14px;
+  padding: 1.1rem 1.15rem 1rem;
+  background: var(--card-inner-bg, #ffffff);
+  border: 1px solid var(--card-inner-border, rgba(0, 0, 0, 0.12));
+  border-radius: 16px;
+  box-shadow: 0 4px 16px -2px rgba(30, 80, 130, 0.08), 0 2px 6px rgba(30, 80, 130, 0.04);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .queue-card {
+  background: linear-gradient(180deg, rgba(30, 45, 77, 0.95) 0%, rgba(20, 32, 56, 0.95) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .queue-card:hover {
-  border-color: var(--primary-accent);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.12);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px -4px rgba(30, 80, 130, 0.16), 0 0 0 1.5px #0284c7;
+  border-color: #0284c7;
+}
+
+[data-theme="dark"] .queue-card:hover {
+  border-color: #38bdf8;
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), 0 0 0 1.5px rgba(56, 189, 248, 0.45);
+  background: linear-gradient(180deg, rgba(36, 54, 92, 0.98) 0%, rgba(24, 38, 68, 0.98) 100%);
 }
 
 .queue-card.selected {
-  border-color: var(--primary-accent);
-  background: rgba(225, 29, 72, 0.06);
-  box-shadow: 0 0 0 2px var(--primary-accent);
+  border-color: #e11d48;
+  box-shadow: 0 0 0 2px #e11d48, 0 8px 24px rgba(225, 29, 72, 0.25);
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.9) 0%, #ffffff 100%);
+}
+
+[data-theme="dark"] .queue-card.selected {
+  border-color: #f43f5e;
+  box-shadow: 0 0 0 2px #f43f5e, 0 8px 28px rgba(244, 63, 94, 0.35);
+  background: linear-gradient(180deg, rgba(88, 28, 48, 0.5) 0%, rgba(24, 36, 62, 0.95) 100%);
 }
 
 .card-unit-id {
-  margin-bottom: 0.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
 }
 
 .unit-barcode-pill {
   font-family: ui-monospace, monospace;
   font-weight: 700;
-  font-size: 0.82rem;
-  color: var(--primary-accent);
-  letter-spacing: 0.02em;
+  font-size: 0.85rem;
+  color: #0284c7;
+  letter-spacing: 0.03em;
+  background: rgba(2, 132, 199, 0.1);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid rgba(2, 132, 199, 0.2);
+}
+
+[data-theme="dark"] .unit-barcode-pill {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.25);
 }
 
 .card-donation-num {
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--text-secondary);
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.5rem;
 }
 
 .card-donor-info {
-  margin-bottom: 0.25rem;
-  font-size: 0.86rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
   color: var(--text-primary);
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .donor-code-sub {
   margin-left: 0.35rem;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   color: var(--text-secondary);
   font-weight: normal;
 }
 
 .card-blood-type {
-  font-size: 0.76rem;
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--text-secondary);
+  margin-bottom: 0.2rem;
 }
 
-/* BBMS-F-031: a separated donation is one ticket listing its components */
+/* Separated donation components listing */
 .card-components {
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #0284c7;
+  margin-bottom: 0.25rem;
+}
+
+[data-theme="dark"] .card-components {
+  color: #38bdf8;
 }
 
 .card-collected-time {
-  font-size: 0.72rem;
+  font-size: 0.73rem;
   color: var(--text-muted);
-  margin-top: 0.15rem;
-  margin-bottom: 0.6rem;
-  padding-bottom: 0.45rem;
-  border-bottom: 1px dashed var(--border-color);
+  margin-top: 0.2rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+[data-theme="dark"] .card-collected-time {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 .card-progress-badges {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 0.65rem;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
 }
 
 .badge {
   display: inline-block;
-  padding: 0.16rem 0.45rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 6px;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 600;
   width: fit-content;
 }
@@ -252,27 +310,46 @@
 .btn-card-select {
   margin-top: auto;
   width: 100%;
-  padding: 0.38rem 0.5rem;
-  border-radius: 8px;
-  font-size: 0.76rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 9px;
+  font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
-  border: 1px solid var(--border-color);
-  background: var(--card-inner-bg);
-  color: var(--text-primary);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+  background: rgba(2, 132, 199, 0.08);
+  color: #0284c7;
   transition: all 0.2s ease;
+  text-align: center;
+}
+
+[data-theme="dark"] .btn-card-select {
+  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(56, 189, 248, 0.1);
+  color: #38bdf8;
 }
 
 .btn-card-select:hover {
-  background: var(--primary-accent);
+  background: #0284c7;
   color: #ffffff;
-  border-color: var(--primary-accent);
+  border-color: #0284c7;
+}
+
+[data-theme="dark"] .btn-card-select:hover {
+  background: #38bdf8;
+  color: #0f172a;
+  border-color: #38bdf8;
 }
 
 .btn-card-select.is-selected {
-  background: var(--primary-accent);
+  background: #e11d48;
   color: #ffffff;
-  border-color: var(--primary-accent);
+  border-color: #e11d48;
+}
+
+[data-theme="dark"] .btn-card-select.is-selected {
+  background: #f43f5e;
+  color: #ffffff;
+  border-color: #f43f5e;
 }
 
 /* --- Queue Pagination Bar --- */

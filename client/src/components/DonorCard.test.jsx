@@ -44,9 +44,9 @@ describe('DonorCard component', () => {
 
     expect(screen.queryByText(/Default Password/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/12041995/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/bbms\.pes\.edu/i)).toBeInTheDocument();
+    expect(screen.getByText(/portal\.pes\.edu/i)).toBeInTheDocument();
     expect(screen.getByText(/Log in with your Donor ID/i)).toBeInTheDocument();
-    expect(screen.getByText(/1800-BBMS-PES/i)).toBeInTheDocument();
+    expect(screen.getByText(/1800-BLOOD-PES/i)).toBeInTheDocument();
   });
 
   it('does NOT display any Pending Test badge when blood group is unassigned', () => {

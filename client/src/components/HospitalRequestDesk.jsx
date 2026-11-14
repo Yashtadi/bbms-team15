@@ -499,7 +499,7 @@ export default function HospitalRequestDesk() {
           <h2>{hospitalUser?.organisation || 'Hospital Blood Request Desk'}</h2>
           <p className="hospital-desk-subtitle">
             Authenticated Personnel: <strong>{hospitalUser?.fullName || 'Hospital Staff'}</strong> ({hospitalUser?.email})
-            {' · '}Source: <em>BBMS-F-040 Standard Blood Request Workflow</em>
+            {' · '}Source: <em>Standard Blood Request Workflow</em>
           </p>
         </div>
         <div className="hospital-stats-pills">
@@ -1050,7 +1050,7 @@ export default function HospitalRequestDesk() {
                   <div className="fefo-header">
                     <h4>Chain of Custody</h4>
                     <p className="section-desc">
-                      BBMS-F-043 · Issuance records are append-only and include the issuing staff member, server timestamp, unit, request, and recipient.
+                      Issuance records are append-only and include the issuing staff member, server timestamp, unit, request, and recipient.
                     </p>
                   </div>
                   {isLabStaff && (
@@ -1131,7 +1131,7 @@ export default function HospitalRequestDesk() {
                   <div className="fefo-header">
                     <h4>Reserved Units</h4>
                     <p className="section-desc">
-                      BBMS-F-042 · A reserved unit is held for this request only. It goes back to available stock when
+                      A reserved unit is held for this request only. It goes back to available stock when
                       released or when its hold time runs out.
                     </p>
                   </div>
@@ -1240,7 +1240,7 @@ export default function HospitalRequestDesk() {
                   <div className="fefo-header">
                     <h4>Suggested Units for Allocation (FEFO)</h4>
                     <p className="section-desc">
-                      BBMS-F-033 · Soonest-to-expire compatible unit suggested first to minimize inventory wastage.
+                      Soonest-to-expire compatible unit suggested first to minimize inventory wastage.
                     </p>
                   </div>
 

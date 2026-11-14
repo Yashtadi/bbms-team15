@@ -110,7 +110,7 @@ export default function DonationVitalsForm() {
   return (
     <div className="registration-form-container vitals-form-container">
       <h2>Donation Vitals</h2>
-      <p className="subtitle">BBMS-F-011 · Record BP, pulse and haemoglobin before and after donating</p>
+      <p className="subtitle">Record BP, pulse and haemoglobin before and after donating</p>
 
       {generalError && (
         <div className="alert-box alert-error" role="alert" data-testid="general-error">

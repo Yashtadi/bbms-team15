@@ -46,6 +46,13 @@ router.post('/donations/:id/tti-results', requireRole('LAB_TECH'), async (req, r
 router.get('/queue', requireRole('LAB_TECH', 'MANAGER', 'ADMIN'), async (req, res) => {
   try {
     const data = await labService.getLabQueue();
+    const limit = req.query.limit ? Number(req.query.limit) : null;
+    if (limit && Number.isInteger(limit) && limit > 0) {
+      return res.status(200).json({
+        queue: data.queue.slice(0, limit),
+        storage: data.storage,
+      });
+    }
     return res.status(200).json(data);
   } catch (error) {
     return handleError(res, error, 'Failed to load lab testing queue');

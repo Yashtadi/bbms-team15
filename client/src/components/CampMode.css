@@ -133,3 +133,10 @@
 .camp-label-preview .btn-primary {
   width: auto;
 }
+
+@media print {
+  .workspace-mode-toggle,
+  .camp-sync-bar {
+    display: none !important;
+  }
+}
