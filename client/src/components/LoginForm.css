@@ -218,14 +218,105 @@
   line-height: 1.5;
 }
 
+.mfa-qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0 12px;
+}
+
+.mfa-qr-card {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.mfa-qr-code {
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mfa-qr-code svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.mfa-qr-loading {
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.mfa-qr-hint {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.mfa-manual-key-box {
+  margin: 12px 0 16px;
+  text-align: center;
+}
+
+.mfa-manual-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
 .mfa-setup-key {
   display: block;
-  margin: 8px 0 16px;
+  margin: 0;
   padding: 10px;
   border-radius: 8px;
   background: var(--card-inner-bg);
   overflow-wrap: anywhere;
   user-select: all;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.88rem;
+}
+
+.login-back-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.login-back-btn:hover:not(:disabled) {
+  background: var(--card-inner-bg);
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+
+.login-back-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .login-card .login-hint {

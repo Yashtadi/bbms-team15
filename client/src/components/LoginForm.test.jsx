@@ -112,6 +112,7 @@ describe('TC-Sec-02: LoginForm', () => {
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(await screen.findByTestId('mfa-setup-secret')).toHaveTextContent('JBSWY3DPEHPK3PXP');
+    expect(await screen.findByTestId('mfa-qr-code')).toBeInTheDocument();
     expect(onLogin).not.toHaveBeenCalled();
     expect(sessionStorage.getItem('bbms.session')).toBeNull();
 
@@ -142,5 +143,35 @@ describe('TC-Sec-02: LoginForm', () => {
     await user.type(screen.getByLabelText('Authenticator code'), '654321');
     await user.click(screen.getByRole('button', { name: 'Verify and sign in' }));
     await waitFor(() => expect(onLogin).toHaveBeenCalledWith(session));
+  });
+
+  it('allows navigating back to the sign-in form from the 2FA setup screen', async () => {
+    const user = userEvent.setup();
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ mfaSetupRequired: true, setupToken: 'setup-token' }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ secret: 'JBSWY3DPEHPK3PXP', otpauthUrl: 'otpauth://totp/BBMS' }),
+      });
+    const onLogin = vi.fn();
+
+    render(<LoginForm onLogin={onLogin} />);
+    await user.type(screen.getByLabelText('Email'), 'admin@bbms.test');
+    await user.type(screen.getByLabelText('Password'), 'Password@123');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    expect(await screen.findByTestId('mfa-setup-secret')).toBeInTheDocument();
+    expect(await screen.findByTestId('mfa-qr-code')).toBeInTheDocument();
+
+    const backButton = screen.getByRole('button', { name: /back/i });
+    expect(backButton).toBeInTheDocument();
+    await user.click(backButton);
+
+    expect(screen.getByLabelText('Email')).toBeInTheDocument();
+    expect(screen.getByLabelText('Password')).toBeInTheDocument();
+    expect(screen.queryByTestId('mfa-setup-secret')).not.toBeInTheDocument();
   });
 });
