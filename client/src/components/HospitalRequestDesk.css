@@ -63,6 +63,7 @@
 .hospital-stats-pills {
   display: flex;
   gap: 1rem;
+  align-items: stretch;
 }
 
 .stat-pill {
@@ -74,7 +75,8 @@
   border: 1px solid var(--card-inner-border);
   border-radius: 12px;
   padding: 0.75rem 1.25rem;
-  min-width: 90px;
+  min-width: 115px;
+  box-sizing: border-box;
 }
 
 .stat-pill-pending {
@@ -88,12 +90,17 @@
   font-weight: 700;
   color: var(--text-muted);
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  text-align: center;
+  display: block;
 }
 
 .stat-pill-val {
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--text-primary);
+  margin-top: 0.35rem;
+  line-height: 1;
 }
 
 .stat-pill-pending .stat-pill-val {

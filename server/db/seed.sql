@@ -41,7 +41,10 @@ INSERT INTO blood_units (id, unit_code, donation_id, component, blood_group, vol
   (4, 'U-2026-000004', 2, 'PRBC',        'A+', 220, NOW() - INTERVAL 40 DAY, NOW() + INTERVAL 2 DAY,   'AVAILABLE',  NULL),  -- near expiry (F-032)
   (5, 'U-2026-000005', 2, 'FFP',         'A+', 150, NOW() - INTERVAL 40 DAY, NOW() + INTERVAL 325 DAY, 'AVAILABLE',  NULL),
   (6, 'U-2026-000006', 3, 'WHOLE_BLOOD', 'B+', 450, NOW() - INTERVAL 5 DAY,  NOW() + INTERVAL 30 DAY,  'DISCARDED',  'Reactive TTI: HIV'),
-  (7, 'U-2026-000007', 4, 'WHOLE_BLOOD', NULL, 350, NOW(),                   NOW() + INTERVAL 35 DAY,  'QUARANTINE', NULL);  -- awaiting lab tests
+  (7, 'U-2026-000007', 4, 'WHOLE_BLOOD', NULL, 350, NOW(),                   NOW() + INTERVAL 35 DAY,  'QUARANTINE', NULL),  -- awaiting lab tests
+  (8, 'U-2026-000008', 2, 'PRBC',        'A+', 250, NOW() - INTERVAL 15 DAY, NOW() + INTERVAL 27 DAY,  'RESERVED',   NULL),  -- reserved for R-000003
+  (9, 'U-2026-000009', 1, 'PRBC',        'O-', 280, NOW() - INTERVAL 20 DAY, NOW() + INTERVAL 22 DAY,  'ISSUED',     NULL),  -- issued for R-000004
+  (10,'U-2026-000010', 3, 'PRBC',        'B+', 240, NOW() - INTERVAL 10 DAY, NOW() + INTERVAL 32 DAY,  'AVAILABLE',  NULL);  -- tested incompatible for R-000005
 
 -- Lab results: donations 1 and 2 passed everything, donation 3 is HIV reactive, donation 4 not tested yet
 INSERT INTO lab_results (donation_id, test_type, result, method, tested_by, verified_by, verified_at,
@@ -65,8 +68,26 @@ INSERT INTO lab_results (donation_id, test_type, result, method, tested_by, veri
   (3, 'SYPHILIS', 'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING'),
   (3, 'MALARIA',  'NON_REACTIVE', 'ELISA', 3, NULL, NULL, 'PENDING');
 
--- Hospital requests: one routine, one emergency (F-044)
+-- Hospital requests covering every workflow state (F-040 to F-044)
 INSERT INTO blood_requests (id, request_code, hospital_user_id, patient_name, patient_blood_group,
                             component, units_requested, priority, status, required_by) VALUES
-  (1, 'R-000001', 5, 'Patient One', 'A+', 'PRBC', 1, 'ROUTINE',   'PENDING', NOW() + INTERVAL 2 DAY),
-  (2, 'R-000002', 5, 'Patient Two', 'O-', 'PRBC', 1, 'EMERGENCY', 'PENDING', NOW());
+  (1, 'R-000001', 5, 'Patient One', 'A+', 'PRBC', 1, 'ROUTINE',   'PENDING',  NOW() + INTERVAL 2 DAY),
+  (2, 'R-000002', 5, 'Patient Two', 'O-', 'PRBC', 1, 'EMERGENCY', 'PENDING',  NOW() + INTERVAL 4 HOUR),
+  (3, 'R-000003', 5, 'Aarav Patel', 'A+', 'PRBC', 1, 'ROUTINE',   'RESERVED', NOW() + INTERVAL 2 DAY),
+  (4, 'R-000004', 5, 'Meera Nambiar (Emergency ICU)', 'O-', 'PRBC', 1, 'EMERGENCY', 'ISSUED', NOW() - INTERVAL 1 HOUR),
+  (5, 'R-000005', 5, 'Kavita Reddy', 'O-', 'PRBC', 1, 'URGENT',   'PENDING',  NOW() + INTERVAL 1 DAY);
+
+-- F-042: link active unit hold to R-000003
+UPDATE blood_units
+SET reserved_for_request_id = 3, reserved_by = 3, reserved_until = NOW() + INTERVAL 120 MINUTE
+WHERE id = 8;
+
+-- Crossmatch test records (F-041)
+INSERT INTO crossmatches (id, request_id, unit_id, result, performed_by, performed_at) VALUES
+  (1, 3, 8,  'COMPATIBLE',   3, NOW() - INTERVAL 30 MINUTE),
+  (2, 4, 9,  'COMPATIBLE',   3, NOW() - INTERVAL 3 HOUR),
+  (3, 5, 10, 'INCOMPATIBLE', 3, NOW() - INTERVAL 45 MINUTE);
+
+-- Issuances / Chain of Custody records (F-043)
+INSERT INTO issuances (id, request_id, unit_id, crossmatch_id, issued_by, issued_at, received_by) VALUES
+  (1, 4, 9, 2, 3, NOW() - INTERVAL 2 HOUR, 'Staff Nurse Sunita (ICU OT-1)');
