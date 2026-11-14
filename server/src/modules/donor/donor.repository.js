@@ -9,16 +9,16 @@ const { encrypt, decryptDonorRow } = require('../../utils/encryption');
 function deriveDobPassword(dob) {
   if (!dob) return '01012000';
   const str = String(dob).trim();
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
   if (match) {
     const [, yyyy, mm, dd] = match;
     return `${dd}${mm}${yyyy}`;
   }
   const d = new Date(dob);
   if (!isNaN(d.getTime())) {
-    const dd = String(d.getUTCDate()).padStart(2, '0');
-    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const yyyy = d.getUTCFullYear();
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
     return `${dd}${mm}${yyyy}`;
   }
   return '01012000';
@@ -112,7 +112,7 @@ async function findLastDonation(donorId) {
   const [rows] = await db.query(
     `SELECT id, donor_id, collected_at, status, volume_ml
      FROM donations
-     WHERE donor_id = ? AND status = 'COMPLETED'
+     WHERE donor_id = ? AND status <> 'ABORTED' AND volume_ml > 0
      ORDER BY collected_at DESC
      LIMIT 1`,
     [donorId]

@@ -18,6 +18,9 @@ const pool = mysql.createPool({
   connectTimeout: 10000,
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
+  // Keep MySQL DATE columns (e.g. date_of_birth) as clean 'YYYY-MM-DD' strings
+  // to avoid timezone shifting when serialised to JSON
+  dateStrings: ['DATE'],
 });
 
 module.exports = pool;

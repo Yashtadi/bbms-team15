@@ -9,7 +9,7 @@ function formatDate(dateStr) {
   if (!dateStr) return 'Not Specified';
   try {
     const str = String(dateStr).trim();
-    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
     if (match) {
       const [, year, month, day] = match;
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

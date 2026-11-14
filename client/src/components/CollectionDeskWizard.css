@@ -566,6 +566,9 @@
 
 /* Print Styles for Chair-side Barcode Label Printing */
 @media print {
+  .workspace-mode-toggle,
+  .checkin-mode-toggle,
+  .camp-sync-bar,
   .collection-wizard-container .wizard-stepper,
   .collection-wizard-container .success-banner,
   .collection-wizard-container .quarantine-safety-card,
