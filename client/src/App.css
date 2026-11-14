@@ -74,9 +74,10 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   color: #dc2645;
-  box-shadow: 0 4px 12px rgba(30, 80, 130, 0.12);
+  box-shadow: 0 4px 12px rgba(30, 80, 130, 0.08);
   transition: all 0.3s ease;
 }
 
