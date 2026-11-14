@@ -1,5 +1,7 @@
 .lab-workflow {
-  max-width: 980px;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
   --border-color: var(--card-inner-border, rgba(226, 232, 240, 0.9));
   --surface-bg-card: var(--card-inner-bg, #ffffff);
   --primary-accent: #0284c7;

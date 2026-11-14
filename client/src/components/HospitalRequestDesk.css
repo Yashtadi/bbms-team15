@@ -1,12 +1,17 @@
 /* BBMS-F-040: Hospital Blood Request Desk Styling */
 
 .hospital-desk-container {
-  max-width: 1100px;
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 1rem 0 3rem;
+  padding: 0.5rem 0 3rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.blood-request-form {
+  max-width: 900px;
 }
 
 /* 1. Header Hero Card */
@@ -413,6 +418,37 @@
   overflow-x: auto;
   border-radius: 12px;
   border: 1px solid var(--card-inner-border);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.requests-table-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.requests-table-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.requests-table-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+}
+
+.requests-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="light"] .requests-table-container {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+[data-theme="light"] .requests-table-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .requests-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .requests-table {
@@ -424,18 +460,20 @@
 
 .requests-table th {
   background: var(--card-inner-bg);
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 1.1rem;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
   border-bottom: 1px solid var(--card-inner-border);
+  white-space: nowrap;
 }
 
 .requests-table td {
-  padding: 0.9rem 1rem;
+  padding: 0.85rem 1.1rem;
   border-bottom: 1px solid var(--card-inner-border);
   color: var(--text-primary);
+  vertical-align: middle;
 }
 
 .requests-table tbody tr:hover {
@@ -445,6 +483,31 @@
 .code-cell {
   font-family: ui-monospace, monospace;
   color: #60a5fa;
+  white-space: nowrap;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.patient-cell {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.group-cell {
+  white-space: nowrap;
+  text-align: center;
+}
+
+.units-cell {
+  white-space: nowrap;
+  text-align: center;
+  font-weight: 600;
+}
+
+.date-cell {
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 
 .badge-group {
@@ -531,18 +594,22 @@
   background: rgba(59, 130, 246, 0.1);
   color: #60a5fa;
   border: 1px solid rgba(59, 130, 246, 0.3);
-  padding: 0.35rem 0.75rem;
-  font-size: 0.8rem;
+  padding: 0.42rem 0.95rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-details:hover {
   background: rgba(59, 130, 246, 0.2);
   border-color: #60a5fa;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
 }
 
 .crossmatch-panel-card {
