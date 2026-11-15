@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { beginMfaSetup, login, verifyMfa, verifyMfaSetup } from '../api';
 import ThemeToggle from './ThemeToggle';
 import './LoginForm.css';
@@ -11,6 +12,44 @@ export default function LoginForm({ onLogin }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mfaState, setMfaState] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
+  const [qrCodeSvg, setQrCodeSvg] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    if (mfaState?.type === 'setup') {
+      const url = mfaState.otpauthUrl || (mfaState.secret ? `otpauth://totp/BloodBank?secret=${mfaState.secret}` : '');
+      if (url) {
+        QRCode.toString(url, {
+          type: 'svg',
+          margin: 2,
+          width: 180,
+          color: {
+            dark: '#000000',
+            light: '#ffffff',
+          },
+        })
+          .then((svg) => {
+            if (active) setQrCodeSvg(svg);
+          })
+          .catch((err) => {
+            console.error('Failed to generate QR code', err);
+            if (active) setQrCodeSvg('');
+          });
+      }
+    } else {
+      setQrCodeSvg('');
+    }
+    return () => {
+      active = false;
+    };
+  }, [mfaState]);
+
+  const handleBackToLogin = () => {
+    setMfaState(null);
+    setMfaCode('');
+    setQrCodeSvg('');
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -70,8 +109,24 @@ export default function LoginForm({ onLogin }) {
             {mfaState.type === 'setup' ? (
               <div className="mfa-instructions">
                 <p>Set up an authenticator app, then enter its 6-digit code to finish signing in.</p>
-                <p>Enter this setup key in your authenticator app:</p>
-                <code className="mfa-setup-key" data-testid="mfa-setup-secret">{mfaState.secret}</code>
+                <div className="mfa-qr-container">
+                  <div className="mfa-qr-card">
+                    {qrCodeSvg ? (
+                      <div
+                        className="mfa-qr-code"
+                        data-testid="mfa-qr-code"
+                        dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
+                      />
+                    ) : (
+                      <div className="mfa-qr-loading">Generating QR code…</div>
+                    )}
+                  </div>
+                  <p className="mfa-qr-hint">Scan this QR code with Google Authenticator or any TOTP app</p>
+                </div>
+                <div className="mfa-manual-key-box">
+                  <span className="mfa-manual-label">Or enter setup key manually:</span>
+                  <code className="mfa-setup-key" data-testid="mfa-setup-secret">{mfaState.secret}</code>
+                </div>
               </div>
             ) : (
               <p className="mfa-instructions">Enter the 6-digit code from your authenticator app.</p>
@@ -93,6 +148,15 @@ export default function LoginForm({ onLogin }) {
             {error && <p className="login-error" role="alert">{error}</p>}
             <button type="submit" className="login-submit" disabled={isSubmitting || mfaCode.length !== 6}>
               {isSubmitting ? 'Verifying…' : 'Verify and sign in'}
+            </button>
+            <button
+              type="button"
+              className="login-back-btn"
+              data-testid="mfa-back-button"
+              onClick={handleBackToLogin}
+              disabled={isSubmitting}
+            >
+              ← Back to Sign In
             </button>
           </form>
         ) : (

@@ -93,7 +93,7 @@ export default function ComponentSeparation({ unit, onSeparated, onPrint }) {
     <section className="component-separation" aria-label="Separate components">
       <h3>Separate components</h3>
       <p className="subtitle">
-        BBMS-F-031 · Each component gets its own unit ID and label, and stays linked to {unit.unitId}. Expiry is
+        Each component gets its own unit ID and label, and stays linked to {unit.unitId}. Expiry is
         counted from when the blood was collected.
       </p>
 

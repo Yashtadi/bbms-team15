@@ -97,7 +97,7 @@ export default function UnitLabelLookup() {
   return (
     <div className={`registration-form-container unit-lookup-container print-${printTarget}`}>
       <h2>Blood Unit Label</h2>
-      <p className="subtitle">BBMS-F-012 · Scan or enter a unit ID to open its record and print its barcode label</p>
+      <p className="subtitle">Scan or enter a unit ID to open its record and print its barcode label</p>
 
       {generalError && (
         <div className="alert-box alert-error" role="alert" data-testid="general-error">

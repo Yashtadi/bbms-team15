@@ -425,7 +425,9 @@ async function getDonorPortalData(userId, queryDonorId = null, repository = defa
     ? await repository.findDonationsByDonorId(donor.id)
     : [];
 
-  const completed = (donations || []).filter((d) => d.status === 'COMPLETED');
+  const completed = (donations || []).filter(
+    (d) => d.status !== 'ABORTED' && (d.status === 'COMPLETED' || Number(d.volume_ml) > 0)
+  );
   const totalDonations = completed.length;
   const totalVolumeMl = completed.reduce((sum, d) => sum + (Number(d.volume_ml) || 0), 0);
   const livesSaved = totalDonations * 3;

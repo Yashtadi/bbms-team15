@@ -9,7 +9,7 @@ function formatDate(dateStr) {
   if (!dateStr) return 'Not Specified';
   try {
     const str = String(dateStr).trim();
-    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
     if (match) {
       const [, year, month, day] = match;
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -488,8 +488,8 @@ export default function DonorCard({
 
       ctx.fillStyle = '#475569';
       ctx.font = '9px system-ui, sans-serif';
-      ctx.fillText('Online Portal: bbms.pes.edu · Use your Donor ID to log in', width / 2, 250);
-      ctx.fillText('24/7 Helpline: 1800-BBMS-PES', width / 2, 262);
+      ctx.fillText('Online Portal: portal.pes.edu · Use your Donor ID to log in', width / 2, 250);
+      ctx.fillText('24/7 Helpline: 1800-BLOOD-PES', width / 2, 262);
 
       // Border outline
       ctx.restore();
@@ -622,10 +622,10 @@ export default function DonorCard({
         {/* Card Footer / Portal Access Details (No password shown) */}
         <div className="bbms-card-footer">
           <div className="portal-notice">
-            <span>Online Portal: <strong>bbms.pes.edu</strong> · Log in with your Donor ID</span>
+            <span>Online Portal: <strong>portal.pes.edu</strong> · Log in with your Donor ID</span>
           </div>
           <div className="helpline-notice">
-            <span>24/7 Helpline: 1800-BBMS-PES</span>
+            <span>24/7 Helpline: 1800-BLOOD-PES</span>
           </div>
         </div>
       </div>

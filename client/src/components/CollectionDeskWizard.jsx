@@ -579,11 +579,11 @@ export default function CollectionDeskWizard() {
 
           <div className="wizard-panel-header">
             <h2>Donation Session & Pre-Vitals</h2>
-            <p className="subtitle">BBMS-F-010 · Record collection volume and clinical vitals</p>
+            <p className="subtitle">Record collection volume and clinical vitals</p>
           </div>
 
           <div className="alert-box alert-success mt-2" data-testid="portal-account-notice" style={{ fontSize: '0.85rem' }}>
-            <strong>Online Portal Account Generated:</strong> Username: <strong>{activeDonor.donorCode || activeDonor.donorId}</strong> · Default Password Syntax: <strong>DDMMYYYY</strong> (Date of Birth). Instruct donor to log into <strong>bbms.pes.edu</strong> and change their password.
+            <strong>Online Portal Account Generated:</strong> Username: <strong>{activeDonor.donorCode || activeDonor.donorId}</strong> · Default Password Syntax: <strong>DDMMYYYY</strong> (Date of Birth). Instruct donor to <strong>log into the portal</strong> and change their password.
           </div>
 
           {sessionError && (
@@ -620,7 +620,7 @@ export default function CollectionDeskWizard() {
             </div>
 
             <div className="vitals-section-title">
-              <h3>Clinical Vitals Measurement (BBMS-F-011)</h3>
+              <h3>Clinical Vitals Measurement</h3>
             </div>
 
             <div className="form-row vitals-4col">

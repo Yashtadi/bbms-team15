@@ -79,10 +79,10 @@ async function createSession(data) {
 // BBMS-F-011: One fixed statement per phase, so column names never come from input.
 const UPDATE_VITALS_SQL = {
   PRE: `UPDATE donations
-        SET bp_systolic = ?, bp_diastolic = ?, pulse_bpm = ?, hemoglobin_g_dl = ?
+        SET bp_systolic = ?, bp_diastolic = ?, pulse_bpm = ?, hemoglobin_g_dl = ?, status = 'COMPLETED'
         WHERE id = ?`,
   POST: `UPDATE donations
-         SET post_bp_systolic = ?, post_bp_diastolic = ?, post_pulse_bpm = ?, post_hemoglobin_g_dl = ?
+         SET post_bp_systolic = ?, post_bp_diastolic = ?, post_pulse_bpm = ?, post_hemoglobin_g_dl = ?, status = 'COMPLETED'
          WHERE id = ?`,
 };
 

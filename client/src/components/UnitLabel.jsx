@@ -32,7 +32,7 @@ export default function UnitLabel({ unit }) {
   return (
     <div className="unit-label" data-testid="unit-label">
       <div className="unit-label-header">
-        <span>BBMS BLOOD UNIT</span>
+        <span>BLOOD BANK UNIT</span>
         <span data-testid="label-component">{COMPONENT_NAMES[unit.component] || unit.component}</span>
       </div>
 

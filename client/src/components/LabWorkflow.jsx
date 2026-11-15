@@ -10,7 +10,7 @@ async function responseData(response) {
   return response.json().catch(() => ({}));
 }
 
-export default function LabWorkflow({ canEnterResults }) {
+export default function LabWorkflow({ canEnterResults, onOpenStorage, maxQueueItems = null }) {
   const [donationId, setDonationId] = useState('');
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [bloodGroup, setBloodGroup] = useState(EMPTY_BLOOD_GROUP);
@@ -51,7 +51,8 @@ export default function LabWorkflow({ canEnterResults }) {
 
   const fetchQueue = useCallback(async () => {
     try {
-      const response = await apiFetch('/api/lab/queue');
+      const url = maxQueueItems ? `/api/lab/queue?limit=${maxQueueItems}` : '/api/lab/queue';
+      const response = await apiFetch(url);
       const data = await responseData(response);
       if (response.status === 200) {
         return data.queue || [];
@@ -60,7 +61,7 @@ export default function LabWorkflow({ canEnterResults }) {
     } catch {
       return [];
     }
-  }, []);
+  }, [maxQueueItems]);
 
   const loadQueue = useCallback(async () => {
     setIsLoadingQueue(true);
@@ -157,11 +158,14 @@ export default function LabWorkflow({ canEnterResults }) {
   };
 
   // Sort testing queue strictly First In First Out (oldest collected blood tested first)
-  const fifoQueue = [...queue].sort((a, b) => {
+  const allSortedQueue = [...queue].sort((a, b) => {
     const timeDiff = new Date(a.collectedAt).getTime() - new Date(b.collectedAt).getTime();
     if (timeDiff !== 0) return timeDiff;
     return (a.donationId || 0) - (b.donationId || 0);
   });
+
+  // Display up to maxQueueItems if configured for demo purposes
+  const fifoQueue = maxQueueItems && maxQueueItems > 0 ? allSortedQueue.slice(0, maxQueueItems) : allSortedQueue;
 
   const totalPages = Math.max(1, Math.ceil(fifoQueue.length / QUEUE_PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
@@ -175,7 +179,7 @@ export default function LabWorkflow({ canEnterResults }) {
         <div>
           <h2>Lab Screening</h2>
           <p className="subtitle">
-            BBMS-F-020 to F-023 · Verify blood groups, record 5 mandatory infection tests, and release units to inventory
+            Verify blood groups, record 5 mandatory infection tests, and release units to inventory
           </p>
         </div>
       </div>
@@ -186,7 +190,7 @@ export default function LabWorkflow({ canEnterResults }) {
           <div className="queue-title-group">
             <h3>Newly Donated Blood — Testing Queue</h3>
             <span className="queue-counter-badge">
-              {fifoQueue.length} {fifoQueue.length === 1 ? 'Unit' : 'Units'} Awaiting Screening (FIFO)
+              {fifoQueue.length} {fifoQueue.length === 1 ? 'Unit' : 'Units'} Awaiting Screening
             </span>
           </div>
           <button

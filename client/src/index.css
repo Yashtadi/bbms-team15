@@ -6,31 +6,31 @@
 
   /* Theme Tokens - Light Mode Default */
   --bg-body:
-    radial-gradient(ellipse 120% 55% at 50% 115%, #ffffff 0%, rgba(255, 255, 255, 0.85) 35%, rgba(255, 255, 255, 0) 65%),
-    linear-gradient(180deg, #a7d2f0 0%, #cde6f7 55%, #eef6fc 100%) fixed;
-  --bg-color-fallback: #cde6f7;
-  --ring-1-border: rgba(255, 255, 255, 0.65);
-  --ring-2-border: rgba(255, 255, 255, 0.35);
+    radial-gradient(ellipse 120% 55% at 50% 115%, rgba(240, 246, 252, 0.6) 0%, rgba(230, 240, 250, 0.3) 35%, rgba(255, 255, 255, 0) 65%),
+    linear-gradient(180deg, #a3cce8 0%, #c4ddf0 55%, #e2eff8 100%) fixed;
+  --bg-color-fallback: #c4ddf0;
+  --ring-1-border: rgba(255, 255, 255, 0.5);
+  --ring-2-border: rgba(255, 255, 255, 0.25);
 
-  --header-bg: rgba(255, 255, 255, 0.85);
-  --header-border: rgba(255, 255, 255, 0.9);
-  --header-shadow: 0 4px 20px rgba(30, 80, 130, 0.08);
+  --header-bg: rgba(248, 250, 252, 0.92);
+  --header-border: #e2e8f0;
+  --header-shadow: 0 4px 20px rgba(30, 80, 130, 0.06);
 
-  --card-bg: linear-gradient(180deg, rgba(212, 240, 252, 0.94) 0%, rgba(255, 255, 255, 0.97) 45%);
-  --card-border: rgba(255, 255, 255, 0.95);
-  --card-shadow: 0 24px 60px rgba(30, 80, 130, 0.16), 0 2px 6px rgba(30, 80, 130, 0.06);
+  --card-bg: #f8fafc;
+  --card-border: #e2e8f0;
+  --card-shadow: 0 16px 40px rgba(30, 80, 130, 0.08), 0 2px 6px rgba(30, 80, 130, 0.04);
 
-  --card-inner-bg: #ffffff;
-  --card-inner-border: rgba(226, 232, 240, 0.9);
-  --card-inner-shadow: 0 6px 16px rgba(30, 80, 130, 0.06);
+  --card-inner-bg: #f1f5f9;
+  --card-inner-border: #e2e8f0;
+  --card-inner-shadow: 0 4px 12px rgba(30, 80, 130, 0.04);
 
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #6b7280;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
 
-  --input-bg: #eef1f4;
-  --input-border: rgba(209, 213, 219, 0.6);
-  --input-text: #111827;
+  --input-bg: #f1f5f9;
+  --input-border: #cbd5e1;
+  --input-text: #0f172a;
   --input-focus-border: #38bdf8;
   --input-focus-ring: rgba(56, 189, 248, 0.25);
 
@@ -38,24 +38,24 @@
   --btn-primary-text: #ffffff;
   --btn-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 6px rgba(17, 18, 22, 0.2);
 
-  --nav-tabs-bg: #eef1f4;
-  --tab-inactive-text: #4b5563;
-  --tab-inactive-hover: #111827;
-  --tab-inactive-hover-bg: rgba(255, 255, 255, 0.6);
-  --tab-active-bg: #ffffff;
-  --tab-active-text: #111827;
-  --tab-active-border: transparent;
-  --tab-active-shadow: 0 2px 6px rgba(30, 80, 130, 0.1);
+  --nav-tabs-bg: #e2e8f0;
+  --tab-inactive-text: #475569;
+  --tab-inactive-hover: #0f172a;
+  --tab-inactive-hover-bg: rgba(248, 250, 252, 0.7);
+  --tab-active-bg: #f8fafc;
+  --tab-active-text: #0f172a;
+  --tab-active-border: #cbd5e1;
+  --tab-active-shadow: 0 2px 6px rgba(30, 80, 130, 0.08);
 
-  --user-pill-bg: #ffffff;
-  --user-pill-border: rgba(255, 255, 255, 0.9);
+  --user-pill-bg: #f8fafc;
+  --user-pill-border: #e2e8f0;
   --user-avatar-bg: #e0f2fe;
   --user-avatar-text: #0369a1;
 
-  --theme-toggle-bg: #ffffff;
-  --theme-toggle-border: rgba(255, 255, 255, 0.9);
+  --theme-toggle-bg: #f8fafc;
+  --theme-toggle-border: #e2e8f0;
   --theme-toggle-color: #f59e0b;
-  --theme-toggle-shadow: 0 2px 8px rgba(30, 80, 130, 0.08);
+  --theme-toggle-shadow: 0 2px 8px rgba(30, 80, 130, 0.06);
 
   --alert-success-bg: #f0fdf4;
   --alert-success-border: #bbf7d0;
