@@ -10,7 +10,7 @@ async function responseData(response) {
   return response.json().catch(() => ({}));
 }
 
-export default function LabWorkflow({ canEnterResults, onOpenStorage, maxQueueItems = null }) {
+export default function LabWorkflow({ canEnterResults, _onOpenStorage, maxQueueItems = null }) {
   const [donationId, setDonationId] = useState('');
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [bloodGroup, setBloodGroup] = useState(EMPTY_BLOOD_GROUP);
@@ -422,7 +422,7 @@ export default function LabWorkflow({ canEnterResults, onOpenStorage, maxQueueIt
           )}
 
           {/* Fill-in-the-blank options: only shown when a ticket is pressed or search bar has an ID entered */}
-          {Boolean(donationId.trim() || selectedUnit) ? (
+          {donationId.trim() || selectedUnit ? (
             <>
               <div className="lab-form-grid">
                 <form onSubmit={(e) => {

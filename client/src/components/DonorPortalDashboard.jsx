@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '../api';
 import DonorCard from './DonorCard';
 import './DonorPortalDashboard.css';
@@ -39,11 +39,7 @@ export default function DonorPortalDashboard({ onLogout }) {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  useEffect(() => {
-    fetchPortalData();
-  }, []);
-
-  const fetchPortalData = async () => {
+  const fetchPortalData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -62,7 +58,11 @@ export default function DonorPortalDashboard({ onLogout }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [onLogout]);
+
+  useEffect(() => {
+    fetchPortalData();
+  }, [fetchPortalData]);
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();

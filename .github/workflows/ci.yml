@@ -6,8 +6,43 @@ on:
     branches: [main]
 
 jobs:
-  server:
+  # ========================================================
+  # Block 1: Code Quality, Lint & Static Analysis
+  # ========================================================
+  quality:
+    name: Code Quality & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+
+      - name: Verify server syntax
+        working-directory: server
+        run: |
+          npm ci
+          node --check src/server.js
+          node --check src/app.js
+
+      - name: Lint client codebase
+        working-directory: client
+        run: |
+          npm ci
+          npm run lint
+
+  # ========================================================
+  # Block 2: Automated Test Suites (Server & Client)
+  # ========================================================
+  server-tests:
     name: Server tests
+    needs: quality
     runs-on: ubuntu-latest
 
     services:
@@ -48,8 +83,9 @@ jobs:
       # Integration tests share one database, so run them one file at a time
       - run: npm run test:integration -- --runInBand
 
-  client:
-    name: Client tests and build
+  client-tests:
+    name: Client tests
+    needs: quality
     runs-on: ubuntu-latest
 
     defaults:
@@ -65,4 +101,31 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - run: npm ci
       - run: npm test
+
+  # ========================================================
+  # Block 3: Production Build & Artifact Packaging
+  # ========================================================
+  build-and-package:
+    name: Production build & package
+    needs: [server-tests, client-tests]
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: client
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
       - run: npm run build
+      - name: Archive production build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-production-build
+          path: client/dist/
+          retention-days: 7
