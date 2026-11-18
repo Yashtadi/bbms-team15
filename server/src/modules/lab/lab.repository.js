@@ -69,6 +69,56 @@ async function recordBloodGroup(donationId, bloodGroup, testedBy) {
     const donation = await lockDonation(connection, donationId);
     if (!donation) return { notFound: true };
 
+    const [existingRows] = await connection.query(
+      `SELECT id, result, tested_by, verification_status
+       FROM lab_results WHERE donation_id = ? AND test_type = 'ABO_RH' FOR UPDATE`,
+      [donationId]
+    );
+
+    if (existingRows.length > 0) {
+      const existing = existingRows[0];
+      if (existing.verification_status === 'VERIFIED') {
+        return { locked: true };
+      }
+      if (Number(existing.tested_by) === Number(testedBy)) {
+        return { sameUserRecord: true };
+      }
+
+      // If a different technician submits blood group when PENDING or MISMATCH,
+      // seamlessly complete dual-verification.
+      if (existing.result !== bloodGroup) {
+        await connection.query(
+          `UPDATE lab_results
+           SET verification_result = ?, verification_status = 'MISMATCH'
+           WHERE id = ?`,
+          [bloodGroup, existing.id]
+        );
+        for (const unit of donation.units) {
+          await writeAudit(connection, testedBy, 'BLOOD_GROUP_MISMATCH', unit.unit_code, {
+            verificationStatus: 'MISMATCH',
+          });
+        }
+        return { mismatch: true };
+      }
+
+      await connection.query(
+        `UPDATE lab_results
+         SET verified_by = ?, verified_at = NOW(), verification_result = ?,
+             verification_status = 'VERIFIED'
+         WHERE id = ?`,
+        [testedBy, bloodGroup, existing.id]
+      );
+      await connection.query('UPDATE blood_units SET blood_group = ? WHERE donation_id = ?', [
+        bloodGroup,
+        donationId,
+      ]);
+      await updateAvailability(connection, donationId);
+      for (const unit of donation.units) {
+        await writeAudit(connection, testedBy, 'BLOOD_GROUP_VERIFIED', unit.unit_code, { bloodGroup });
+      }
+      return { donationId, bloodGroup, verificationStatus: 'VERIFIED' };
+    }
+
     await connection.query(
       `INSERT INTO lab_results
        (donation_id, test_type, result, tested_by, verification_status)
