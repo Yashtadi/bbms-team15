@@ -37,7 +37,7 @@ export default function LoginForm({ onLogin }) {
           });
       }
     } else {
-      setQrCodeSvg('');
+      setQrCodeSvg((prev) => (prev ? '' : prev));
     }
     return () => {
       active = false;

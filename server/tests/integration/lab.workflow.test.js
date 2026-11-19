@@ -164,4 +164,32 @@ describe('TC-Test-01 to TC-Test-04: blood-group verification and TTI workflow', 
     const inventory = await request(app).get('/api/inventory').set(authHeader('MANAGER'));
     expect(inventory.body.units.map((unit) => unit.unit_code)).not.toContain(reactiveUnitCode);
   });
+
+  it('allows second technician to complete dual-verification via /blood-group and blocks initial tech from re-recording', async () => {
+    const rec1 = await request(app)
+      .post(`/api/lab/donations/${untouchedDonationId}/blood-group`).set(authHeader('LAB_TECH'))
+      .send({ aboGroup: 'B', rh: '+' });
+    expect(rec1.status).toBe(201);
+    expect(rec1.body.verificationStatus).toBe('PENDING');
+
+    const recSame = await request(app)
+      .post(`/api/lab/donations/${untouchedDonationId}/blood-group`).set(authHeader('LAB_TECH'))
+      .send({ aboGroup: 'B', rh: '+' });
+    expect(recSame.status).toBe(409);
+    expect(recSame.body.message).toMatch(/already been recorded/i);
+
+    const rec2 = await request(app)
+      .post(`/api/lab/donations/${untouchedDonationId}/blood-group`)
+      .set(authHeaderForUser(4, 'LAB_TECH'))
+      .send({ aboGroup: 'B', rh: '+' });
+    expect(rec2.status).toBe(200);
+    expect(rec2.body.verificationStatus).toBe('VERIFIED');
+    expect(rec2.body.bloodGroup).toBe('B+');
+
+    const [units] = await db.query(
+      'SELECT blood_group, status FROM blood_units WHERE donation_id = ?',
+      [untouchedDonationId]
+    );
+    expect(units[0].blood_group).toBe('B+');
+  });
 });

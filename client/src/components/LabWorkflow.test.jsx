@@ -317,4 +317,53 @@ describe('TC-Inv-02: separated donations in the testing queue', () => {
 
     expect(screen.getByText(/Active Unit: U-2026-000605 \(Donation #5\)/)).toBeInTheDocument();
   });
+
+  it('guides 2nd verification when a unit already has blood group recorded as PENDING', async () => {
+    const pendingQueueItem = {
+      donationId: 5,
+      unitId: 11,
+      unitCode: 'U-2026-000011',
+      donorName: 'Yash Tadi',
+      donorCode: 'D-000006',
+      component: 'WHOLE_BLOOD',
+      volumeMl: 450,
+      collectedAt: new Date().toISOString(),
+      unitStatus: 'QUARANTINE',
+      abo: { result: 'B+', verificationStatus: 'PENDING', testedBy: 3 },
+      tti: { completedCount: 0, results: [], remaining: ['HIV', 'HBV', 'HCV', 'SYPHILIS', 'MALARIA'] },
+    };
+
+    apiFetch.mockImplementation(async (url) => {
+      if (url.includes('/notifications')) return jsonResponse(200, { notifications: [] });
+      if (url.includes('/queue')) return jsonResponse(200, { queue: [pendingQueueItem] });
+      if (url.includes('/blood-group/verify')) {
+        return jsonResponse(200, { donationId: 5, bloodGroup: 'B+', verificationStatus: 'VERIFIED' });
+      }
+      return jsonResponse(200, {});
+    });
+
+    render(<LabWorkflow canEnterResults />);
+
+    await screen.findByText('Yash Tadi');
+    fireEvent.click(screen.getByRole('button', { name: /Select for Testing/i }));
+
+    // Shows 2nd verification guidance
+    expect(screen.getByText(/Dual-Verification Required:/i)).toBeInTheDocument();
+    expect(screen.getByText(/1st technician recorded/i)).toBeInTheDocument();
+
+    // Verify button is primary submit button
+    const verifyBtn = screen.getByRole('button', { name: 'Verify blood group' });
+    expect(verifyBtn).toHaveAttribute('type', 'submit');
+
+    // Submitting verifies the blood group
+    fireEvent.click(verifyBtn);
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/lab/donations/5/blood-group/verify',
+        { method: 'POST', body: JSON.stringify({ aboGroup: 'B', rh: '+' }) },
+      );
+    });
+    expect(await screen.findByText(/Blood group B\+ verified and locked\./i)).toBeInTheDocument();
+  });
 });

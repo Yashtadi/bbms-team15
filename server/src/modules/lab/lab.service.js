@@ -48,6 +48,9 @@ function throwForRepositoryResult(result) {
   if (result.notFound) throw serviceError('Donation or blood unit not found', 404);
   if (result.resultNotFound) throw serviceError('Blood group result not found', 404);
   if (result.sameUser) throw serviceError('A different lab technician must verify the blood group', 409);
+  if (result.sameUserRecord) {
+    throw serviceError('Blood group has already been recorded for this donation. A different technician must perform verification.', 409);
+  }
   if (result.locked) throw serviceError('A verified blood group cannot be edited', 409);
   if (result.mismatch) {
     throw serviceError('Blood-group verification did not match; the result remains unlocked and is flagged', 409, {

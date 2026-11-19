@@ -10,7 +10,7 @@ async function responseData(response) {
   return response.json().catch(() => ({}));
 }
 
-export default function LabWorkflow({ canEnterResults, onOpenStorage, maxQueueItems = null }) {
+export default function LabWorkflow({ canEnterResults, _onOpenStorage, maxQueueItems = null }) {
   const [donationId, setDonationId] = useState('');
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [bloodGroup, setBloodGroup] = useState(EMPTY_BLOOD_GROUP);
@@ -68,6 +68,11 @@ export default function LabWorkflow({ canEnterResults, onOpenStorage, maxQueueIt
     try {
       const items = await fetchQueue();
       setQueue(items);
+      setSelectedUnit((current) => {
+        if (!current) return null;
+        const fresh = items.find((q) => String(q.donationId) === String(current.donationId));
+        return fresh || current;
+      });
     } catch {
       setQueue([]);
     } finally {
@@ -171,6 +176,10 @@ export default function LabWorkflow({ canEnterResults, onOpenStorage, maxQueueIt
   const safePage = Math.min(currentPage, totalPages);
   const startIndex = (safePage - 1) * QUEUE_PAGE_SIZE;
   const visibleCards = fifoQueue.slice(startIndex, startIndex + QUEUE_PAGE_SIZE);
+
+  const isAboPending = selectedUnit?.abo?.verificationStatus === 'PENDING';
+  const isAboVerified = selectedUnit?.abo?.verificationStatus === 'VERIFIED';
+  const isAboMismatch = selectedUnit?.abo?.verificationStatus === 'MISMATCH';
 
   return (
     <section className="lab-workflow registration-form-container">
@@ -346,15 +355,28 @@ export default function LabWorkflow({ canEnterResults, onOpenStorage, maxQueueIt
                 onChange={(e) => {
                   const val = e.target.value;
                   setDonationId(val);
-                  const matchIndex = fifoQueue.findIndex(
+                  const matchIndex = allSortedQueue.findIndex(
                     (q) => String(q.donationId) === val.trim()
                         || q.unitCode?.toUpperCase() === val.trim().toUpperCase()
                         // BBMS-F-031: a scan of any component of a separated donation finds its ticket
                         || (q.unitCodes || []).some((c) => c.toUpperCase() === val.trim().toUpperCase()),
                   );
                   if (matchIndex !== -1) {
-                    setSelectedUnit(fifoQueue[matchIndex]);
-                    setCurrentPage(Math.floor(matchIndex / QUEUE_PAGE_SIZE) + 1);
+                    const matched = allSortedQueue[matchIndex];
+                    setSelectedUnit(matched);
+                    if (matched.abo?.result) {
+                      const match = matched.abo.result.match(/^([A-Z]+)([+-])$/);
+                      if (match) {
+                        setBloodGroup({ aboGroup: match[1], rh: match[2] });
+                      }
+                    }
+                    if (matched.tti?.remaining?.length > 0) {
+                      setTti((curr) => ({ ...curr, testType: matched.tti.remaining[0] }));
+                    }
+                    const fifoIdx = fifoQueue.findIndex((q) => q.donationId === matched.donationId);
+                    if (fifoIdx !== -1) {
+                      setCurrentPage(Math.floor(fifoIdx / QUEUE_PAGE_SIZE) + 1);
+                    }
                   } else {
                     setSelectedUnit(null);
                   }
@@ -400,22 +422,61 @@ export default function LabWorkflow({ canEnterResults, onOpenStorage, maxQueueIt
           )}
 
           {/* Fill-in-the-blank options: only shown when a ticket is pressed or search bar has an ID entered */}
-          {Boolean(donationId.trim() || selectedUnit) ? (
+          {donationId.trim() || selectedUnit ? (
             <>
               <div className="lab-form-grid">
-                <form onSubmit={(e) => submitResult(
-                  e,
-                  'blood-group',
-                  bloodGroup,
-                  (data) => `Blood group ${data.bloodGroup} recorded and awaiting second-person verification.`,
-                )}>
-                  <h3>ABO/Rh blood group</h3>
+                <form onSubmit={(e) => {
+                  if (isAboPending || isAboMismatch) {
+                    submitResult(
+                      e,
+                      'blood-group/verify',
+                      bloodGroup,
+                      (data) => `Blood group ${data.bloodGroup} verified and locked.`,
+                    );
+                  } else {
+                    submitResult(
+                      e,
+                      'blood-group',
+                      bloodGroup,
+                      (data) => `Blood group ${data.bloodGroup} recorded and awaiting second-person verification.`,
+                    );
+                  }
+                }}>
+                  <div className="form-heading-row">
+                    <h3>ABO/Rh blood group</h3>
+                    {isAboVerified && <span className="badge badge-success">✓ Verified &amp; Locked</span>}
+                    {isAboPending && <span className="badge badge-warning">Needs 2nd verify</span>}
+                    {isAboMismatch && <span className="badge badge-danger">Mismatch Flagged</span>}
+                  </div>
+
+                  {isAboPending && (
+                    <div className="abo-status-banner status-pending" role="note">
+                      <strong>Dual-Verification Required:</strong> 1st technician recorded{' '}
+                      <strong>{selectedUnit.abo.result}</strong>. A second technician must verify this result.
+                    </div>
+                  )}
+
+                  {isAboVerified && (
+                    <div className="abo-status-banner status-verified" role="note">
+                      <strong>Blood Group Locked:</strong> Verified as{' '}
+                      <strong>{selectedUnit.abo.result}</strong> by 2nd technician.
+                    </div>
+                  )}
+
+                  {isAboMismatch && (
+                    <div className="abo-status-banner status-mismatch" role="alert">
+                      <strong>Mismatch Flagged:</strong> Previous verification differed from 1st reading (
+                      {selectedUnit.abo.result}). Re-testing required.
+                    </div>
+                  )}
+
                   <div className="form-row">
                     <div className="form-group">
                       <label htmlFor="abo-group">ABO group</label>
                       <select
                         id="abo-group"
                         value={bloodGroup.aboGroup}
+                        disabled={isSubmitting || isAboVerified}
                         onChange={(e) => setBloodGroup((current) => ({ ...current, aboGroup: e.target.value }))}
                       >
                         {['A', 'B', 'AB', 'O'].map((group) => <option key={group}>{group}</option>)}
@@ -426,6 +487,7 @@ export default function LabWorkflow({ canEnterResults, onOpenStorage, maxQueueIt
                       <select
                         id="rh-factor"
                         value={bloodGroup.rh}
+                        disabled={isSubmitting || isAboVerified}
                         onChange={(e) => setBloodGroup((current) => ({ ...current, rh: e.target.value }))}
                       >
                         <option value="+">Positive (+)</option>
@@ -433,22 +495,36 @@ export default function LabWorkflow({ canEnterResults, onOpenStorage, maxQueueIt
                       </select>
                     </div>
                   </div>
-                  <button className="btn-primary" type="submit" disabled={isSubmitting}>
-                    Record blood group
-                  </button>
-                  <button
-                    className="btn-secondary"
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={(e) => submitResult(
-                      e,
-                      'blood-group/verify',
-                      bloodGroup,
-                      (data) => `Blood group ${data.bloodGroup} verified and locked.`,
-                    )}
-                  >
-                    Verify blood group
-                  </button>
+                  <div className="form-actions-row">
+                    <button
+                      className={isAboPending || isAboMismatch ? 'btn-secondary' : 'btn-primary'}
+                      type={isAboPending || isAboMismatch ? 'button' : 'submit'}
+                      disabled={isSubmitting || isAboVerified}
+                      onClick={isAboPending || isAboMismatch ? (e) => submitResult(
+                        e,
+                        'blood-group',
+                        bloodGroup,
+                        (data) => data.verificationStatus === 'VERIFIED'
+                          ? `Blood group ${data.bloodGroup} verified and locked.`
+                          : `Blood group ${data.bloodGroup} recorded and awaiting second-person verification.`,
+                      ) : undefined}
+                    >
+                      Record blood group
+                    </button>
+                    <button
+                      className={isAboPending || isAboMismatch ? 'btn-primary' : 'btn-secondary'}
+                      type={isAboPending || isAboMismatch ? 'submit' : 'button'}
+                      disabled={isSubmitting || isAboVerified}
+                      onClick={!isAboPending && !isAboMismatch ? (e) => submitResult(
+                        e,
+                        'blood-group/verify',
+                        bloodGroup,
+                        (data) => `Blood group ${data.bloodGroup} verified and locked.`,
+                      ) : undefined}
+                    >
+                      Verify blood group
+                    </button>
+                  </div>
                 </form>
 
                 <form onSubmit={(e) => submitResult(

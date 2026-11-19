@@ -18,7 +18,8 @@ function handleError(res, error, fallbackMessage) {
 router.post('/donations/:id/blood-group', requireRole('LAB_TECH'), async (req, res) => {
   try {
     const result = await labService.recordBloodGroup(req.params.id, req.body, req.user.id);
-    return res.status(201).json(result);
+    const status = result.verificationStatus === 'VERIFIED' ? 200 : 201;
+    return res.status(status).json(result);
   } catch (error) {
     return handleError(res, error, 'Failed to record blood group');
   }

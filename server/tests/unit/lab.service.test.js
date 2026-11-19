@@ -78,6 +78,17 @@ describe('BBMS-F-020 to F-023 lab service validation', () => {
       )
     ).rejects.toMatchObject({ status: 409 });
   });
+
+  it('rejects a second blood-group record attempt by the initial technician', async () => {
+    repository.recordBloodGroup.mockResolvedValue({ sameUserRecord: true });
+
+    await expect(
+      labService.recordBloodGroup(11, { aboGroup: 'A', rh: '+' }, 3, repository)
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('already been recorded'),
+    });
+  });
   it('fetches the queue and storage from the repository', async () => {
     const fakeData = { queue: [{ donationId: 99 }], storage: [{ donationId: 99 }] };
     repository.getQueueAndStorage.mockResolvedValue(fakeData);
